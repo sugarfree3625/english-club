@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+  <title id="page-title">English Club</title>
+  <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{--p:#6366f1;--pd:#4f46e5;--a:#f59e0b;--bg:#f8fafc;--s:#fff;--t:#1e293b;--tl:#64748b;--r:16px;--sh:0 2px 10px rgba(0,0,0,0.04);--sh2:0 8px 30px rgba(0,0,0,0.06);--b:#e2e8f0}
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--t);min-height:100vh;transition:all 0.3s}
+    body.dark{background:#0f172a;color:#e2e8f0}
+    body.dark .card,body.dark .modal,body.dark .session,body.dark .header{background:#1e293b;border-color:#334155}
+    body.dark .header{background:rgba(30,41,59,0.9)}
+    body.dark .input{background:#334155;border-color:#475569;color:#e2e8f0}
+    body.dark .btn-o{border-color:#818cf8;color:#818cf8}
+    body.dark .tab-btn{color:#818cf8;border-color:#818cf8}
+    body.dark .tab-btn.active{background:#818cf8;color:#fff}
+    body.dark .word-card{background:#1e293b;border-left-color:#818cf8}
+    body.dark .msg-in{background:#334155;color:#e2e8f0}
+    body.dark .sidebar-btn:hover,.dark .sidebar-btn.active{background:#312e81;color:#818cf8}
+    body.dark .dropdown,body.dark #profile-menu{background:#1e293b;border-color:#334155}
+    body.dark .dropdown a{color:#e2e8f0}
+    #particles{position:fixed;inset:0;z-index:0;pointer-events:none}
+    .header{position:sticky;top:0;z-index:1000;background:rgba(255,255,255,0.9);backdrop-filter:blur(20px);border-bottom:1px solid var(--b)}
+    .header-inner{max-width:1280px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;justify-content:space-between}
+    .logo{font-size:1.1rem;font-weight:800;display:flex;align-items:center;gap:6px;cursor:pointer;letter-spacing:-0.5px}
+    .logo img{width:32px;height:32px;border-radius:8px;object-fit:cover}
+    .btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:50px;font-weight:600;font-size:0.85rem;cursor:pointer;transition:all 0.3s;border:none;font-family:inherit;letter-spacing:-0.3px}
+    .btn-p{background:var(--p);color:#fff;box-shadow:0 4px 14px rgba(99,102,241,0.25)}
+    .btn-p:hover{background:var(--pd);transform:translateY(-1px)}
+    .btn-o{border:2px solid var(--p);color:var(--p);background:transparent}
+    .btn-o:hover{background:var(--p);color:#fff}
+    .btn-sm{padding:6px 14px;font-size:0.8rem}
+    .container{max-width:1280px;margin:0 auto;padding:24px 16px}
+    .hero{min-height:70vh;display:flex;align-items:center;position:relative;z-index:1;text-align:center}
+    .hero h1{font-size:clamp(2rem,5vw,3.5rem);font-weight:800;line-height:1.1;margin-bottom:12px;letter-spacing:-1px}
+    .hero h1 span{color:var(--p)}
+    .section{padding:60px 0;position:relative;z-index:1}
+    .section-title{font-size:clamp(1.5rem,3vw,2rem);font-weight:700;text-align:center;margin-bottom:8px;letter-spacing:-0.5px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+    .card{background:var(--s);border-radius:var(--r);padding:20px;border:1px solid var(--b);box-shadow:var(--sh);transition:all 0.3s;word-wrap:break-word;overflow:hidden}
+    .card:hover{box-shadow:var(--sh2)}
+    .card h3{font-weight:700;margin-bottom:4px;font-size:1rem}
+    .card .price{font-size:1.3rem;font-weight:800;color:var(--p);margin-top:6px}
+    .contact-icons{display:flex;gap:16px;justify-content:center;margin-top:16px;flex-wrap:wrap}
+    .contact-icons a{font-size:2rem;color:var(--p);transition:transform 0.3s}
+    .contact-icons a:hover{transform:scale(1.1)}
+    .session{border-left:4px solid var(--p);padding:12px 16px;margin-bottom:8px;background:var(--s);border-radius:0 10px 10px 0;box-shadow:var(--sh)}
+    .input{width:100%;padding:12px;border:2px solid var(--b);border-radius:12px;font-family:inherit;font-size:0.9rem;margin-bottom:8px;background:var(--s);color:var(--t);transition:border 0.2s}
+    .input:focus{outline:none;border-color:var(--p)}
+    textarea.input{resize:vertical;min-height:70px}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:16px}
+    .modal{background:var(--s);border-radius:var(--r);padding:24px;max-width:550px;width:100%;max-height:85vh;overflow-y:auto}
+    .admin-panel{position:fixed;bottom:16px;right:16px;z-index:1500}
+    .admin-btn{width:48px;height:48px;border-radius:50%;background:var(--p);color:#fff;font-size:1.2rem;border:none;cursor:pointer;box-shadow:0 8px 25px rgba(99,102,241,0.4)}
+    .profile-page{display:flex;gap:16px}
+    .profile-sidebar{width:220px;flex-shrink:0;background:var(--s);border-radius:var(--r);padding:14px;border:1px solid var(--b);display:flex;flex-direction:column;gap:2px}
+    .sidebar-btn{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;border:none;background:transparent;cursor:pointer;font-weight:500;font-size:0.8rem;color:var(--tl);width:100%;text-align:left;font-family:inherit;transition:all 0.2s}
+    .sidebar-btn:hover,.sidebar-btn.active{background:#eef0ff;color:var(--p)}
+    .profile-main{flex:1;min-width:0}
+    .profile-section{display:none}
+    .profile-section.active{display:block}
+    .word-card{background:#f8fafc;padding:10px;border-radius:8px;margin-bottom:4px;border-left:3px solid var(--p);display:flex;justify-content:space-between;align-items:center;font-size:0.85rem}
+    .toast{position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:6px}
+    .toast-item{padding:12px 18px;border-radius:12px;color:#fff;font-weight:600;font-size:0.85rem;animation:slideIn 0.3s ease}
+    @keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
+    .hidden{display:none!important}
+    .tab-btn{padding:6px 14px;font-size:0.8rem;border-radius:50px;cursor:pointer;border:2px solid var(--p);background:transparent;color:var(--p);font-weight:600;margin-right:4px;transition:all 0.2s}
+    .tab-btn.active{background:var(--p);color:#fff}
+    .dash-hero{background:linear-gradient(135deg,#eef0ff,#fff5f0);border-radius:var(--r);padding:20px;margin-bottom:20px;text-align:center}
+    .dash-hero h2{font-weight:700;margin-bottom:4px;font-size:1.3rem}
+    .dash-hero .dash-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+    .msg{padding:8px 12px;border-radius:12px;margin-bottom:4px;max-width:85%;font-size:0.85rem}
+    .msg-in{background:#f1f5f9;color:var(--t)}
+    .msg-out{background:var(--p);color:#fff;margin-left:auto}
+    @media(max-width:768px){
+      .profile-page{flex-direction:column}
+      .profile-sidebar{width:100%;flex-direction:row;flex-wrap:wrap;gap:4px;padding:8px}
+      .sidebar-btn{width:auto;font-size:0.75rem;padding:6px 10px}
+      .header-inner{padding:8px 12px}
+      .logo{font-size:1rem}
+      .btn{font-size:0.8rem;padding:8px 16px}
+      .container{padding:16px 12px}
+      .section{padding:40px 0}
+    }
+  </style>
+</head>
+<body>
+<div id="particles"></div>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="logo" onclick="goPage('home')"><img src="https://i.pinimg.com/736x/5b/ca/8f/5bca8fdc8339996311f4c8ee07787bf7.jpg" alt=""><span id="club-name-display">English Club</span></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="btn btn-o btn-sm" onclick="toggleTheme()" id="theme-btn">🌙</button>
+      <div id="auth-btns"><button class="btn btn-p btn-sm" onclick="showForm('login-form')">Войти</button></div>
+      <div id="profile-nav" style="display:none;position:relative">
+        <button class="btn btn-o btn-sm" onclick="toggleProfileMenu()"><img id="nav-av" style="width:22px;height:22px;border-radius:50%;object-fit:cover" src=""> <span id="nav-name"></span></button>
+        <div id="profile-menu" class="hidden" style="position:absolute;top:100%;right:0;background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.1);min-width:160px;padding:6px 0;border:1px solid #e5e7eb;z-index:100">
+          <a onclick="goPage('dashboard')" style="display:block;padding:8px 14px;cursor:pointer;font-size:0.85rem">📅 Дашборд</a>
+          <a onclick="goPage('profile')" style="display:block;padding:8px 14px;cursor:pointer;font-size:0.85rem">👤 Профиль</a>
+          <a onclick="logout()" style="display:block;padding:8px 14px;cursor:pointer;font-size:0.85rem">🚪 Выйти</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- СТРАНИЦА 1: Обложка -->
+<div id="page-home">
+  <section class="hero"><div class="container"><h1><span id="hero-typed"></span></h1><p id="hero-subtitle">Разговорный клуб для практики языка</p></div></section>
+  <section class="section" id="services-section"><div class="container"><h2 class="section-title">Мои услуги</h2><div class="grid" id="services-grid"></div></div></section>
+  <section class="section" id="contacts-section"><div class="container" style="text-align:center"><h2 class="section-title">Связаться</h2><div class="contact-icons"><a id="contact-vk" href="#" target="_blank"><i class="fab fa-vk"></i></a><a id="contact-tg" href="#" target="_blank"><i class="fab fa-telegram"></i></a><a id="contact-wa" href="#" target="_blank"><i class="fab fa-whatsapp"></i></a></div></div></section>
+  <footer style="text-align:center;padding:30px 0;color:var(--tl);border-top:1px solid var(--b);font-size:0.85rem"><p>© 2024 English Club</p></footer>
+</div>
+
+<!-- СТРАНИЦА 2: Дашборд -->
+<div id="page-dashboard" class="hidden"><div class="container">
+  <div class="dash-hero">
+    <h2>📅 Добро пожаловать!</h2>
+    <p style="color:var(--tl);font-size:0.9rem">Выберите встречу и присоединяйтесь</p>
+    <div class="dash-btns">
+      <button class="btn btn-o btn-sm" onclick="showForm('leaderboard-modal')">🏆 Лидеры</button>
+      <button class="btn btn-o btn-sm" onclick="showForm('info-modal')">📖 О занятиях</button>
+    </div>
+  </div>
+  <section><h2 class="section-title">Календарь</h2><div id="calendar"></div></section>
+  <section style="margin-top:20px"><h2 class="section-title">Встречи</h2><div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap"><button class="tab-btn active" onclick="switchTab('available')">Доступные</button><button class="tab-btn" onclick="switchTab('my')">Мои записи</button><button class="tab-btn" id="host-tab" style="display:none" onclick="switchTab('host')">Мои встречи</button></div><div id="tab-available"></div><div id="tab-my" class="hidden"></div><div id="tab-host" class="hidden"></div></section>
+  <section id="posts-section" style="margin-top:20px"><h2 class="section-title">Лента</h2><div id="posts-list" class="grid"></div></section>
+</div></div>
+
+<!-- СТРАНИЦА 3: Профиль -->
+<div id="page-profile" class="hidden"><div class="container"><div class="profile-page">
+  <div class="profile-sidebar">
+    <div style="text-align:center;padding:10px 0"><img id="prof-av" style="width:60px;height:60px;border-radius:50%;object-fit:cover;border:3px solid var(--p)"><h3 id="prof-name" style="margin-top:6px;font-weight:700;font-size:0.9rem"></h3><span id="prof-rating" style="color:var(--a);font-weight:700;font-size:0.8rem"></span></div>
+    <button class="sidebar-btn active" onclick="switchProfTab('info')"><i class="fas fa-user"></i>Инфо</button>
+    <button class="sidebar-btn" onclick="switchProfTab('mywords')"><i class="fas fa-bookmark"></i>Словарь</button>
+    <button class="sidebar-btn" onclick="switchProfTab('notes')"><i class="fas fa-sticky-note"></i>Блокнот</button>
+    <button class="sidebar-btn" onclick="switchProfTab('messages')"><i class="fas fa-envelope"></i>Сообщения</button>
+    <button class="sidebar-btn" onclick="switchProfTab('reminders')"><i class="fas fa-bell"></i>Напоминания</button>
+    <button class="sidebar-btn" onclick="switchProfTab('history')"><i class="fas fa-history"></i>История</button>
+    <button class="sidebar-btn" onclick="goPage('dashboard')"><i class="fas fa-arrow-left"></i>Назад</button>
+  </div>
+  <div class="profile-main">
+    <div class="profile-section active" id="ptab-info"><div class="card"><h3>📋 Информация</h3><p style="font-size:0.9rem"><strong>Уровень:</strong> <span id="prof-level"></span></p><p style="font-size:0.9rem"><strong>Рейтинг:</strong> <span id="prof-rating-full"></span></p><p style="font-size:0.9rem"><strong>О себе:</strong> <span id="prof-bio"></span></p><button class="btn btn-o btn-sm mt-3" onclick="showForm('intro-form')">✏️ Редактировать</button></div></div>
+    <div class="profile-section" id="ptab-mywords"><div class="card"><h3>📝 Мой словарь</h3><div style="display:flex;gap:6px;margin-bottom:10px"><input class="input" id="word-en" placeholder="Слово"><input class="input" id="word-ru" placeholder="Перевод"><button class="btn btn-p btn-sm" onclick="addWord()">+</button></div><div id="words-list"></div></div></div>
+    <div class="profile-section" id="ptab-notes"><div class="card"><h3>📝 Блокнот</h3><textarea class="input" id="note-text" rows="6" oninput="saveNote()"></textarea></div></div>
+    <div class="profile-section" id="ptab-messages"><div class="card"><h3>💬 Сообщения</h3><input class="input" id="prof-msg-search" placeholder="🔍 Поиск..." oninput="searchU()"><div id="dm-results"></div><div id="dm-chat" style="max-height:250px;overflow-y:auto;border:1px solid var(--b);border-radius:12px;padding:10px;margin:10px 0"></div><div style="display:flex;gap:6px"><input class="input" id="dm-input" placeholder="Сообщение..."><button class="btn btn-p btn-sm" onclick="sendDM()">Отправить</button></div></div></div>
+    <div class="profile-section" id="ptab-reminders"><div class="card"><h3>🔔 Напоминания</h3><div id="reminders-list"></div></div></div>
+    <div class="profile-section" id="ptab-history"><div class="card"><h3>📖 История</h3><div id="history-list"></div></div></div>
+  </div>
+</div></div></div>
+
+<!-- МОДАЛКИ -->
+<div id="login-form" class="modal-overlay hidden"><div class="modal"><h3>Войти</h3><input class="input" id="login-email" placeholder="Email"><input class="input" id="login-password" placeholder="Пароль" type="password"><button class="btn btn-p w-100" onclick="login()">Войти</button><p style="margin-top:10px;text-align:center;font-size:0.85rem">Нет аккаунта? <a href="#" onclick="showForm('reg-form')" style="color:var(--p)">Регистрация</a></p><button class="btn btn-o w-100 mt-2" onclick="hideForm('login-form')">Закрыть</button></div></div>
+<div id="reg-form" class="modal-overlay hidden"><div class="modal"><h3>Регистрация</h3><input class="input" id="reg-username" placeholder="Имя"><input class="input" id="reg-email" placeholder="Email"><input class="input" id="reg-password" placeholder="Пароль" type="password"><select class="input" id="reg-level"><option value="A1">Beginner</option><option value="B1" selected>Intermediate</option><option value="C1">Advanced</option></select><button class="btn btn-p w-100" onclick="register()">Зарегистрироваться</button><p style="margin-top:10px;text-align:center;font-size:0.85rem">Есть аккаунт? <a href="#" onclick="showForm('login-form')" style="color:var(--p)">Войти</a></p><button class="btn btn-o w-100 mt-2" onclick="hideForm('reg-form')">Закрыть</button></div></div>
+<div id="intro-form" class="modal-overlay hidden"><div class="modal"><h3>О себе</h3><textarea class="input" id="intro-bio" rows="3"></textarea><select class="input" id="intro-level"><option value="A1">Beginner</option><option value="B1" selected>Intermediate</option><option value="C1">Advanced</option></select><button class="btn btn-p w-100" onclick="saveIntro()">Сохранить</button><button class="btn btn-o w-100 mt-2" onclick="hideForm('intro-form')">Отмена</button></div></div>
+<div id="session-form" class="modal-overlay hidden"><div class="modal"><h3 id="session-form-title">Новая встреча</h3><input type="hidden" id="s-edit-id"><input class="input" id="s-title" placeholder="Название"><textarea class="input" id="s-desc" placeholder="Описание" rows="2"></textarea><input class="input" type="datetime-local" id="s-date"><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><input class="input" type="number" id="s-dur" value="60"><input class="input" type="number" id="s-max" value="10"></div><select class="input" id="s-type"><option value="google">Google Meet</option><option value="zoom">Zoom</option></select><input class="input" id="s-zlink" placeholder="Ссылка Zoom" style="display:none"><button class="btn btn-p w-100 mt-3" onclick="submitSes()">Создать</button><button class="btn btn-o w-100 mt-2" onclick="hideForm('session-form')">Отмена</button></div></div>
+<div id="post-form" class="modal-overlay hidden"><div class="modal"><h3>Публикация</h3><input class="input" id="p-title" placeholder="Заголовок"><textarea class="input" id="p-content" placeholder="Текст..." rows="3"></textarea><input class="input" type="file" id="p-img" accept="image/*" onchange="upNImg()"><img id="p-preview" style="max-width:100%;max-height:180px;border-radius:10px;display:none"><input class="input" id="p-vid" placeholder="YouTube ссылка"><button class="btn btn-p w-100" onclick="createPost()">Опубликовать</button><button class="btn btn-o w-100 mt-2" onclick="hideForm('post-form')">Отмена</button></div></div>
+<div id="leaderboard-modal" class="modal-overlay hidden"><div class="modal"><h3>🏆 Лидеры</h3><div id="leaderboard-popup"></div><button class="btn btn-o w-100 mt-3" onclick="hideForm('leaderboard-modal')">Закрыть</button></div></div>
+<div id="info-modal" class="modal-overlay hidden"><div class="modal"><h3>📖 О занятиях</h3><div id="info-content"></div><button class="btn btn-o w-100 mt-3" onclick="hideForm('info-modal')">Закрыть</button></div></div>
+
+<div class="admin-panel hidden" id="admin-panel-btn"><button class="admin-btn" onclick="openAdmin()">⚙️</button></div>
+<div id="admin-modal" class="modal-overlay hidden"><div class="modal" style="max-width:800px"><h3>⚙️ Админ-панель</h3>
+  <div style="display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap" id="admin-tabs">
+    <button class="btn btn-o tab-btn active" onclick="switchAdminTab('general')">🎨 Сайт</button>
+    <button class="btn btn-o tab-btn" onclick="switchAdminTab('hero')">🖼️ Hero</button>
+    <button class="btn btn-o tab-btn" onclick="switchAdminTab('services')">💼 Услуги</button>
+    <button class="btn btn-o tab-btn" onclick="switchAdminTab('contacts')">📞 Контакты</button>
+    <button class="btn btn-o tab-btn" onclick="switchAdminTab('users')">👥 Польз.</button>
+    <button class="btn btn-o tab-btn" onclick="switchAdminTab('sessions')">📅 Встречи</button>
+    <button class="btn btn-o tab-btn" onclick="switchAdminTab('posts')">📰 Посты</button>
+  </div>
+  <div id="admin-tab-general"><div class="grid" style="grid-template-columns:1fr 1fr;gap:10px"><div><h4>Цвета</h4><label>Основной</label><input class="input" type="color" id="set-primary-color"><label>Фон</label><input class="input" type="color" id="set-bg-color" value="#fafbff"><label>Текст</label><input class="input" type="color" id="set-text-color" value="#1e293b"><label>Акцент</label><input class="input" type="color" id="set-accent-color" value="#f59e0b"></div><div><h4>Текст</h4><label>Название клуба</label><input class="input" id="set-club-name"><label>Заголовки (rem)</label><input class="input" type="number" id="set-heading-size" value="2" step="0.1"><label>Текст (rem)</label><input class="input" type="number" id="set-text-size" value="1" step="0.1"><label>Скругление (px)</label><input class="input" type="number" id="set-radius" value="16"></div></div></div>
+  <div id="admin-tab-hero" class="hidden"><h4>🖼️ Hero</h4><label>Заголовок</label><input class="input" id="set-hero-title"><label>Подзаголовок</label><textarea class="input" id="set-hero-subtitle" rows="2"></textarea><label>О занятиях</label><textarea class="input" id="set-info-text" rows="4"></textarea></div>
+  <div id="admin-tab-services" class="hidden"><h4>💼 Услуги</h4><div id="services-admin-list"></div><button class="btn btn-p btn-sm mt-3" onclick="addService()">+ Добавить</button><div id="service-edit-form" class="hidden mt-3 card"><input type="hidden" id="svc-edit-id"><label>Название</label><input class="input" id="svc-title"><label>Описание</label><textarea class="input" id="svc-desc" rows="2"></textarea><label>Цена</label><input class="input" id="svc-price"><label>Иконка</label><input class="input" id="svc-icon"><button class="btn btn-p btn-sm mt-2" onclick="saveService()">💾</button><button class="btn btn-o btn-sm mt-2" onclick="cancelServiceEdit()">Отмена</button></div></div>
+  <div id="admin-tab-contacts" class="hidden"><h4>📞 Контакты</h4><label>VK</label><input class="input" id="set-vk"><label>Telegram</label><input class="input" id="set-tg"><label>WhatsApp</label><input class="input" id="set-wa"><label>Email</label><input class="input" id="set-email"><label>YouTube</label><input class="input" id="set-yt"></div>
+  <div id="admin-tab-users" class="hidden"><h4>👥 Пользователи</h4><input class="input" id="admin-user-search" placeholder="🔍 Поиск..." oninput="searchAdminUsers()"><div id="admin-users-list" style="max-height:300px;overflow-y:auto"></div></div>
+  <div id="admin-tab-sessions" class="hidden"><h4>📅 Встречи</h4><button class="btn btn-p btn-sm mb-3" onclick="showSessionForm()">+ Создать</button><div id="admin-sessions-list" style="max-height:300px;overflow-y:auto"></div></div>
+  <div id="admin-tab-posts" class="hidden"><h4>📰 Посты</h4><button class="btn btn-a btn-sm mb-3" onclick="showForm('post-form')">+ Создать</button><div id="admin-posts-list" style="max-height:300px;overflow-y:auto"></div></div>
+  <button class="btn btn-p w-100 mt-3" onclick="saveSettings()">💾 Сохранить всё</button><button class="btn btn-o w-100 mt-2" onclick="closeAdmin()">Закрыть</button>
+</div></div>
+
+<div class="toast" id="toast"></div>
+<input type="file" id="av-upload" class="hidden" accept="image/*" onchange="uploadAv()">
+
+<script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/typed.js@2.0.12"></script>
+<script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+AOS.init({duration:800,once:true});
+particlesJS('particles',{particles:{number:{value:12},color:{value:'#6366f1'},opacity:{value:0.04},size:{value:2},move:{speed:1}}});
+
+let U=null,sock=null,dmTo=null,nImg=null,editingSesId=null,settings={},services=[],words=[],noteTimer=null,calendar=null;
+
+fetch('/api/me').then(r=>r.json()).then(d=>{if(d.ok){U=d.user;showDash();}});
+fetch('/api/settings').then(r=>r.json()).then(d=>{settings=d;applySettings();loadServices();loadContacts();});
+
+function escHTML(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function toast(m,c='info'){const cl={success:'#10b981',error:'#ef4444',info:'#6366f1'};const e=document.createElement('div');e.className='toast-item';e.style.background=cl[c]||cl.info;e.textContent=m;document.getElementById('toast').appendChild(e);setTimeout(()=>e.remove(),3000);}
+function showForm(id){document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.add('hidden'));const el=document.getElementById(id);if(el)el.classList.remove('hidden');
+  if(id==='leaderboard-modal'){fetch('/api/top').then(r=>r.json()).then(l=>{document.getElementById('leaderboard-popup').innerHTML=l.map((u,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:6px;border-bottom:1px solid var(--b);font-size:0.85rem"><span>${i+1}</span><img src="${u.avatar_url||'https://ui-avatars.com/api/?name='+encodeURIComponent(u.username)}" style="width:24px;height:24px;border-radius:50%"><span>${escHTML(u.username)}</span><span style="margin-left:auto;color:var(--a);font-weight:600">${u.rating}🏆</span></div>`).join('');});}
+  if(id==='info-modal'){document.getElementById('info-content').innerHTML=settings.info_text||'<p>Информация скоро появится</p>';}
+}
+function hideForm(id){document.getElementById(id)?.classList.add('hidden');}
+function goPage(p){['home','dashboard','profile'].forEach(x=>document.getElementById('page-'+x).classList.add('hidden'));document.getElementById('page-'+p).classList.remove('hidden');if(p==='dashboard'){initCalendar();loadSes();loadMyB();loadPosts();}if(p==='profile')loadProfileData();}
+function toggleProfileMenu(){document.getElementById('profile-menu').classList.toggle('hidden');}
+
+function toggleTheme(){document.body.classList.toggle('dark');const isDark=document.body.classList.contains('dark');const btn=document.getElementById('theme-btn');if(btn)btn.innerHTML=isDark?'☀️':'🌙';document.getElementById('particles').style.display=isDark?'none':'block';localStorage.setItem('theme',isDark?'dark':'light');}
+if(localStorage.getItem('theme')==='dark'){document.body.classList.add('dark');document.getElementById('particles').style.display='none';const b=document.getElementById('theme-btn');if(b)b.innerHTML='☀️';}
+
+function applySettings(){if(settings.hero_title){document.getElementById('hero-typed')?.remove();document.querySelector('.hero h1').innerHTML='<span id="hero-typed"></span>';new Typed('#hero-typed',{strings:[settings.hero_title],typeSpeed:50,backSpeed:30,loop:false,showCursor:false});}if(settings.hero_subtitle)document.getElementById('hero-subtitle').textContent=settings.hero_subtitle;if(settings.primary_color)document.documentElement.style.setProperty('--p',settings.primary_color);if(settings.club_name){document.getElementById('club-name-display').textContent=settings.club_name;document.title=settings.club_name;}}
+
+async function register(){const u=document.getElementById('reg-username').value.trim(),e=document.getElementById('reg-email').value.trim(),p=document.getElementById('reg-password').value,l=document.getElementById('reg-level').value;if(!u||!e||!p)return toast('Заполните поля','error');const r=await fetch('/api/reg',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,email:e,password:p,level:l})});const d=await r.json();if(d.error)toast(d.error,'error');else{toast('Успешно!','success');showForm('login-form');}}
+async function login(){const e=document.getElementById('login-email').value.trim(),p=document.getElementById('login-password').value;const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:e,password:p})});const d=await r.json();if(d.error)toast(d.error,'error');else{U=d.user;hideForm('login-form');showDash();toast(`Привет, ${U.username}!`,'success');}}
+function showDash(){document.getElementById('auth-btns').classList.add('hidden');document.getElementById('profile-nav').style.display='block';document.getElementById('nav-av').src=U.avatar_url||`https://ui-avatars.com/api/?name=${encodeURIComponent(U.username)}&background=6366f1&color=fff&size=48&format=svg`;document.getElementById('nav-name').textContent=U.username;if(U.role==='admin')document.getElementById('admin-panel-btn').classList.remove('hidden');if(U.role==='host'||U.role==='admin')document.getElementById('host-tab').style.display='inline-block';goPage('dashboard');sock=io();sock.emit('join',{uid:U.id,uname:U.username,role:U.role});if(U.role==='admin')sock.emit('jadmin');
+  sock.on('dm',d=>{if(dmTo&&(d.from===dmTo||d.from===U.id)){const c=document.getElementById('dm-chat');if(c)c.innerHTML+=`<div class="msg ${d.from===U.id?'msg-out':'msg-in'}"><strong>${escHTML(d.fn)}</strong><br>${escHTML(d.msg)}</div>`;if(c)c.scrollTop=c.scrollHeight;}});
+  sock.on('dmhist',d=>{if(d.with===dmTo){const c=document.getElementById('dm-chat');if(c){c.innerHTML=d.msgs.map(m=>`<div class="msg ${m.sender_id===U.id?'msg-out':'msg-in'}"><strong>${escHTML(m.fn)}</strong><br>${escHTML(m.message)}</div>`).join('');c.scrollTop=c.scrollHeight;}}});
+}
+
+// КАЛЕНДАРЬ
+function initCalendar(){
+  const el=document.getElementById('calendar');if(!el)return;if(calendar)calendar.destroy();
+  calendar=new FullCalendar.Calendar(el,{
+    initialView:'dayGridMonth',locale:'ru',height:'auto',
+    events:async function(info,success){const r=await fetch('/api/cal');const d=await r.json();success([...d.s.map(s=>({title:s.title,start:s.date,color:'#6366f1'})),...d.p.map(p=>({title:'📢 '+p.title,start:p.date,color:'#f59e0b'}))]);},
+    dateClick:function(info){if(U&&(U.role==='host'||U.role==='admin')){showSessionForm(null,info.dateStr);}}
+  });
+  calendar.render();
+}
+
+function showSessionForm(editId=null,dateStr=null){editingSesId=editId;if(editId){document.getElementById('session-form-title').textContent='✏️ Редактировать';loadSesData(editId);}else{document.getElementById('session-form-title').textContent='Новая встреча';document.getElementById('s-edit-id').value='';document.getElementById('s-title').value='';document.getElementById('s-desc').value='';document.getElementById('s-date').value=dateStr?dateStr+'T19:00':'';document.getElementById('s-dur').value='60';document.getElementById('s-max').value='10';}showForm('session-form');}
+async function loadSesData(id){const r=await fetch('/api/ses');const s=(await r.json()).find(s=>s.id===id);if(!s)return;document.getElementById('s-edit-id').value=s.id;document.getElementById('s-title').value=s.title||'';document.getElementById('s-desc').value=s.description||'';document.getElementById('s-date').value=s.date?s.date.replace(' ','T').substring(0,16):'';document.getElementById('s-dur').value=s.duration||60;document.getElementById('s-max').value=s.max_participants||10;}
+async function submitSes(){const id=document.getElementById('s-edit-id').value,t=document.getElementById('s-title').value.trim(),desc=document.getElementById('s-desc').value.trim(),date=document.getElementById('s-date').value,dur=parseInt(document.getElementById('s-dur').value),max=parseInt(document.getElementById('s-max').value),type=document.getElementById('s-type').value,zlink=document.getElementById('s-zlink').value.trim();if(!t||!date)return toast('Заполните поля','error');const url=id?`/api/ses/${id}`:'/api/ses',method=id?'PUT':'POST';const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify({title:t,desc,date,dur,max_participants:max,type,zlink})});const d=await r.json();toast(d.message||d.error,d.success?'success':'error');if(d.success){hideForm('session-form');loadSes();initCalendar();}}
+async function loadSes(){const r=await fetch('/api/ses');const s=await r.json();const c=document.getElementById('tab-available');c.innerHTML=s.length?s.map(s=>`<div class="session"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px"><strong>${escHTML(s.title)}</strong><span style="color:${s.cnt>=s.max_participants?'#ef4444':'var(--p)'};font-size:0.8rem">${s.cnt}/${s.max_participants}</span></div><small style="font-size:0.8rem">${escHTML(s.host)} · ${new Date(s.date).toLocaleString('ru')} · ${s.duration}мин</small><br><button class="btn btn-p btn-sm mt-2" onclick="bookSes(${s.id})" ${s.cnt>=s.max_participants?'disabled':''}>${s.cnt>=s.max_participants?'Мест нет':'Записаться'}</button></div>`).join(''):'<p style="font-size:0.85rem">Нет встреч</p>';}
+async function bookSes(id){const r=await fetch(`/api/ses/${id}/book`,{method:'POST'});const d=await r.json();if(d.error)toast(d.error,'error');else{toast('Записаны!','success');loadSes();loadMyB();}}
+async function loadMyB(){const r=await fetch('/api/myb');const b=await r.json();const c=document.getElementById('tab-my');c.innerHTML=b.length?b.map(b=>`<div class="session"><strong style="font-size:0.9rem">${escHTML(b.title)}</strong><br><small style="font-size:0.8rem">${new Date(b.date).toLocaleString('ru')} · ${b.status==='active'?'Записан':'Посетил'}</small></div>`).join(''):'<p style="font-size:0.85rem">Нет записей</p>';}
+function switchTab(t){document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));document.querySelector(`.tab-btn[onclick*="${t}"]`)?.classList.add('active');['available','my','host'].forEach(id=>document.getElementById('tab-'+id).classList.add('hidden'));document.getElementById('tab-'+t).classList.remove('hidden');if(t==='host')loadHostSes();}
+async function loadHostSes(){const r=await fetch('/api/my-ses');const s=await r.json();const c=document.getElementById('tab-host');c.innerHTML=s.length?s.map(s=>`<div class="session"><strong style="font-size:0.9rem">${escHTML(s.title)}</strong><br><small style="font-size:0.8rem">${s.ac||0} записаны · ${s.at||0} посетили</small><div style="display:flex;gap:4px;margin-top:4px"><button class="btn btn-o btn-sm" onclick="loadPart(${s.id})">👥</button><button class="btn btn-o btn-sm" onclick="showSessionForm(${s.id})">✏️</button><button class="btn btn-o btn-sm" style="color:#ef4444" onclick="delSes(${s.id})">🗑</button></div></div>`).join(''):'<p style="font-size:0.85rem">Нет встреч</p>';}
+async function loadPart(sid){const r=await fetch(`/api/ses/${sid}/part`);const p=await r.json();document.getElementById('part-'+sid).innerHTML=p.map(p=>`<div style="font-size:0.8rem">${escHTML(p.username)} ${p.status==='active'?`<button class="btn btn-p btn-sm" onclick="markAtt(${sid},${p.uid})">✓</button>`:'✓'}</div>`).join('');}
+async function markAtt(sid,uid){await fetch(`/api/ses/${sid}/att/${uid}`,{method:'POST'});loadPart(sid);}
+async function delSes(id){if(!confirm('Удалить?'))return;const r=await fetch(`/api/ses/${id}`,{method:'DELETE'});const d=await r.json();toast(d.message||d.error,d.success?'success':'error');if(d.success){loadHostSes();loadSes();initCalendar();}}
+
+async function upNImg(){const f=document.getElementById('p-img').files[0];if(!f)return;const fd=new FormData();fd.append('img',f);const r=await fetch('/api/nimg',{method:'POST',body:fd});const d=await r.json();if(d.success){nImg=d.url;document.getElementById('p-preview').src=d.url;document.getElementById('p-preview').style.display='block';}}
+async function createPost(){const t=document.getElementById('p-title').value.trim(),c=document.getElementById('p-content').value.trim(),v=document.getElementById('p-vid').value.trim();if(!t||!c)return toast('Заполните поля','error');let vid=null;if(v){const m=v.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);vid=m?`https://www.youtube.com/embed/${m[1]}`:v;}const r=await fetch('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:t,content:c,img:nImg,vid})});const d=await r.json();toast(d.message||d.error,d.success?'success':'error');if(d.success){hideForm('post-form');nImg=null;loadPosts();}}
+async function loadPosts(){const r=await fetch('/api/posts');const p=await r.json();const c=document.getElementById('posts-list');if(c)c.innerHTML=p.length?p.map(p=>{let m='';if(p.img)m+=`<img src="${p.img}" style="width:100%;border-radius:8px;margin:6px 0">`;if(p.vid)m+=`<iframe src="${p.vid}" style="width:100%;height:180px;border-radius:8px"></iframe>`;return`<div class="card"><h3>${escHTML(p.title)}</h3><p style="font-size:0.85rem">${escHTML(p.content)}</p>${m}<small style="font-size:0.75rem">${escHTML(p.an)} · ${new Date(p.ts).toLocaleString('ru')}</small></div>`;}).join(''):'<p style="font-size:0.85rem">Нет публикаций</p>';}
+
+function switchProfTab(t){document.querySelectorAll('.sidebar-btn').forEach(b=>b.classList.remove('active'));document.querySelector(`.sidebar-btn[onclick*="${t}"]`)?.classList.add('active');document.querySelectorAll('.profile-section').forEach(s=>s.classList.remove('active'));document.getElementById('ptab-'+t).classList.add('active');if(t==='reminders')loadReminders();if(t==='history')loadHistory();if(t==='messages'){document.getElementById('dm-chat').innerHTML='';dmTo=0;sock.emit('hist');}}
+function loadProfileData(){document.getElementById('prof-av').src=U.avatar_url||`https://ui-avatars.com/api/?name=${encodeURIComponent(U.username)}&background=6366f1&color=fff&size=120&format=svg`;document.getElementById('prof-name').textContent=U.username;document.getElementById('prof-rating').textContent=U.rating+'🏆';document.getElementById('prof-rating-full').textContent=U.rating+'🏆';document.getElementById('prof-level').textContent=U.level;document.getElementById('prof-bio').textContent=U.bio||'Не указано';loadWords();loadNote();}
+async function loadWords(){const r=await fetch('/api/words');words=await r.json();const c=document.getElementById('words-list');c.innerHTML=words.length?words.map(w=>`<div class="word-card"><span><strong>${escHTML(w.en)}</strong> — ${escHTML(w.ru)}</span><button class="btn btn-o btn-sm" style="color:#ef4444;padding:2px 8px" onclick="delWord(${w.id})">✕</button></div>`).join(''):'<p style="font-size:0.85rem">Словарь пуст</p>';}
+async function addWord(){const en=document.getElementById('word-en').value.trim(),ru=document.getElementById('word-ru').value.trim();if(!en||!ru)return;await fetch('/api/words',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({en,ru})});document.getElementById('word-en').value='';document.getElementById('word-ru').value='';loadWords();}
+async function delWord(id){await fetch(`/api/words/${id}`,{method:'DELETE'});loadWords();}
+async function loadNote(){const r=await fetch('/api/notes');const d=await r.json();document.getElementById('note-text').value=d.note||'';}
+function saveNote(){clearTimeout(noteTimer);noteTimer=setTimeout(async()=>{await fetch('/api/notes',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({note:document.getElementById('note-text').value})});},500);}
+async function loadReminders(){const r=await fetch('/api/myb');const b=await r.json();const u=b.filter(b=>b.status==='active'&&new Date(b.date)>new Date());document.getElementById('reminders-list').innerHTML=u.length?u.map(b=>`<div class="session" style="font-size:0.85rem"><strong>📅 ${escHTML(b.title)}</strong><br>${new Date(b.date).toLocaleString('ru')}</div>`).join(''):'<p style="font-size:0.85rem">Нет встреч</p>';}
+async function loadHistory(){const r=await fetch('/api/myb');const b=await r.json();const p=b.filter(b=>b.status==='attended'||new Date(b.date)<new Date());document.getElementById('history-list').innerHTML=p.length?p.map(b=>`<div class="session" style="font-size:0.85rem"><strong>${escHTML(b.title)}</strong><br><small>${new Date(b.date).toLocaleString('ru')} · ${b.status==='attended'?'Посетил':'Пропущено'}</small></div>`).join(''):'<p style="font-size:0.85rem">Нет истории</p>';}
+
+async function loadServices(){const r=await fetch('/api/services');services=await r.json();const c=document.getElementById('services-grid');if(c)c.innerHTML=services.length?services.map(s=>`<div class="card"><h3>${escHTML(s.title)}</h3><p style="font-size:0.85rem">${escHTML(s.desc||'')}</p><div class="price">${escHTML(s.price||'')}</div></div>`).join(''):'<p>Услуги скоро появятся</p>';}
+async function loadContacts(){const r=await fetch('/api/settings');const s=await r.json();document.getElementById('contact-vk').href=s.vk||'#';document.getElementById('contact-tg').href=s.tg||'#';document.getElementById('contact-wa').href=s.wa||'#';}
+
+function searchU(){const q=document.getElementById('prof-msg-search')?.value.trim();if(!q||q.length<2)return;fetch(`/api/users?q=${q}`).then(r=>r.json()).then(u=>{const c=document.getElementById('dm-results');if(c)c.innerHTML=u.map(u=>`<div style="padding:6px;cursor:pointer;border-bottom:1px solid var(--b);font-size:0.85rem" onclick="startDM(${u.id},'${escHTML(u.username)}')">${escHTML(u.username)}</div>`).join('');});}
+function startDM(id,name){dmTo=id;document.getElementById('dm-chat').innerHTML='';document.getElementById('dm-input').focus();sock.emit('dmhist',{with:id});}
+function sendDM(){const i=document.getElementById('dm-input');if(!i.value.trim()||!sock||!dmTo)return;sock.emit('dm',{to:dmTo,msg:i.value.trim()});i.value='';}
+
+async function uploadAv(){const f=document.getElementById('av-upload').files[0];if(!f)return;const fd=new FormData();fd.append('avatar',f);const r=await fetch('/api/av',{method:'POST',body:fd});const d=await r.json();if(d.success){document.getElementById('nav-av').src=d.url+'?t='+Date.now();toast('Готово!','success');}}
+async function saveIntro(){const bio=document.getElementById('intro-bio').value.trim(),lvl=document.getElementById('intro-level').value;await fetch('/api/me',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({bio,level:lvl})});hideForm('intro-form');toast('Сохранено!','success');}
+
+// АДМИН
+function openAdmin(){fetch('/api/settings').then(r=>r.json()).then(s=>{settings=s;document.getElementById('set-hero-title').value=s.hero_title||'';document.getElementById('set-hero-subtitle').value=s.hero_subtitle||'';document.getElementById('set-info-text').value=s.info_text||'';document.getElementById('set-primary-color').value=s.primary_color||'#6366f1';document.getElementById('set-bg-color').value=s.bg_color||'#fafbff';document.getElementById('set-text-color').value=s.text_color||'#1e293b';document.getElementById('set-accent-color').value=s.accent_color||'#f59e0b';document.getElementById('set-club-name').value=s.club_name||'';document.getElementById('set-heading-size').value=s.heading_size||'2';document.getElementById('set-text-size').value=s.text_size||'1';document.getElementById('set-radius').value=s.radius||'16';document.getElementById('set-vk').value=s.vk||'';document.getElementById('set-tg').value=s.tg||'';document.getElementById('set-wa').value=s.wa||'';document.getElementById('set-email').value=s.email||'';document.getElementById('set-yt').value=s.yt||'';});loadServices().then(()=>renderAdminServices());showForm('admin-modal');}
+function closeAdmin(){hideForm('admin-modal');}
+function switchAdminTab(tab){document.querySelectorAll('#admin-tabs .tab-btn').forEach(b=>b.classList.remove('active'));document.querySelector(`#admin-tabs .tab-btn[onclick*="${tab}"]`)?.classList.add('active');['general','hero','services','contacts','users','sessions','posts'].forEach(t=>document.getElementById('admin-tab-'+t).classList.add('hidden'));document.getElementById('admin-tab-'+tab).classList.remove('hidden');if(tab==='users')loadAdminUsers();if(tab==='sessions')loadAdminSessions();if(tab==='posts')loadAdminPosts();}
+function g(id){return document.getElementById(id)?.value||'';}
+async function saveSettings(){const s={hero_title:g('set-hero-title'),hero_subtitle:g('set-hero-subtitle'),info_text:g('set-info-text'),primary_color:g('set-primary-color'),bg_color:g('set-bg-color'),text_color:g('set-text-color'),accent_color:g('set-accent-color'),club_name:g('set-club-name'),heading_size:g('set-heading-size'),text_size:g('set-text-size'),radius:g('set-radius'),vk:g('set-vk'),tg:g('set-tg'),wa:g('set-wa'),email:g('set-email'),yt:g('set-yt')};const r=await fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(s)});const d=await r.json();toast(d.message||d.error,d.success?'success':'error');if(d.success){settings=s;applySettings();loadContacts();closeAdmin();}}
+function renderAdminServices(){const l=document.getElementById('services-admin-list');if(l)l.innerHTML=services.map(s=>`<div style="display:flex;justify-content:space-between;padding:6px;border-bottom:1px solid var(--b);font-size:0.85rem"><span><strong>${escHTML(s.title)}</strong> · ${escHTML(s.price)}</span><div><button class="btn btn-o btn-sm" onclick="editService(${s.id})">✏️</button><button class="btn btn-o btn-sm" style="color:#ef4444" onclick="delService(${s.id})">🗑</button></div></div>`).join('');}
+function addService(){['svc-edit-id','svc-title','svc-desc','svc-price','svc-icon'].forEach(id=>document.getElementById(id).value='');document.getElementById('service-edit-form').classList.remove('hidden');}
+function editService(id){const s=services.find(s=>s.id===id);if(!s)return;document.getElementById('svc-edit-id').value=s.id;document.getElementById('svc-title').value=s.title;document.getElementById('svc-desc').value=s.desc||'';document.getElementById('svc-price').value=s.price||'';document.getElementById('svc-icon').value=s.icon||'';document.getElementById('service-edit-form').classList.remove('hidden');}
+function cancelServiceEdit(){document.getElementById('service-edit-form').classList.add('hidden');}
+async function saveService(){const id=document.getElementById('svc-edit-id').value,data={title:g('svc-title'),desc:g('svc-desc'),price:g('svc-price'),icon:g('svc-icon')},url=id?`/api/services/${id}`:'/api/services',method=id?'PUT':'POST';const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const d=await r.json();toast(d.message||d.error,d.success?'success':'error');if(d.success){cancelServiceEdit();loadServices().then(()=>renderAdminServices());}}
+async function delService(id){if(!confirm('Удалить?'))return;await fetch(`/api/services/${id}`,{method:'DELETE'});loadServices().then(()=>renderAdminServices());}
+async function loadAdminUsers(){const r=await fetch('/api/admin/users');const u=await r.json();document.getElementById('admin-users-list').innerHTML=u.map(u=>`<div style="display:flex;justify-content:space-between;padding:6px;border-bottom:1px solid var(--b);font-size:0.85rem"><span>${escHTML(u.username)} · ${u.rating}🏆 · ${escHTML(u.role)}</span><select onchange="changeRole(${u.id},this.value)"><option value="user" ${u.role==='user'?'selected':''}>Участник</option><option value="host" ${u.role==='host'?'selected':''}>Хост</option><option value="admin" ${u.role==='admin'?'selected':''}>Админ</option></select></div>`).join('');}
+async function changeRole(uid,role){await fetch('/api/admin/prom',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid,role})});toast('Готово','success');}
+async function searchAdminUsers(){const q=document.getElementById('admin-user-search').value.trim();if(!q)return loadAdminUsers();const r=await fetch(`/api/users?q=${encodeURIComponent(q)}`);const u=await r.json();document.getElementById('admin-users-list').innerHTML=u.map(u=>`<div style="padding:6px;border-bottom:1px solid var(--b);font-size:0.85rem">${escHTML(u.username)} · ${u.rating}🏆</div>`).join('');}
+async function loadAdminSessions(){const r=await fetch('/api/ses');const s=await r.json();document.getElementById('admin-sessions-list').innerHTML=s.map(s=>`<div class="session" style="font-size:0.85rem"><div style="display:flex;justify-content:space-between"><strong>${escHTML(s.title)}</strong><span>${s.cnt}/${s.max_participants}</span></div><small>${escHTML(s.host)} · ${new Date(s.date).toLocaleString('ru')}</small><div style="display:flex;gap:4px;margin-top:4px"><button class="btn btn-o btn-sm" onclick="showSessionForm(${s.id})">✏️</button><button class="btn btn-o btn-sm" style="color:#ef4444" onclick="delSes(${s.id})">🗑</button></div></div>`).join('');}
+async function loadAdminPosts(){const r=await fetch('/api/posts');const p=await r.json();document.getElementById('admin-posts-list').innerHTML=p.map(p=>`<div style="display:flex;justify-content:space-between;padding:6px;border-bottom:1px solid var(--b);font-size:0.85rem"><span>${escHTML(p.title)}</span><button class="btn btn-o btn-sm" style="color:#ef4444" onclick="delPost(${p.id})">🗑</button></div>`).join('');}
+async function delPost(id){if(!confirm('Удалить?'))return;const r=await fetch(`/api/posts/${id}`,{method:'DELETE'});const d=await r.json();toast(d.message||d.error,d.success?'success':'error');if(d.success){loadAdminPosts();loadPosts();}}
+
+async function logout(){if(sock)sock.disconnect();await fetch('/api/out',{method:'POST'});location.reload();}
+</script>
+</body>
+</html>
