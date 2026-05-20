@@ -33,7 +33,7 @@ const upNw = multer({ storage: nwStorage, limits: { fileSize: 10 * 1024 * 1024 }
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-app.use(express.static('public'));
+app.use(express.static('dist'));
 app.use(session({
   secret: 'sp-club-2026',
   resave: false,
@@ -417,7 +417,7 @@ init().then(() => {
 
   app.get('*', (req, res) => {
     if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io')) return res.status(404).json({ error: 'Not found' });
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
   });
 
   server.listen(process.env.PORT || 3000, () => console.log('🚀 Сервер запущен'));
