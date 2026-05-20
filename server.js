@@ -66,7 +66,6 @@ async function init() {
   run(`CREATE TABLE IF NOT EXISTS notes(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER UNIQUE,note TEXT)`);
   run(`CREATE TABLE IF NOT EXISTS tg_users(user_id INTEGER UNIQUE, chat_id TEXT)`);
   
-  // Добавляем колонки если их нет
   try { run(`ALTER TABLE msg ADD COLUMN file_url TEXT`); } catch(e) {}
   try { run(`ALTER TABLE msg ADD COLUMN file_type TEXT`); } catch(e) {}
   try { run(`ALTER TABLE posts ADD COLUMN items TEXT`); } catch(e) {}
@@ -259,7 +258,6 @@ init().then(() => {
     res.json(all(`SELECT id,username,avatar_url,level,rating FROM users WHERE username LIKE'%${esc(q)}%' AND id!=${req.session.userId} LIMIT 10`));
   });
 
-  // ЧАТ — список диалогов
   app.get('/api/dialogs', auth, (req, res) => {
     const uid = req.session.userId;
     const dialogs = all(`
@@ -283,7 +281,6 @@ init().then(() => {
     res.json(dialogs);
   });
 
-  // ЧАТ — сообщения с пользователем
   app.get('/api/messages/:userId', auth, (req, res) => {
     const partnerId = parseInt(req.params.userId);
     const uid = req.session.userId;
@@ -293,7 +290,6 @@ init().then(() => {
     ORDER BY ts ASC`));
   });
 
-  // ПОСТЫ
   app.post('/api/nimg', auth, upNw.single('img'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'Нет' });
     res.json({ success: true, url: `/uploads/${req.file.filename}` });
@@ -325,7 +321,6 @@ init().then(() => {
     res.json({ success: true });
   });
 
-  // РЕЙТИНГ, АДМИНКА, НАСТРОЙКИ, УСЛУГИ, СЛОВАРЬ, ЗАМЕТКИ
   app.get('/api/rh', auth, (req, res) => res.json(all(`SELECT points,reason,ts FROM rh WHERE user_id=${req.session.userId} ORDER BY ts DESC LIMIT 10`)));
   app.get('/api/myb', auth, (req, res) => res.json(all(`SELECT b.id as bid,b.status,s.title,s.date,s.meeting_link FROM bookings b JOIN sessions s ON b.session_id=s.id WHERE b.user_id=${req.session.userId} ORDER BY s.date DESC`)));
   app.get('/api/top', (req, res) => res.json(all('SELECT id,username,level,rating,avatar_url FROM users ORDER BY rating DESC LIMIT 10')));
@@ -410,7 +405,6 @@ init().then(() => {
       io.to(`u:${d.to}`).emit('dm', m);
       s.emit('dm', m);
       run(`INSERT INTO msg(sender_id,receiver_id,message,file_url,file_type) VALUES(${s.uid},${d.to},'${esc(d.msg||'')}',${d.fileUrl?`'${esc(d.fileUrl)}'`:'NULL'},${d.fileType?`'${esc(d.fileType)}'`:'NULL'})`);
-      // Telegram уведомление
       if (d.to !== 0) {
         const receiver = one(`SELECT username FROM users WHERE id=${d.to}`);
         notifyUser(d.to, `💬 Новое сообщение от ${s.uname}: ${(d.msg||'').substring(0, 100)}`);
@@ -421,7 +415,6 @@ init().then(() => {
     s.on('jadmin', () => { if (s.role === 'admin') s.join('admin'); });
   });
 
-  // SPA fallback — все не-API запросы на index.html
   app.get('*', (req, res) => {
     if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io')) return res.status(404).json({ error: 'Not found' });
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -429,7 +422,6 @@ init().then(() => {
 
   server.listen(process.env.PORT || 3000, () => console.log('🚀 Сервер запущен'));
 
-  // Telegram polling
   if (TG_TOKEN) {
     let lastUpdateId = 0;
     setInterval(async () => {
