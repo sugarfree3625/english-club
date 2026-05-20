@@ -1,4 +1,6 @@
 import axios from 'axios';
+
+axios.defaults.baseURL = 'https://english-club-v1.onrender.com';
 axios.defaults.withCredentials = true;
 
 import { createApp } from 'vue';
