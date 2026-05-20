@@ -125,7 +125,6 @@ export default {
   }
 };
 </script>
-
 <style scoped>
 .container { max-width: 1280px; margin: 0 auto; padding: 24px 16px; }
 .profile-page { display: flex; gap: 16px; }

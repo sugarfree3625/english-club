@@ -14,11 +14,9 @@ const multer = require('multer');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-const { SocksProxyAgent } = require('socks-proxy-agent');
-const tgAgent = new SocksProxyAgent('socks5://185.102.73.37:1080');
 
-// Telegram Bot
-const TG_TOKEN = '8868386398:AAF1NjnzxLBclkpFA1Tl92dOfdrTix7At9E';
+// Telegram Bot — токен из переменных окружения (Render)
+const TG_TOKEN = process.env.TG_TOKEN || '';
 const TG_BOT = 'English_Language_Class_Bot';
 
 const avStorage = multer.diskStorage({
@@ -59,7 +57,7 @@ async function init() {
   run(`CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,username TEXT UNIQUE,email TEXT UNIQUE,password TEXT,role TEXT DEFAULT'user',level TEXT DEFAULT'B1',rating INTEGER DEFAULT 0,avatar_url TEXT,bio TEXT DEFAULT'')`);
   run(`CREATE TABLE IF NOT EXISTS sessions(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT,description TEXT,host_id INTEGER,date TEXT,duration INTEGER DEFAULT 60,max_participants INTEGER DEFAULT 10,meeting_link TEXT,meeting_type TEXT DEFAULT'google',created_by INTEGER)`);
   run(`CREATE TABLE IF NOT EXISTS bookings(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,session_id INTEGER,status TEXT DEFAULT'active')`);
-  run(`CREATE TABLE IF NOT EXISTS msg(id INTEGER PRIMARY KEY AUTOINCREMENT,sender_id INTEGER,receiver_id INTEGER,message TEXT,ts DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+  run(`CREATE TABLE IF NOT EXISTS msg(id INTEGER PRIMARY KEY AUTOINCREMENT,sender_id INTEGER,receiver_id INTEGER,message TEXT,ts DATETIME DEFAULT CURRENT_TIMESTAMP,file_url TEXT,file_type TEXT)`);
   run(`CREATE TABLE IF NOT EXISTS rh(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,points INTEGER,reason TEXT,ts DATETIME DEFAULT CURRENT_TIMESTAMP)`);
   run(`CREATE TABLE IF NOT EXISTS posts(id INTEGER PRIMARY KEY AUTOINCREMENT,author_id INTEGER,title TEXT,content TEXT,img TEXT,vid TEXT,sched TEXT,ts DATETIME DEFAULT CURRENT_TIMESTAMP,images TEXT,audio TEXT,file_url TEXT,file_name TEXT,video_url TEXT,items TEXT)`);
   run(`CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT)`);
@@ -67,11 +65,21 @@ async function init() {
   run(`CREATE TABLE IF NOT EXISTS words(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,en TEXT,ru TEXT)`);
   run(`CREATE TABLE IF NOT EXISTS notes(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER UNIQUE,note TEXT)`);
   run(`CREATE TABLE IF NOT EXISTS tg_users(user_id INTEGER UNIQUE, chat_id TEXT)`);
+  
+  // Добавляем колонки если их нет
+  try { run(`ALTER TABLE msg ADD COLUMN file_url TEXT`); } catch(e) {}
+  try { run(`ALTER TABLE msg ADD COLUMN file_type TEXT`); } catch(e) {}
+  try { run(`ALTER TABLE posts ADD COLUMN items TEXT`); } catch(e) {}
 }
 
 function auth(req, res, next) { req.session.userId ? next() : res.status(401).json({ error: 'Войдите' }); }
 
-// Telegram функции
+function sendTelegram(chatId, text) {
+  if (!TG_TOKEN) return;
+  const url = `https://api.telegram.org/bot${TG_TOKEN}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(text)}`;
+  fetch(url).catch(() => {});
+}
+
 function notifyUser(userId, text) {
   const tg = one(`SELECT chat_id FROM tg_users WHERE user_id=${userId}`);
   if (tg) sendTelegram(tg.chat_id, text);
@@ -80,15 +88,13 @@ function notifyUser(userId, text) {
 init().then(() => {
   const adminExists = one("SELECT id FROM users WHERE role='admin'");
   if (!adminExists) {
-    const hash = require('bcrypt').hashSync('admin123', 10);
-    run(`INSERT INTO users(username,email,password,role,level,rating)VALUES('Admin','admin@club.com','${hash}','admin','C1',9999)`);
-    console.log('✅ Админ создан: admin@club.com / admin123');
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@club.com';
+    const adminPass = process.env.ADMIN_PASSWORD || 'changeme123';
+    const hash = require('bcrypt').hashSync(adminPass, 10);
+    run(`INSERT INTO users(username,email,password,role,level,rating)VALUES('Admin','${esc(adminEmail)}','${hash}','admin','C1',9999)`);
+    console.log('✅ Админ создан');
   }
 
-  // Добавляем колонку items если её нет
-  try { run(`ALTER TABLE posts ADD COLUMN items TEXT`); } catch(e) {}
-
-  // Значения по умолчанию
   if (!one("SELECT key FROM settings WHERE key='hero_title'")) {
     run(`INSERT INTO settings(key,value)VALUES('hero_title','Speak English Freely')`);
     run(`INSERT INTO settings(key,value)VALUES('hero_subtitle','Разговорный клуб')`);
@@ -122,7 +128,6 @@ init().then(() => {
 
   app.post('/api/out', (req, res) => { req.session.destroy(); res.json({ success: true }); });
 
-  // Telegram привязка
   app.get('/api/tg-link', auth, (req, res) => {
     res.json({ link: `https://t.me/${TG_BOT}?start=${req.session.userId}` });
   });
@@ -134,13 +139,12 @@ init().then(() => {
       const userId = msg.text.split(' ')[1];
       if (userId) {
         run(`INSERT OR REPLACE INTO tg_users(user_id, chat_id) VALUES(${parseInt(userId)}, '${esc(chatId)}')`);
-        sendTelegram(chatId, '✅ Ты привязан к English Club! Теперь ты будешь получать уведомления о встречах.');
+        sendTelegram(chatId, '✅ Ты привязан к English Club!');
       }
     }
     res.json({ ok: true });
   });
 
-  // АВАТАР
   app.post('/api/av', auth, upAv.single('avatar'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'Нет файла' });
     const url = `/avatars/${req.file.filename}`;
@@ -152,9 +156,7 @@ init().then(() => {
     run(`UPDATE users SET bio='${esc(req.body.bio||'')}',level='${esc(req.body.level||'B1')}' WHERE id=${req.session.userId}`);
     res.json({ success: true });
   });
-  app.get('/api/tg-link', auth, (req, res) => {
-    res.json({ link: `https://t.me/English_Language_Class_Bot?start=${req.session.userId}` });
-  });
+
   // ВСТРЕЧИ
   app.post('/api/ses', auth, (req, res) => {
     if (req.session.role !== 'host' && req.session.role !== 'admin') return res.status(403).json({ error: 'Нет прав' });
@@ -257,6 +259,40 @@ init().then(() => {
     res.json(all(`SELECT id,username,avatar_url,level,rating FROM users WHERE username LIKE'%${esc(q)}%' AND id!=${req.session.userId} LIMIT 10`));
   });
 
+  // ЧАТ — список диалогов
+  app.get('/api/dialogs', auth, (req, res) => {
+    const uid = req.session.userId;
+    const dialogs = all(`
+      SELECT DISTINCT 
+        CASE WHEN m.sender_id = ${uid} THEN m.receiver_id ELSE m.sender_id END as partner_id,
+        u.username, u.avatar_url,
+        (SELECT message FROM msg WHERE 
+          (sender_id = ${uid} AND receiver_id = partner_id) OR 
+          (sender_id = partner_id AND receiver_id = ${uid})
+        ORDER BY ts DESC LIMIT 1) as last_msg,
+        (SELECT ts FROM msg WHERE 
+          (sender_id = ${uid} AND receiver_id = partner_id) OR 
+          (sender_id = partner_id AND receiver_id = ${uid})
+        ORDER BY ts DESC LIMIT 1) as last_ts
+      FROM msg m
+      JOIN users u ON u.id = CASE WHEN m.sender_id = ${uid} THEN m.receiver_id ELSE m.sender_id END
+      WHERE (m.sender_id = ${uid} OR m.receiver_id = ${uid})
+        AND CASE WHEN m.sender_id = ${uid} THEN m.receiver_id ELSE m.sender_id END != 0
+      ORDER BY last_ts DESC
+    `);
+    res.json(dialogs);
+  });
+
+  // ЧАТ — сообщения с пользователем
+  app.get('/api/messages/:userId', auth, (req, res) => {
+    const partnerId = parseInt(req.params.userId);
+    const uid = req.session.userId;
+    res.json(all(`SELECT * FROM msg WHERE 
+      (sender_id = ${uid} AND receiver_id = ${partnerId}) OR 
+      (sender_id = ${partnerId} AND receiver_id = ${uid})
+    ORDER BY ts ASC`));
+  });
+
   // ПОСТЫ
   app.post('/api/nimg', auth, upNw.single('img'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'Нет' });
@@ -289,12 +325,11 @@ init().then(() => {
     res.json({ success: true });
   });
 
-  // РЕЙТИНГ
+  // РЕЙТИНГ, АДМИНКА, НАСТРОЙКИ, УСЛУГИ, СЛОВАРЬ, ЗАМЕТКИ
   app.get('/api/rh', auth, (req, res) => res.json(all(`SELECT points,reason,ts FROM rh WHERE user_id=${req.session.userId} ORDER BY ts DESC LIMIT 10`)));
   app.get('/api/myb', auth, (req, res) => res.json(all(`SELECT b.id as bid,b.status,s.title,s.date,s.meeting_link FROM bookings b JOIN sessions s ON b.session_id=s.id WHERE b.user_id=${req.session.userId} ORDER BY s.date DESC`)));
   app.get('/api/top', (req, res) => res.json(all('SELECT id,username,level,rating,avatar_url FROM users ORDER BY rating DESC LIMIT 10')));
 
-  // АДМИНКА
   app.post('/api/admin/prom', auth, (req, res) => {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Нет прав' });
     run(`UPDATE users SET role='host' WHERE id=${req.body.uid}`);
@@ -306,7 +341,6 @@ init().then(() => {
     res.json(all('SELECT id,username,role,level,rating,avatar_url FROM users ORDER BY rating DESC'));
   });
 
-  // НАСТРОЙКИ
   app.get('/api/settings', (req, res) => {
     const rows = all("SELECT * FROM settings"), s = {};
     rows.forEach(r => s[r.key] = r.value);
@@ -323,7 +357,6 @@ init().then(() => {
     res.json({ success: true });
   });
 
-  // УСЛУГИ
   app.get('/api/services', (req, res) => res.json(all("SELECT * FROM services ORDER BY id ASC")));
   app.post('/api/services', auth, (req, res) => {
     if (req.session.role !== 'admin') return res.status(403).json({ error: 'Нет прав' });
@@ -341,12 +374,10 @@ init().then(() => {
     res.json({ success: true });
   });
 
-  // СЛОВАРЬ
   app.get('/api/words', auth, (req, res) => res.json(all(`SELECT * FROM words WHERE user_id=${req.session.userId} ORDER BY id DESC`)));
   app.post('/api/words', auth, (req, res) => { const { en, ru } = req.body; run(`INSERT INTO words(user_id,en,ru)VALUES(${req.session.userId},'${esc(en)}','${esc(ru)}')`); res.json({ success: true }); });
   app.delete('/api/words/:id', auth, (req, res) => { run(`DELETE FROM words WHERE id=${parseInt(req.params.id)} AND user_id=${req.session.userId}`); res.json({ success: true }); });
 
-  // ЗАМЕТКИ
   app.get('/api/notes', auth, (req, res) => { const n = one(`SELECT note FROM notes WHERE user_id=${req.session.userId}`); res.json({ note: n ? n.note : '' }); });
   app.put('/api/notes', auth, (req, res) => {
     if (one(`SELECT id FROM notes WHERE user_id=${req.session.userId}`)) run(`UPDATE notes SET note='${esc(req.body.note)}' WHERE user_id=${req.session.userId}`);
@@ -373,19 +404,37 @@ init().then(() => {
 
   io.on('connection', s => {
     s.on('join', d => { s.uid = d.uid; s.uname = d.uname; s.role = d.role; s.join(`u:${d.uid}`); });
-    s.on('dm', d => { if (!s.uid) return; const m = { from: s.uid, fn: s.uname, msg: d.msg, ts: new Date().toISOString() }; io.to(`u:${d.to}`).emit('dm', m); s.emit('dm', m); run(`INSERT INTO msg(sender_id,receiver_id,message)VALUES(${s.uid},${d.to},'${esc(d.msg)}')`); });
+    s.on('dm', d => {
+      if (!s.uid) return;
+      const m = { from: s.uid, fn: s.uname, msg: d.msg || '', file_url: d.fileUrl || null, file_type: d.fileType || null, ts: new Date().toISOString() };
+      io.to(`u:${d.to}`).emit('dm', m);
+      s.emit('dm', m);
+      run(`INSERT INTO msg(sender_id,receiver_id,message,file_url,file_type) VALUES(${s.uid},${d.to},'${esc(d.msg||'')}',${d.fileUrl?`'${esc(d.fileUrl)}'`:'NULL'},${d.fileType?`'${esc(d.fileType)}'`:'NULL'})`);
+      // Telegram уведомление
+      if (d.to !== 0) {
+        const receiver = one(`SELECT username FROM users WHERE id=${d.to}`);
+        notifyUser(d.to, `💬 Новое сообщение от ${s.uname}: ${(d.msg||'').substring(0, 100)}`);
+      }
+    });
     s.on('hist', d => { if (!s.uid) return; s.emit('hist', all(`SELECT m.*,u.username as fn FROM msg m JOIN users u ON m.sender_id=u.id WHERE(m.sender_id=${s.uid} AND m.receiver_id=0)OR(m.sender_id=0 AND m.receiver_id=${s.uid})ORDER BY m.ts ASC`)); });
     s.on('dmhist', d => { if (!s.uid) return; s.emit('dmhist', { with: d.with, msgs: all(`SELECT m.*,u.username as fn FROM msg m JOIN users u ON m.sender_id=u.id WHERE(m.sender_id=${s.uid} AND m.receiver_id=${d.with})OR(m.sender_id=${d.with} AND m.receiver_id=${s.uid})ORDER BY m.ts ASC`) }); });
     s.on('jadmin', () => { if (s.role === 'admin') s.join('admin'); });
   });
 
-  server.listen(process.env.PORT || 3000, () => console.log('🚀 http://localhost:3000'));
+  // SPA fallback — все не-API запросы на index.html
+  app.get('*', (req, res) => {
+    if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io')) return res.status(404).json({ error: 'Not found' });
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  });
 
-    // Telegram polling через прокси
+  server.listen(process.env.PORT || 3000, () => console.log('🚀 Сервер запущен'));
+
+  // Telegram polling
+  if (TG_TOKEN) {
     let lastUpdateId = 0;
     setInterval(async () => {
       try {
-        const r = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/getUpdates?offset=${lastUpdateId + 1}`, { agent: tgAgent });
+        const r = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/getUpdates?offset=${lastUpdateId + 1}`);
         const d = await r.json();
         if (d.result && d.result.length) {
           d.result.forEach(up => {
@@ -400,9 +449,8 @@ init().then(() => {
             }
           });
         }
-      } catch(e) {
-        console.log('TG error:', e.message);
-      }
+      } catch(e) {}
     }, 3000);
-  
-  }).catch(e => console.error(e));
+  }
+
+}).catch(e => console.error(e));
