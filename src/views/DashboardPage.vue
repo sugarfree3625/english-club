@@ -67,7 +67,7 @@
           </div>
           
           <h3 class="feed-title">{{ p.title }}</h3>
-          <p class="feed-text">{{ p.content }}</p>
+          <div class="feed-text" v-html="p.content"></div>
           
           <div v-if="p._items && p._items.length" class="feed-attachments">
             <template v-for="item in p._items" :key="Math.random()">
