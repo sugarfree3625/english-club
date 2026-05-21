@@ -62,9 +62,7 @@ export default {
   props: ['show', 'editId'],
   emits: ['close', 'saved'],
   data() {
-    return {
-      form: { title: '', content: '', items: [] }
-    };
+    return { form: { title: '', content: '', items: [] } };
   },
   watch: {
     show(val) {
@@ -83,30 +81,21 @@ export default {
       if (!files.length) return;
       for (let f of files) {
         if (this.form.items[i].urls.length >= 20) break;
-        const fd = new FormData();
-        fd.append('img', f);
+        const fd = new FormData(); fd.append('img', f);
         try {
           const r = await axios.post('/api/nimg', fd);
           if (r.data.success) {
             this.form.items[i].urls.push(r.data.url);
-            if (type === 'file') {
-              this.form.items[i].files.push({ url: r.data.url, name: f.name });
-            }
+            if (type === 'file') this.form.items[i].files.push({ url: r.data.url, name: f.name });
           }
-        } catch(e) { console.error('Ошибка загрузки:', e); }
+        } catch(e) {}
       }
     },
     async loadPost() {
       try {
         const r = await axios.get('/api/posts');
         const p = r.data.find(p => p.id === this.editId);
-        if (p) {
-          this.form = {
-            title: p.title || '',
-            content: p.content || '',
-            items: p.items ? JSON.parse(p.items) : []
-          };
-        }
+        if (p) this.form = { title: p.title || '', content: p.content || '', items: p.items ? JSON.parse(p.items) : [] };
       } catch(e) {}
     },
     async submit() {
@@ -114,13 +103,8 @@ export default {
       try {
         const url = this.editId ? `/api/posts/${this.editId}` : '/api/posts';
         const method = this.editId ? 'put' : 'post';
-        await axios[method](url, {
-          title: this.form.title,
-          content: this.form.content,
-          items: JSON.stringify(this.form.items)
-        });
-        this.$emit('saved');
-        this.$emit('close');
+        await axios[method](url, { title: this.form.title, content: this.form.content, items: JSON.stringify(this.form.items) });
+        this.$emit('saved'); this.$emit('close');
       } catch(e) { alert('Ошибка публикации'); }
     }
   }
