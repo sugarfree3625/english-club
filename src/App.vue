@@ -17,7 +17,6 @@
               <div v-if="menuOpen" class="dropdown">
                 <a @click="$router.push('/dashboard');menuOpen=false">📅 Дашборд</a>
                 <a @click="$router.push('/profile');menuOpen=false">👤 Профиль</a>
-                <a @click="$router.push('/editor');menuOpen=false">🎨 Редактор</a>
                 <a @click="logout();menuOpen=false">🚪 Выйти</a>
               </div>
             </div>
@@ -25,7 +24,6 @@
         </div>
       </header>
   
-      <AdminPanel :user="user" :settings="settings" @update-settings="settings = $event" />
       <router-view :user="user" :settings="settings" @update-user="user = $event" />
   
       <!-- Модалка входа -->
@@ -66,11 +64,9 @@
   
   <script>
   import axios from 'axios';
-  import AdminPanel from './components/AdminPanel.vue';
   
   export default {
     name: 'App',
-    components: { AdminPanel },
     data() {
       return {
         user: null,
