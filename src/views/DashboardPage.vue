@@ -230,4 +230,9 @@ export default {
 .btn-o { border: 2px solid #6366f1; color: #6366f1; background: transparent; }
 .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
 @media (max-width: 768px) { .feed { max-width: 100%; } }
+.feed-text :deep(img) { max-width: 100%; border-radius: 8px; margin: 8px 0; }
+.feed-text :deep(h2) { font-size: 1.2rem; margin: 10px 0 4px; }
+.feed-text :deep(blockquote) { border-left: 3px solid #6366f1; padding-left: 12px; color: #64748b; margin: 8px 0; }
+.feed-text :deep(ul), .feed-text :deep(ol) { padding-left: 20px; margin: 4px 0; }
+.feed-text :deep(video) { max-width: 100%; border-radius: 8px; }  
 </style>
