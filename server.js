@@ -43,7 +43,7 @@ app.use(session({
 }));
 
 let db;
-const DB = path.join(__dirname, 'db.db');
+const DB = '/tmp/db.db';
 ['uploads/avatars', 'uploads/calendars', 'uploads/files'].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
 
 function save() { fs.writeFileSync(DB, Buffer.from(db.export())); }
