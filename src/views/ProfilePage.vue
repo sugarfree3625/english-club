@@ -17,6 +17,7 @@
         <button class="sidebar-btn" :class="{ active: tab === 'reminders' }" @click="tab = 'reminders'">Напоминания</button>
         <button class="sidebar-btn" :class="{ active: tab === 'history' }" @click="tab = 'history'">История</button>
         <button class="sidebar-btn" @click="$router.push('/messages')">💬 Сообщения</button>
+        <button class="sidebar-btn" @click="toggleTheme">{{ isDark ? '☀️ Светлая тема' : '🌙 Тёмная тема' }}</button>
         <button class="sidebar-btn" @click="$router.push('/dashboard')">← Назад</button>
       </div>
       <div class="profile-main">
@@ -76,10 +77,12 @@ export default {
       wordRu: '', 
       note: '', 
       allBookings: [],
-      tgLink: null
+      tgLink: null,
+      isDark: false
     }; 
   },
   async mounted() {
+    this.isDark = document.body.classList.contains('dark');
     try {
       const [w, n, b] = await Promise.all([
         axios.get('/api/words'), 
@@ -100,6 +103,11 @@ export default {
     }
   },
   methods: {
+    toggleTheme() {
+      document.body.classList.toggle('dark');
+      this.isDark = !this.isDark;
+      localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
+    },
     async linkTelegram() {
       const r = await axios.get('/api/tg-link');
       this.tgLink = r.data.link;
@@ -126,17 +134,18 @@ export default {
   }
 };
 </script>
+
 <style scoped>
 .container { max-width: 1280px; margin: 0 auto; padding: 24px 16px; }
 .profile-page { display: flex; gap: 16px; }
-.profile-sidebar { width: 220px; flex-shrink: 0; background: #fff; border-radius: 16px; padding: 14px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 2px; }
-.sidebar-btn { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; border: none; background: transparent; cursor: pointer; font-weight: 500; font-size: 0.8rem; color: #64748b; width: 100%; text-align: left; }
+.profile-sidebar { width: 220px; flex-shrink: 0; border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 2px; }
+.sidebar-btn { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; border: none; background: transparent; cursor: pointer; font-weight: 500; font-size: 0.8rem; width: 100%; text-align: left; }
 .sidebar-btn:hover, .sidebar-btn.active { background: #eef0ff; color: #6366f1; }
 .profile-main { flex: 1; min-width: 0; }
-.card { background: #fff; border-radius: 16px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 12px; }
-.input { width: 100%; padding: 10px; border: 2px solid #e2e8f0; border-radius: 10px; font-family: inherit; font-size: 0.85rem; }
-.word-card { background: #f8fafc; padding: 8px; border-radius: 8px; margin-bottom: 4px; border-left: 3px solid #6366f1; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
-.session { border-left: 4px solid #6366f1; padding: 10px 14px; margin-bottom: 6px; background: #f8fafc; border-radius: 0 8px 8px 0; font-size: 0.85rem; }
+.card { border-radius: 16px; padding: 20px; margin-bottom: 12px; }
+.input { width: 100%; padding: 10px; border-radius: 10px; font-family: inherit; font-size: 0.85rem; }
+.word-card { padding: 8px; border-radius: 8px; margin-bottom: 4px; border-left: 3px solid #6366f1; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
+.session { border-left: 4px solid #6366f1; padding: 10px 14px; margin-bottom: 6px; border-radius: 0 8px 8px 0; font-size: 0.85rem; }
 .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 50px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border: none; }
 .btn-p { background: #6366f1; color: #fff; }
 .btn-o { border: 2px solid #6366f1; color: #6366f1; background: transparent; }
