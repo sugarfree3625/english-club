@@ -20,13 +20,13 @@ const TG_TOKEN = process.env.TG_TOKEN || '';
 const TG_BOT = 'English_Language_Class_Bot';
 
 const avStorage = multer.diskStorage({
-  destination: 'public/avatars',
+  destination: 'dist/avatars',
   filename: (r, f, cb) => cb(null, `av-${r.session.userId}-${Date.now()}${path.extname(f.originalname)}`)
 });
 const upAv = multer({ storage: avStorage, limits: { fileSize: 5 * 1024 * 1024 } });
 
 const nwStorage = multer.diskStorage({
-  destination: (r, f, cb) => { const d = 'public/uploads'; if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); cb(null, d); },
+  destination: (r, f, cb) => { const d = 'dist/uploads'; if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); cb(null, d); },
   filename: (r, f, cb) => cb(null, `nw-${Date.now()}${path.extname(f.originalname)}`)
 });
 const upNw = multer({ storage: nwStorage, limits: { fileSize: 10 * 1024 * 1024 } });
@@ -43,7 +43,7 @@ app.use(session({
 
 let db;
 const DB = path.join(__dirname, 'db.db');
-['public/avatars', 'public/calendars', 'public/uploads'].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
+['dist/avatars', 'dist/calendars', 'dist/uploads'].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
 
 function save() { fs.writeFileSync(DB, Buffer.from(db.export())); }
 function all(sql) { const r = db.exec(sql); if (!r.length || !r[0].values.length) return []; return r[0].values.map(row => { const o = {}; r[0].columns.forEach((c, i) => o[c] = row[i]); return o; }); }
@@ -394,7 +394,7 @@ init().then(() => {
     const st = new Date(s.date), en = new Date(st.getTime() + (s.duration || 60) * 60000);
     const { error, value } = icsEvent({ start: [st.getFullYear(), st.getMonth()+1, st.getDate(), st.getHours(), st.getMinutes()], end: [en.getFullYear(), en.getMonth()+1, en.getDate(), en.getHours(), en.getMinutes()], title: `[Club] ${s.title}`, location: s.meeting_link || 'Онлайн', url: s.meeting_link, status: 'CONFIRMED' });
     if (error) return null;
-    const fn = `s-${s.id}-${Date.now()}.ics`; fs.writeFileSync(`public/calendars/${fn}`, value); return `/calendars/${fn}`;
+    const fn = `s-${s.id}-${Date.now()}.ics`; fs.writeFileSync(`dist/calendars/${fn}`, value); return `/calendars/${fn}`;
   }
 
   io.on('connection', s => {
