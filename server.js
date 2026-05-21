@@ -15,18 +15,17 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Telegram Bot — токен из переменных окружения (Render)
 const TG_TOKEN = process.env.TG_TOKEN || '';
 const TG_BOT = 'English_Language_Class_Bot';
 
 const avStorage = multer.diskStorage({
-  destination: 'dist/avatars',
+  destination: 'uploads/avatars',
   filename: (r, f, cb) => cb(null, `av-${r.session.userId}-${Date.now()}${path.extname(f.originalname)}`)
 });
 const upAv = multer({ storage: avStorage, limits: { fileSize: 5 * 1024 * 1024 } });
 
 const nwStorage = multer.diskStorage({
-  destination: (r, f, cb) => { const d = 'dist/uploads'; if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); cb(null, d); },
+  destination: (r, f, cb) => { const d = 'uploads/files'; if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); cb(null, d); },
   filename: (r, f, cb) => cb(null, `nw-${Date.now()}${path.extname(f.originalname)}`)
 });
 const upNw = multer({ storage: nwStorage, limits: { fileSize: 10 * 1024 * 1024 } });
@@ -34,6 +33,8 @@ const upNw = multer({ storage: nwStorage, limits: { fileSize: 10 * 1024 * 1024 }
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(express.static('dist'));
+app.use('/uploads', express.static('uploads'));
+app.use('/avatars', express.static('uploads/avatars'));
 app.use(session({
   secret: 'sp-club-2026',
   resave: false,
@@ -43,7 +44,7 @@ app.use(session({
 
 let db;
 const DB = path.join(__dirname, 'db.db');
-['dist/avatars', 'dist/calendars', 'dist/uploads'].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
+['uploads/avatars', 'uploads/calendars', 'uploads/files'].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
 
 function save() { fs.writeFileSync(DB, Buffer.from(db.export())); }
 function all(sql) { const r = db.exec(sql); if (!r.length || !r[0].values.length) return []; return r[0].values.map(row => { const o = {}; r[0].columns.forEach((c, i) => o[c] = row[i]); return o; }); }
@@ -57,7 +58,7 @@ async function init() {
   run(`CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,username TEXT UNIQUE,email TEXT UNIQUE,password TEXT,role TEXT DEFAULT'user',level TEXT DEFAULT'B1',rating INTEGER DEFAULT 0,avatar_url TEXT,bio TEXT DEFAULT'')`);
   run(`CREATE TABLE IF NOT EXISTS sessions(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT,description TEXT,host_id INTEGER,date TEXT,duration INTEGER DEFAULT 60,max_participants INTEGER DEFAULT 10,meeting_link TEXT,meeting_type TEXT DEFAULT'google',created_by INTEGER)`);
   run(`CREATE TABLE IF NOT EXISTS bookings(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,session_id INTEGER,status TEXT DEFAULT'active')`);
-  run(`CREATE TABLE IF NOT EXISTS msg(id INTEGER PRIMARY KEY AUTOINCREMENT,sender_id INTEGER,receiver_id INTEGER,message TEXT,ts DATETIME DEFAULT CURRENT_TIMESTAMP,file_url TEXT,file_type TEXT)`);
+  run(`CREATE TABLE IF NOT EXISTS msg(id INTEGER PRIMARY KEY AUTOINCREMENT,sender_id INTEGER,receiver_id INTEGER,message TEXT,ts DATETIME DEFAULT CURRENT_TIMESTAMP,file_url TEXT,file_type TEXT,files TEXT)`);
   run(`CREATE TABLE IF NOT EXISTS rh(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,points INTEGER,reason TEXT,ts DATETIME DEFAULT CURRENT_TIMESTAMP)`);
   run(`CREATE TABLE IF NOT EXISTS posts(id INTEGER PRIMARY KEY AUTOINCREMENT,author_id INTEGER,title TEXT,content TEXT,img TEXT,vid TEXT,sched TEXT,ts DATETIME DEFAULT CURRENT_TIMESTAMP,images TEXT,audio TEXT,file_url TEXT,file_name TEXT,video_url TEXT,items TEXT)`);
   run(`CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT)`);
@@ -68,8 +69,8 @@ async function init() {
   
   try { run(`ALTER TABLE msg ADD COLUMN file_url TEXT`); } catch(e) {}
   try { run(`ALTER TABLE msg ADD COLUMN file_type TEXT`); } catch(e) {}
-  try { run(`ALTER TABLE posts ADD COLUMN items TEXT`); } catch(e) {}
   try { run(`ALTER TABLE msg ADD COLUMN files TEXT`); } catch(e) {}
+  try { run(`ALTER TABLE posts ADD COLUMN items TEXT`); } catch(e) {}
 }
 
 function auth(req, res, next) { req.session.userId ? next() : res.status(401).json({ error: 'Войдите' }); }
@@ -102,7 +103,6 @@ init().then(() => {
     run(`INSERT INTO settings(key,value)VALUES('club_name','English Club')`);
   }
 
-  // АВТОРИЗАЦИЯ
   app.post('/api/reg', async (req, res) => {
     const { username, email, password, level } = req.body;
     if (one(`SELECT id FROM users WHERE email='${esc(email)}'`)) return res.status(400).json({ error: 'Email занят' });
@@ -157,7 +157,6 @@ init().then(() => {
     res.json({ success: true });
   });
 
-  // ВСТРЕЧИ
   app.post('/api/ses', auth, (req, res) => {
     if (req.session.role !== 'host' && req.session.role !== 'admin') return res.status(403).json({ error: 'Нет прав' });
     const { title, desc, date, dur, max, type, zlink } = req.body;
@@ -293,7 +292,7 @@ init().then(() => {
 
   app.post('/api/nimg', auth, upNw.single('img'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'Нет' });
-    res.json({ success: true, url: `/uploads/${req.file.filename}` });
+    res.json({ success: true, url: `/uploads/files/${req.file.filename}` });
   });
 
   app.get('/api/posts', auth, (req, res) => res.json(all(`SELECT p.*,u.username as an,u.avatar_url as aa FROM posts p JOIN users u ON p.author_id=u.id ORDER BY p.ts DESC LIMIT 20`)));
@@ -391,11 +390,11 @@ init().then(() => {
     } catch (e) { return null; }
   }
 
-function genICS(s) {
+  function genICS(s) {
     const st = new Date(s.date), en = new Date(st.getTime() + (s.duration || 60) * 60000);
     const { error, value } = icsEvent({ start: [st.getFullYear(), st.getMonth()+1, st.getDate(), st.getHours(), st.getMinutes()], end: [en.getFullYear(), en.getMonth()+1, en.getDate(), en.getHours(), en.getMinutes()], title: `[Club] ${s.title}`, location: s.meeting_link || 'Онлайн', url: s.meeting_link, status: 'CONFIRMED' });
     if (error) return null;
-    const fn = `s-${s.id}-${Date.now()}.ics`; fs.writeFileSync(`dist/calendars/${fn}`, value); return `/calendars/${fn}`;
+    const fn = `s-${s.id}-${Date.now()}.ics`; fs.writeFileSync(`uploads/calendars/${fn}`, value); return `/calendars/${fn}`;
   }
 
   const onlineUsers = new Map();
@@ -431,10 +430,9 @@ function genICS(s) {
       s.emit('dm', m);
       
       const fileData = files.length ? JSON.stringify(files) : null;
-      run(`INSERT INTO msg(sender_id,receiver_id,message,file_url,file_type) VALUES(${s.uid},${d.to},'${esc(d.msg||'')}',${fileData ? `'${esc(fileData)}'` : 'NULL'},'files')`);
+      run(`INSERT INTO msg(sender_id,receiver_id,message,file_url,file_type,files) VALUES(${s.uid},${d.to},'${esc(d.msg||'')}',${fileData ? `'${esc(fileData)}'` : 'NULL'},'files',${fileData ? `'${esc(fileData)}'` : 'NULL'})`);
       
       if (d.to !== 0 && !onlineUsers.has(d.to)) {
-        const receiver = one(`SELECT username FROM users WHERE id=${d.to}`);
         notifyUser(d.to, `💬 Новое сообщение от ${s.uname}: ${(d.msg||'Прислал файлы').substring(0, 100)}`);
       }
     });
