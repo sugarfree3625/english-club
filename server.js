@@ -43,8 +43,6 @@ app.use(session({
 
 let db;
 const DB = path.join(__dirname, 'db.db');
-// Очистка старой базы при деплое
-try { fs.unlinkSync(DB); console.log('🗑 Старая база удалена'); } catch(e) {}
 
 ['dist/avatars', 'dist/calendars', 'dist/uploads'].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
 
