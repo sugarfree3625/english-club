@@ -16,6 +16,7 @@
         <button class="sidebar-btn" :class="{ active: tab === 'notes' }" @click="tab = 'notes'">Блокнот</button>
         <button class="sidebar-btn" :class="{ active: tab === 'reminders' }" @click="tab = 'reminders'">Напоминания</button>
         <button class="sidebar-btn" :class="{ active: tab === 'history' }" @click="tab = 'history'">История</button>
+        <button class="sidebar-btn" @click="$router.push('/messages')">💬 Сообщения</button>
         <button class="sidebar-btn" @click="$router.push('/dashboard')">← Назад</button>
       </div>
       <div class="profile-main">
