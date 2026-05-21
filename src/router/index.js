@@ -3,7 +3,7 @@ import Home from '../views/Home.vue';
 import DashboardPage from '../views/DashboardPage.vue';
 import ProfilePage from '../views/ProfilePage.vue';
 import MessagesPage from '../views/MessagesPage.vue';
-import AdminPanel from '../components/AdminPanel.vue';
+
 
 const routes = [
   { path: '/', component: Home },
