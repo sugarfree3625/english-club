@@ -470,12 +470,17 @@ init().then(() => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
   });
 
-  server.listen(process.env.PORT || 3000, () => console.log('🚀 Сервер запущен'));
-// Анти-сон для бесплатного тарифа Render — пингуем сами себя каждые 10 минут
-    setInterval(() => {
-      fetch(`http://localhost:${process.env.PORT || 3000}/api/settings`).catch(() => {});
-    }, 10 * 60 * 1000);
+    server.listen(process.env.PORT || 3000, () => {
+    console.log('🚀 Сервер запущен');
+    
+    // Анти-сон для бесплатного тарифа Render
+    setTimeout(() => {
+      setInterval(() => {
+        fetch(`http://localhost:${process.env.PORT || 3000}/api/settings`).catch(() => {});
+      }, 10 * 60 * 1000);
+    }, 5000);
   });
+
   if (TG_TOKEN) {
     let lastUpdateId = 0;
     setInterval(async () => {
