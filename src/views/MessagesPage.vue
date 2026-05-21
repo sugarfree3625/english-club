@@ -31,17 +31,31 @@
       <button class="btn btn-p btn-sm" @click="$router.push('/profile')">← Назад</button>
     </div>
 
-    <!-- Мобильная кнопка назад -->
     <button class="mobile-back" @click="showSidebar = true; activeChat = null">← Чаты</button>
 
     <!-- Правая панель -->
-    <div class="chat-main" v-if="activeChat" :class="{ 'mobile-show': !showSidebar }">
+    <div class="chat-main" v-if="activeChat" :class="{ 'mobile-show': !showSidebar }"
+         @dragover.prevent @drop.prevent="handleDrop">
       <div class="chat-header">
         <strong>{{ activeChatName }}</strong>
-        <span :class="{ online: isPartnerOnline }">{{ isPartnerOnline ? '🟢 Онлайн' : '⚫ Оффлайн' }}</span>
+        <div>
+          <span v-if="isTyping" style="color:#6366f1;font-size:0.75rem;margin-right:8px">Печатает...</span>
+          <span :class="{ online: isPartnerOnline }">{{ isPartnerOnline ? '🟢 Онлайн' : '⚫ Оффлайн' }}</span>
+        </div>
       </div>
+      
+      <!-- Поиск по сообщениям -->
+      <div class="msg-search" v-if="showMsgSearch">
+        <input v-model="msgSearchQuery" @input="searchMessages" placeholder="🔍 Поиск в чате..." class="search-input">
+        <button class="btn btn-o btn-sm" @click="showMsgSearch = false; msgSearchQuery = ''">✕</button>
+      </div>
+      
       <div class="chat-messages" ref="msgContainer">
-        <div v-for="m in messages" :key="m.id" class="msg" :class="{ mine: m.sender_id === currentUserId }">
+        <div v-for="m in filteredMessages" :key="m.id" class="msg" :class="{ mine: m.sender_id === currentUserId }">
+          <!-- Reply -->
+          <div v-if="m.reply_to" class="reply-preview">
+            {{ m.reply_to }}
+          </div>
           <div v-if="m.message" class="msg-text">{{ m.message }}</div>
           <div v-if="m.files && m.files.length" class="msg-files">
             <div v-for="(f, i) in m.files" :key="i" class="msg-file">
@@ -52,7 +66,33 @@
             </div>
           </div>
           <small class="msg-time">{{ new Date(m.ts).toLocaleTimeString('ru', {hour:'2-digit',minute:'2-digit'}) }}</small>
+          
+          <!-- Кнопки для своих сообщений -->
+          <div v-if="m.sender_id === currentUserId" class="msg-actions">
+            <button @click="replyTo(m)">↩</button>
+            <button @click="editMsg(m)">✏️</button>
+            <button @click="deleteMsg(m.id)">🗑</button>
+          </div>
         </div>
+      </div>
+      
+      <!-- Редактирование -->
+      <div v-if="editingMsg" class="edit-bar">
+        <span>✏️ Редактирование</span>
+        <input v-model="editText" @keydown.enter="saveEdit" class="edit-input">
+        <button class="btn btn-p btn-sm" @click="saveEdit">Сохранить</button>
+        <button class="btn btn-o btn-sm" @click="editingMsg = null">Отмена</button>
+      </div>
+      
+      <!-- Reply bar -->
+      <div v-if="replyMsg" class="reply-bar">
+        <span>↩ {{ replyMsg.message?.substring(0, 50) }}</span>
+        <button @click="replyMsg = null" style="color:red;background:none;border:none;cursor:pointer">✕</button>
+      </div>
+      
+      <!-- Индикатор печатает -->
+      <div v-if="isTyping" class="typing-indicator">
+        {{ activeChatName }} печатает...
       </div>
       
       <div class="chat-input">
@@ -64,9 +104,10 @@
         </div>
         <button class="btn btn-o btn-sm" @click="$refs.fileInput.click()">📎</button>
         <input type="file" ref="fileInput" @change="handleFiles" hidden multiple accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.zip">
+        <button class="btn btn-o btn-sm" @click="showMsgSearch = !showMsgSearch">🔍</button>
         <button class="btn btn-o btn-sm" @mousedown="startRecord" @mouseup="stopRecord" @mouseleave="stopRecord" @touchstart.prevent="startRecord" @touchend.prevent="stopRecord">🎤</button>
         <span v-if="recording" style="color:red;font-size:0.8rem">🔴</span>
-        <textarea v-model="msgText" @keydown.enter.exact.prevent="sendMsg" placeholder="Сообщение..." rows="1"></textarea>
+        <textarea v-model="msgText" @keydown.enter.exact.prevent="sendMsg" @input="emitTyping" placeholder="Сообщение..." rows="1"></textarea>
         <button class="btn btn-p btn-sm" @click="sendMsg">➤</button>
       </div>
       
@@ -112,17 +153,33 @@ export default {
       recording: false,
       mediaRecorder: null,
       isPartnerOnline: false,
+      isTyping: false,
       chunks: [],
       showSidebar: true,
+      replyMsg: null,
+      editingMsg: null,
+      editText: '',
+      showMsgSearch: false,
+      msgSearchQuery: '',
+      typingTimer: null,
       emojis: ['😀','😂','🤣','😍','🥰','😘','😜','😎','🤩','😇','🤔','😴','🥳','😡','💀','👻','💩','👍','👎','❤️','💔','🔥','🎉','⭐','✅','❌','💯','🙏','🤝','💪','👀','🦄','🐶','🌹','🍕','⚽','🚀','🌈','🎵','📚','💡','💰','⏰','📍']
     };
   },
   computed: {
     isDark() {
       return document.body.classList.contains('dark');
+    },
+    filteredMessages() {
+      if (!this.msgSearchQuery) return this.messages;
+      const q = this.msgSearchQuery.toLowerCase();
+      return this.messages.filter(m => m.message && m.message.toLowerCase().includes(q));
     }
   },
   async mounted() {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    
     this.currentUserId = this.user?.id;
     await this.loadDialogs();
     
@@ -135,16 +192,74 @@ export default {
         this.$nextTick(() => this.scrollToBottom());
       }
       this.loadDialogs();
+      
+      if (document.hidden && msg.from !== this.currentUserId) {
+        this.sendBrowserNotification(msg);
+      }
     });
     
     this.socket.on('userStatus', ({ userId, online }) => {
       if (userId === this.activeChat) this.isPartnerOnline = online;
+    });
+    
+    this.socket.on('typing', ({ from }) => {
+      if (from === this.activeChat) {
+        this.isTyping = true;
+        clearTimeout(this.typingTimer);
+        this.typingTimer = setTimeout(() => { this.isTyping = false; }, 2000);
+      }
     });
   },
   beforeUnmount() {
     if (this.socket) this.socket.disconnect();
   },
   methods: {
+    sendBrowserNotification(msg) {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(`💬 ${msg.fn || 'Новое сообщение'}`, {
+          body: msg.msg?.substring(0, 100) || '📎 Файл',
+          icon: 'https://ui-avatars.com/api/?name=' + (msg.fn || 'U'),
+          tag: 'english-club'
+        });
+      }
+    },
+    emitTyping() {
+      if (this.socket && this.activeChat) {
+        this.socket.emit('typing', { to: this.activeChat });
+      }
+    },
+    handleDrop(e) {
+      const files = Array.from(e.dataTransfer.files);
+      files.forEach(f => {
+        if (f.type.startsWith('image/')) f.preview = URL.createObjectURL(f);
+        this.pendingFiles.push(f);
+      });
+    },
+    replyTo(m) {
+      this.replyMsg = m;
+      this.$refs.msgInput?.focus();
+    },
+    editMsg(m) {
+      this.editingMsg = m;
+      this.editText = m.message || '';
+    },
+    async saveEdit() {
+      if (!this.editingMsg || !this.editText.trim()) return;
+      // Обновляем локально
+      this.editingMsg.message = this.editText;
+      // Отправляем обновление через сокет
+      this.socket.emit('editMsg', { msgId: this.editingMsg.id, message: this.editText, to: this.activeChat });
+      this.editingMsg = null;
+      this.editText = '';
+    },
+    async deleteMsg(msgId) {
+      if (!confirm('Удалить сообщение?')) return;
+      this.messages = this.messages.filter(m => m.id !== msgId);
+      this.socket.emit('deleteMsg', { msgId, to: this.activeChat });
+    },
+    searchMessages() {
+      // filteredMessages computed
+    },
     async loadDialogs() {
       try { const r = await axios.get('/api/dialogs'); this.dialogs = r.data; } catch(e) {}
     },
@@ -164,7 +279,8 @@ export default {
     async sendMsg() {
       const text = this.msgText.trim();
       if (!text && !this.pendingFiles.length || !this.activeChat) return;
-      if (text) this.socket.emit('dm', { to: this.activeChat, msg: text });
+      const replyTo = this.replyMsg ? this.replyMsg.message?.substring(0, 100) : null;
+      if (text) this.socket.emit('dm', { to: this.activeChat, msg: text, replyTo });
       for (const file of this.pendingFiles) {
         const form = new FormData(); form.append('img', file);
         try {
@@ -173,7 +289,7 @@ export default {
           this.socket.emit('dm', { to: this.activeChat, msg: '', files: [{ url: r.data.url, type, name: file.name }] });
         } catch(e) {}
       }
-      this.msgText = ''; this.pendingFiles = [];
+      this.msgText = ''; this.pendingFiles = []; this.replyMsg = null;
     },
     handleFiles(e) { this.pendingFiles.push(...Array.from(e.target.files)); e.target.value = ''; },
     async startRecord() {
@@ -197,7 +313,6 @@ export default {
 </script>
 
 <style scoped>
-/* Базовые стили */
 .chat-container { display: flex; height: calc(100vh - 60px); max-width: 1280px; margin: 0 auto; background: #f8fafc; color: #1e293b; }
 .chat-container.dark { background: #0f172a; color: #e2e8f0; }
 .chat-sidebar { width: 300px; border-right: 1px solid #e2e8f0; background: #fff; padding: 16px; display: flex; flex-direction: column; flex-shrink: 0; }
@@ -225,16 +340,27 @@ export default {
 .chat-header { padding: 14px 16px; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
 .dark .chat-header { background: #1e293b; border-color: #334155; }
 .chat-header .online { color: #22c55e; font-size: 0.8rem; }
+.msg-search { display: flex; gap: 8px; padding: 8px 16px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+.dark .msg-search { background: #1e293b; border-color: #334155; }
 .chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
-.msg { max-width: 75%; padding: 10px 14px; border-radius: 16px; background: #e2e8f0; align-self: flex-start; }
+.msg { max-width: 75%; padding: 10px 14px; border-radius: 16px; background: #e2e8f0; align-self: flex-start; position: relative; }
 .dark .msg { background: #334155; }
 .msg.mine { background: #6366f1; color: #fff; align-self: flex-end; }
+.msg:hover .msg-actions { display: flex; }
+.msg-actions { display: none; position: absolute; top: -8px; right: 8px; gap: 4px; }
+.msg.mine .msg-actions { right: auto; left: 8px; }
+.msg-actions button { background: #fff; border: 1px solid #e2e8f0; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 0.7rem; display: flex; align-items: center; justify-content: center; }
+.reply-preview { border-left: 3px solid #6366f1; padding: 4px 8px; margin-bottom: 4px; font-size: 0.75rem; opacity: 0.8; }
 .msg-text { font-size: 0.9rem; word-break: break-word; }
 .msg-files { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
 .msg-img { max-width: 200px; border-radius: 8px; cursor: pointer; }
 .msg-video { max-width: 250px; border-radius: 8px; }
 .file-link { color: #6366f1; text-decoration: none; font-size: 0.85rem; }
 .msg-time { font-size: 0.7rem; opacity: 0.7; display: block; margin-top: 4px; }
+.reply-bar, .edit-bar { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: #fff; border-top: 1px solid #e2e8f0; font-size: 0.85rem; }
+.dark .reply-bar, .dark .edit-bar { background: #1e293b; border-color: #334155; }
+.edit-input { flex: 1; padding: 6px 10px; border: 2px solid #e2e8f0; border-radius: 8px; font-family: inherit; font-size: 0.85rem; }
+.typing-indicator { padding: 4px 16px; font-size: 0.75rem; color: #6366f1; font-style: italic; }
 .chat-input { display: flex; gap: 6px; padding: 12px 16px; background: #fff; border-top: 1px solid #e2e8f0; align-items: flex-end; position: relative; }
 .dark .chat-input { background: #1e293b; border-color: #334155; }
 .emoji-wrapper { position: relative; }
@@ -254,7 +380,6 @@ export default {
 .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
 .mobile-back { display: none; }
 
-/* Мобильная адаптация */
 @media (max-width: 768px) {
   .chat-sidebar { width: 100%; height: 100%; }
   .chat-sidebar.mobile-hidden { display: none; }
