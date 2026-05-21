@@ -1,8 +1,6 @@
 <template>
   <div class="chat-container">
-    <!-- Левая панель -->
     <div class="chat-sidebar">
-      <!-- Поиск пользователей -->
       <div class="search-box">
         <input v-model="searchQuery" @input="searchUsers" placeholder="🔍 Поиск людей..." class="search-input">
         <div v-if="searchResults.length" class="search-results">
@@ -32,7 +30,6 @@
       <button class="btn btn-p btn-sm" @click="$router.push('/profile')">← Назад</button>
     </div>
 
-    <!-- Правая панель: сообщения -->
     <div class="chat-main" v-if="activeChat">
       <div class="chat-header">
         <strong>{{ activeChatName }}</strong>
@@ -53,9 +50,7 @@
         </div>
       </div>
       
-      <!-- Поле ввода -->
       <div class="chat-input">
-        <!-- Эмодзи -->
         <div class="emoji-wrapper">
           <button class="btn btn-o btn-sm" @click="showEmoji = !showEmoji">😊</button>
           <div v-if="showEmoji" class="emoji-picker">
@@ -63,19 +58,16 @@
           </div>
         </div>
         
-        <!-- Файлы -->
         <button class="btn btn-o btn-sm" @click="$refs.fileInput.click()">📎</button>
         <input type="file" ref="fileInput" @change="handleFiles" hidden multiple accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.zip">
         
-        <!-- Голосовое -->
-        <button class="btn btn-o btn-sm" @mousedown="startRecord" @mouseup="stopRecord" @touchstart="startRecord" @touchend="stopRecord">🎤</button>
+        <button class="btn btn-o btn-sm" @mousedown="startRecord" @mouseup="stopRecord" @mouseleave="stopRecord" @touchstart.prevent="startRecord" @touchend.prevent="stopRecord">🎤</button>
         <span v-if="recording" style="color:red;font-size:0.8rem">🔴 Запись...</span>
         
         <textarea v-model="msgText" @keydown.enter.exact.prevent="sendMsg" placeholder="Сообщение..." rows="1"></textarea>
         <button class="btn btn-p btn-sm" @click="sendMsg">➤</button>
       </div>
       
-      <!-- Превью файлов -->
       <div v-if="pendingFiles.length" class="file-preview">
         <div v-for="(f, i) in pendingFiles" :key="i" class="preview-item">
           <span>{{ f.name }}</span>
@@ -88,7 +80,6 @@
       <p style="text-align:center;color:#94a3b8;margin-top:40px">Выберите чат или найдите человека</p>
     </div>
 
-    <!-- Лайтбокс -->
     <div class="lightbox" v-if="lightbox" @click="lightbox = null">
       <img :src="lightbox" style="max-width:90%;max-height:90%;border-radius:12px">
     </div>
@@ -119,6 +110,7 @@ export default {
       recording: false,
       mediaRecorder: null,
       isPartnerOnline: false,
+      chunks: [],
       emojis: ['😀','😂','🤣','😍','🥰','😘','😜','😎','🤩','😇','🤔','😴','🥳','😡','💀','👻','💩','👍','👎','❤️','💔','🔥','🎉','⭐','✅','❌','💯','🙏','🤝','💪','👀','🦄','🐶','🌹','🍕','⚽','🚀','🌈','🎵','📚','💡','💰','⏰','📍']
     };
   },
@@ -215,15 +207,15 @@ export default {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         this.recording = true;
         this.mediaRecorder = new MediaRecorder(stream);
-        const chunks = [];
-        this.mediaRecorder.ondataavailable = e => chunks.push(e.data);
+        this.chunks = [];
+        this.mediaRecorder.ondataavailable = e => this.chunks.push(e.data);
         this.mediaRecorder.onstop = async () => {
-          const blob = new Blob(chunks, { type: 'audio/webm' });
+          const blob = new Blob(this.chunks, { type: 'audio/webm' });
           const form = new FormData();
           form.append('img', blob, 'voice.webm');
           try {
             const r = await axios.post('/api/nimg', form);
-            this.socket.emit('dm', { to: this.activeChat, msg: '', files: [{ url: r.data.url, type: 'audio', name: '🎤 Голосовое' }] });
+            this.socket.emit('dm', { to: this.activeChat, msg: '🎤 Голосовое сообщение', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }] });
           } catch(e) {}
           stream.getTracks().forEach(t => t.stop());
           this.recording = false;
@@ -232,7 +224,7 @@ export default {
       } catch(e) { this.recording = false; }
     },
     stopRecord() {
-      if (this.mediaRecorder && this.recording) {
+      if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
         this.mediaRecorder.stop();
       }
     },
