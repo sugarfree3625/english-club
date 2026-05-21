@@ -12,8 +12,8 @@ const { Server } = require('socket.io');
 const multer = require('multer');
 
 const app = express();
-const server = http.createServer(app);
 const io = new Server(server);
+const server = http.createServer(app);
 
 const TG_TOKEN = process.env.TG_TOKEN || '';
 const TG_BOT = 'English_Language_Class_Bot';
@@ -471,7 +471,11 @@ init().then(() => {
   });
 
   server.listen(process.env.PORT || 3000, () => console.log('🚀 Сервер запущен'));
-
+// Анти-сон для бесплатного тарифа Render — пингуем сами себя каждые 10 минут
+    setInterval(() => {
+      fetch(`http://localhost:${process.env.PORT || 3000}/api/settings`).catch(() => {});
+    }, 10 * 60 * 1000);
+  });
   if (TG_TOKEN) {
     let lastUpdateId = 0;
     setInterval(async () => {
