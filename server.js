@@ -397,7 +397,7 @@ init().then(() => {
     const fn = `s-${s.id}-${Date.now()}.ics`; fs.writeFileSync(`uploads/calendars/${fn}`, value); return `/calendars/${fn}`;
   }
 
-  const onlineUsers = new Map();
+    const onlineUsers = new Map();
 
   io.on('connection', s => {
     s.on('join', d => { 
@@ -416,14 +416,17 @@ init().then(() => {
       }
     });
     
+    // Отправка сообщения
     s.on('dm', d => {
       if (!s.uid) return;
       const files = d.files || [];
       const m = { 
+        id: Date.now(),
         from: s.uid, 
         fn: s.uname, 
         msg: d.msg || '', 
         files: files.length ? files : null,
+        reply_to: d.replyTo || null,
         ts: new Date().toISOString() 
       };
       io.to(`u:${d.to}`).emit('dm', m);
@@ -435,6 +438,26 @@ init().then(() => {
       if (d.to !== 0 && !onlineUsers.has(d.to)) {
         notifyUser(d.to, `💬 Новое сообщение от ${s.uname}: ${(d.msg||'Прислал файлы').substring(0, 100)}`);
       }
+    });
+    
+    // Индикатор печати
+    s.on('typing', d => {
+      if (!s.uid) return;
+      io.to(`u:${d.to}`).emit('typing', { from: s.uid });
+    });
+    
+    // Редактирование сообщения
+    s.on('editMsg', d => {
+      if (!s.uid) return;
+      run(`UPDATE msg SET message='${esc(d.message)}' WHERE id=${d.msgId} AND sender_id=${s.uid}`);
+      io.to(`u:${d.to}`).emit('msgEdited', { msgId: d.msgId, message: d.message });
+    });
+    
+    // Удаление сообщения
+    s.on('deleteMsg', d => {
+      if (!s.uid) return;
+      run(`DELETE FROM msg WHERE id=${d.msgId} AND sender_id=${s.uid}`);
+      io.to(`u:${d.to}`).emit('msgDeleted', { msgId: d.msgId });
     });
     
     s.on('hist', d => { if (!s.uid) return; s.emit('hist', all(`SELECT m.*,u.username as fn FROM msg m JOIN users u ON m.sender_id=u.id WHERE(m.sender_id=${s.uid} AND m.receiver_id=0)OR(m.sender_id=0 AND m.receiver_id=${s.uid})ORDER BY m.ts ASC`)); });
