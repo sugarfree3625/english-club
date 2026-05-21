@@ -10,7 +10,7 @@ const routes = [
   { path: '/dashboard', component: DashboardPage },
   { path: '/profile', component: ProfilePage },
   { path: '/messages', component: MessagesPage },
-  { path: '/admin', component: AdminPanel }
+  
 ];
 
 const router = createRouter({
