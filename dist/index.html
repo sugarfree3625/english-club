@@ -4,25 +4,106 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>English Club</title>
-  
-  <!-- Стили -->
-  <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗣️</text></svg>">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  
-  <!-- PWA -->
-  <!-- PWAA -->
-  <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#6366f1">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="EngClub">
-  <link rel="apple-touch-icon" href="https://i.pinimg.com/736x/5b/ca/8f/5bca8fdc8339996311f4c8ee07787bf7.jpg">
-  <script type="module" crossorigin src="/assets/index-CebK-HQg.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-H3wSo77T.css">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --text-secondary: #64748b;
+      --primary: #6366f1;
+      --primary-light: #eef0ff;
+      --hover: #f1f5f9;
+      --input-bg: #ffffff;
+    }
+    
+    body.dark {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --border: #334155;
+      --text: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --primary: #818cf8;
+      --primary-light: #1e3a5f;
+      --hover: #334155;
+      --input-bg: #1e293b;
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      transition: background 0.3s, color 0.3s;
+      min-height: 100vh;
+    }
+    
+    .card, .modal, .profile-sidebar, .chat-sidebar, .chat-header, .feed-card, .session,
+    .dialog-item, .preview-item, .file-preview, .chat-input {
+      background: var(--surface);
+      border-color: var(--border);
+      color: var(--text);
+      transition: background 0.3s, color 0.3s, border-color 0.3s;
+    }
+    
+    .input, .search-input, textarea, select {
+      background: var(--input-bg);
+      border-color: var(--border);
+      color: var(--text);
+      transition: background 0.3s, color 0.3s, border-color 0.3s;
+    }
+    
+    .sidebar-btn, .dialog-item, .search-item {
+      color: var(--text-secondary);
+      transition: background 0.3s, color 0.3s;
+    }
+    
+    .sidebar-btn:hover, .sidebar-btn.active, .dialog-item:hover, .dialog-item.active,
+    .search-item:hover {
+      background: var(--primary-light);
+      color: var(--primary);
+    }
+    
+    .chat-main, .profile-main, section {
+      background: var(--bg);
+      transition: background 0.3s;
+    }
+    
+    .dropdown {
+      background: var(--surface);
+      border-color: var(--border);
+      color: var(--text);
+    }
+    
+    .header {
+      background: var(--surface);
+      border-color: var(--border);
+    }
+
+    .dash-hero {
+      background: linear-gradient(135deg, var(--primary-light), var(--bg));
+    }
+
+    .word-card {
+      background: var(--hover);
+    }
+  </style>
+  <script>
+    // Восстановление темы при загрузке
+    (function() {
+      const saved = localStorage.getItem('theme');
+      if (saved === 'dark') document.body.classList.add('dark');
+    })();
+  </script>
 </head>
 <body>
   <div id="app"></div>
-  </script>
+  <script src="/assets/index-CebK-HQg.js"></script>
+  <link rel="stylesheet" href="/assets/index-H3wSo77T.css">
 </body>
 </html>
