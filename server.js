@@ -12,8 +12,8 @@ const { Server } = require('socket.io');
 const multer = require('multer');
 
 const app = express();
-const io = new Server(server);
 const server = http.createServer(app);
+const io = new Server(server);
 
 const TG_TOKEN = process.env.TG_TOKEN || '';
 const TG_BOT = 'English_Language_Class_Bot';
