@@ -391,26 +391,54 @@ init().then(() => {
     } catch (e) { return null; }
   }
 
-  function genICS(s) {
+function genICS(s) {
     const st = new Date(s.date), en = new Date(st.getTime() + (s.duration || 60) * 60000);
     const { error, value } = icsEvent({ start: [st.getFullYear(), st.getMonth()+1, st.getDate(), st.getHours(), st.getMinutes()], end: [en.getFullYear(), en.getMonth()+1, en.getDate(), en.getHours(), en.getMinutes()], title: `[Club] ${s.title}`, location: s.meeting_link || 'Онлайн', url: s.meeting_link, status: 'CONFIRMED' });
     if (error) return null;
     const fn = `s-${s.id}-${Date.now()}.ics`; fs.writeFileSync(`dist/calendars/${fn}`, value); return `/calendars/${fn}`;
   }
 
+  const onlineUsers = new Map();
+
   io.on('connection', s => {
-    s.on('join', d => { s.uid = d.uid; s.uname = d.uname; s.role = d.role; s.join(`u:${d.uid}`); });
-    s.on('dm', d => {
-      if (!s.uid) return;
-      const m = { from: s.uid, fn: s.uname, msg: d.msg || '', file_url: d.fileUrl || null, file_type: d.fileType || null, ts: new Date().toISOString() };
-      io.to(`u:${d.to}`).emit('dm', m);
-      s.emit('dm', m);
-      run(`INSERT INTO msg(sender_id,receiver_id,message,file_url,file_type) VALUES(${s.uid},${d.to},'${esc(d.msg||'')}',${d.fileUrl?`'${esc(d.fileUrl)}'`:'NULL'},${d.fileType?`'${esc(d.fileType)}'`:'NULL'})`);
-      if (d.to !== 0) {
-        const receiver = one(`SELECT username FROM users WHERE id=${d.to}`);
-        notifyUser(d.to, `💬 Новое сообщение от ${s.uname}: ${(d.msg||'').substring(0, 100)}`);
+    s.on('join', d => { 
+      s.uid = d.uid; 
+      s.uname = d.uname; 
+      s.role = d.role; 
+      s.join(`u:${d.uid}`);
+      onlineUsers.set(d.uid, true);
+      io.emit('userStatus', { userId: d.uid, online: true });
+    });
+    
+    s.on('disconnect', () => {
+      if (s.uid) {
+        onlineUsers.delete(s.uid);
+        io.emit('userStatus', { userId: s.uid, online: false });
       }
     });
+    
+    s.on('dm', d => {
+      if (!s.uid) return;
+      const files = d.files || [];
+      const m = { 
+        from: s.uid, 
+        fn: s.uname, 
+        msg: d.msg || '', 
+        files: files.length ? files : null,
+        ts: new Date().toISOString() 
+      };
+      io.to(`u:${d.to}`).emit('dm', m);
+      s.emit('dm', m);
+      
+      const fileData = files.length ? JSON.stringify(files) : null;
+      run(`INSERT INTO msg(sender_id,receiver_id,message,file_url,file_type) VALUES(${s.uid},${d.to},'${esc(d.msg||'')}',${fileData ? `'${esc(fileData)}'` : 'NULL'},'files')`);
+      
+      if (d.to !== 0 && !onlineUsers.has(d.to)) {
+        const receiver = one(`SELECT username FROM users WHERE id=${d.to}`);
+        notifyUser(d.to, `💬 Новое сообщение от ${s.uname}: ${(d.msg||'Прислал файлы').substring(0, 100)}`);
+      }
+    });
+    
     s.on('hist', d => { if (!s.uid) return; s.emit('hist', all(`SELECT m.*,u.username as fn FROM msg m JOIN users u ON m.sender_id=u.id WHERE(m.sender_id=${s.uid} AND m.receiver_id=0)OR(m.sender_id=0 AND m.receiver_id=${s.uid})ORDER BY m.ts ASC`)); });
     s.on('dmhist', d => { if (!s.uid) return; s.emit('dmhist', { with: d.with, msgs: all(`SELECT m.*,u.username as fn FROM msg m JOIN users u ON m.sender_id=u.id WHERE(m.sender_id=${s.uid} AND m.receiver_id=${d.with})OR(m.sender_id=${d.with} AND m.receiver_id=${s.uid})ORDER BY m.ts ASC`) }); });
     s.on('jadmin', () => { if (s.role === 'admin') s.join('admin'); });
