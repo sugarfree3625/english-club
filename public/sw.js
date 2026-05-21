@@ -1,12 +1,7 @@
-const CACHE = 'engclub-v1';
-const urls = ['/', '/dashboard', '/profile', '/manifest.json'];
-
+const CACHE = 'engclub-v2';
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(urls)));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(['/'])));
 });
-
 self.addEventListener('fetch', e => {
-  e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request))
-  );
+  e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
 });
