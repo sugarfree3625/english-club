@@ -206,8 +206,47 @@ async function ensureTutorChat(userId) {
   app.get('/api/feedback/:studentId', auth, async (req, res) => { /* без изменений */ });
 
   // ПРИВЯЗКА РОДИТЕЛЯ
-  app.post('/api/parent/bind', auth, async (req, res) => { /* без изменений */ });
-
+app.post('/api/parent/bind', auth, async (req, res) => {
+  try {
+    const { student_id, parent_id } = req.body;
+    
+    if (!student_id || !parent_id) {
+      return res.status(400).json({ error: 'Укажите ученика и родителя' });
+    }
+    
+    // Проверяем, что пользователь — репетитор или админ
+    if (req.session.role !== 'admin' && req.session.role !== 'host') {
+      return res.status(403).json({ error: 'Нет прав' });
+    }
+    
+    // Проверяем, существует ли уже такая связь
+    const { data: existing } = await supabase
+      .from('student_parents')
+      .select('id')
+      .eq('student_id', student_id)
+      .eq('parent_id', parent_id)
+      .single();
+    
+    if (existing) {
+      return res.status(400).json({ error: 'Связь уже существует' });
+    }
+    
+    // Создаём связь
+    const { error } = await supabase
+      .from('student_parents')
+      .insert({ student_id, parent_id });
+    
+    if (error) {
+      console.error('Ошибка привязки родителя:', error);
+      return res.status(500).json({ error: 'Ошибка сервера' });
+    }
+    
+    res.json({ success: true });
+  } catch(e) {
+    console.error('Ошибка привязки родителя:', e);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
   // ========== НОВЫЙ КАЛЕНДАРЬ (SLOTS) ==========
 app.get('/api/slots', auth, async (req, res) => {
   try {
