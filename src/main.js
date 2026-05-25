@@ -1,4 +1,4 @@
-import './assets/main.css';
+import './assets/global.css';
 import axios from 'axios';
 
 axios.defaults.baseURL = 'https://english-club-v1.onrender.com';
