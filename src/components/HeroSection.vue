@@ -1,54 +1,72 @@
 <template>
-  <section class="relative min-h-screen flex items-center justify-center bg-[#0f172a] overflow-hidden">
-    <!-- Анимированные шары -->
-    <div class="absolute top-[-200px] left-[-200px] w-[600px] h-[600px] rounded-full bg-[#6366f1] blur-[120px] opacity-30 floating-orb-1"></div>
-    <div class="absolute bottom-[-200px] right-[-200px] w-[500px] h-[500px] rounded-full bg-[#2dd4bf] blur-[120px] opacity-30 floating-orb-2"></div>
+  <section class="hero-new">
+    <div class="hero-orb hero-orb-1"></div>
+    <div class="hero-orb hero-orb-2"></div>
 
-    <div class="relative z-10 text-center px-6 max-w-4xl mx-auto">
-      <!-- Заголовок -->
-      <h1 class="font-['Space_Grotesk'] text-5xl md:text-7xl font-bold mb-6 leading-tight">
+    <div class="hero-content-new">
+      <h1 class="hero-title">
         <span class="gradient-text-animated">Speak English Freely</span>
       </h1>
 
-      <!-- Подзаголовок -->
-      <p class="fade-in-up font-['Inter'] text-lg md:text-xl text-gray-400 mb-10 max-w-2xl mx-auto" style="animation-delay: 0.3s">
+      <p class="hero-subtitle fade-in-up" style="animation-delay: 0.3s">
         Разговорный клуб нового поколения
       </p>
 
-      <!-- Кнопка -->
-      <button class="glass-btn group fade-in-up mx-auto" style="animation-delay: 0.6s">
-        <MessageCircle class="w-5 h-5 group-hover:scale-120 group-hover:-rotate-12 transition-all duration-500" />
+      <button class="glass-btn fade-in-up" style="animation-delay: 0.6s">
+        <i class="fas fa-comment-dots hero-icon"></i>
         <span>Начать говорить</span>
       </button>
 
-      <!-- Индикаторы -->
-      <div class="flex justify-center gap-6 mt-12 flex-wrap">
+      <div class="hero-indicators">
         <div class="glass-indicator fade-in-up" style="animation-delay: 0.8s">
-          <Globe class="w-5 h-5 text-[#6366f1]" />
-          <span class="text-sm text-gray-300">Онлайн встречи</span>
+          <i class="fas fa-globe" style="color: var(--p)"></i>
+          <span>Онлайн встречи</span>
         </div>
         <div class="glass-indicator fade-in-up" style="animation-delay: 1.0s">
-          <Users class="w-5 h-5 text-[#2dd4bf]" />
-          <span class="text-sm text-gray-300">500+ учеников</span>
+          <i class="fas fa-users" style="color: #2dd4bf"></i>
+          <span>500+ учеников</span>
         </div>
         <div class="glass-indicator fade-in-up" style="animation-delay: 1.2s">
-          <TrendingUp class="w-5 h-5 text-[#6366f1]" />
-          <span class="text-sm text-gray-300">98% довольны</span>
+          <i class="fas fa-chart-line" style="color: var(--p)"></i>
+          <span>98% довольны</span>
         </div>
       </div>
     </div>
   </section>
 </template>
 
-<script setup>
-import { Globe, MessageCircle, TrendingUp, Users } from 'lucide-vue-next';
-</script>
-
 <style scoped>
-.floating-orb-1 {
+.hero-new {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  background: #0f172a;
+}
+.hero-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.3;
+  pointer-events: none;
+}
+.hero-orb-1 {
+  width: 600px;
+  height: 600px;
+  background: #6366f1;
+  top: -200px;
+  left: -200px;
   animation: floatOrb1 15s ease-in-out infinite;
 }
-.floating-orb-2 {
+.hero-orb-2 {
+  width: 500px;
+  height: 500px;
+  background: #2dd4bf;
+  bottom: -200px;
+  right: -200px;
   animation: floatOrb2 15s ease-in-out infinite;
 }
 @keyframes floatOrb1 {
@@ -63,6 +81,20 @@ import { Globe, MessageCircle, TrendingUp, Users } from 'lucide-vue-next';
   50% { transform: translate(30px, -40px) scale(0.94); }
   75% { transform: translate(25px, 50px) scale(1.03); }
 }
+.hero-content-new {
+  position: relative;
+  z-index: 1;
+  padding: 0 24px;
+  max-width: 700px;
+  width: 100%;
+}
+.hero-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-weight: 800;
+  line-height: 1.1;
+  margin-bottom: 20px;
+}
 .gradient-text-animated {
   background: linear-gradient(90deg, #6366f1, #2dd4bf, #6366f1);
   background-size: 200% 100%;
@@ -74,6 +106,11 @@ import { Globe, MessageCircle, TrendingUp, Users } from 'lucide-vue-next';
 @keyframes gradientMove {
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
+}
+.hero-subtitle {
+  font-size: 1.15rem;
+  color: #94a3b8;
+  margin-bottom: 32px;
 }
 .glass-btn {
   display: inline-flex;
@@ -89,11 +126,24 @@ import { Globe, MessageCircle, TrendingUp, Users } from 'lucide-vue-next';
   font-size: 1rem;
   cursor: pointer;
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-bottom: 40px;
 }
 .glass-btn:hover {
   transform: scale(1.02);
   box-shadow: 0 0 20px rgba(99,102,241,0.3);
   background: rgba(255,255,255,0.1);
+}
+.hero-icon {
+  transition: all 0.3s;
+}
+.glass-btn:hover .hero-icon {
+  transform: scale(1.2) rotate(-10deg);
+}
+.hero-indicators {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 .glass-indicator {
   display: flex;
@@ -104,6 +154,8 @@ import { Globe, MessageCircle, TrendingUp, Users } from 'lucide-vue-next';
   background: rgba(255,255,255,0.03);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255,255,255,0.08);
+  color: #94a3b8;
+  font-size: 0.9rem;
 }
 .fade-in-up {
   opacity: 0;
@@ -112,5 +164,8 @@ import { Globe, MessageCircle, TrendingUp, Users } from 'lucide-vue-next';
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
+}
+@media (max-width: 768px) {
+  .hero-title { font-size: 2.5rem; }
 }
 </style>
