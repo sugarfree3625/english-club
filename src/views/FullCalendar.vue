@@ -3,21 +3,22 @@
     <!-- Заголовок -->
     <div class="calendar-header">
       <div class="calendar-nav">
-        <button class="btn btn-o btn-sm" @click="prevMonth">←</button>
-        <h2 class="calendar-title">{{ currentMonthName }} {{ currentYear }}</h2>
-        <button class="btn btn-o btn-sm" @click="nextMonth">→</button>
+        <button class="btn btn-o btn-sm" @click="prevWeek">←</button>
+        <h2 class="calendar-title">{{ weekLabel }}</h2>
+        <button class="btn btn-o btn-sm" @click="nextWeek">→</button>
+        <button class="btn btn-o btn-sm" @click="goToday">Сегодня</button>
       </div>
       <div class="calendar-actions">
         <button class="btn btn-o btn-sm" @click="viewMode = 'month'">📅 Месяц</button>
         <button class="btn btn-o btn-sm" @click="viewMode = 'week'">📆 Неделя</button>
         <button class="btn btn-o btn-sm" @click="exportICS">📤 Экспорт</button>
-        <button class="btn btn-p btn-sm" @click="showAddSlot = true" v-if="isTutor">+ Занятие</button>
+        <button class="btn btn-p btn-sm" @click="openAddSlot" v-if="isTutor">+ Занятие</button>
       </div>
     </div>
 
     <!-- Сетка месяца -->
     <div v-if="viewMode === 'month'" class="month-grid">
-      <div class="day-header" v-for="day in weekDays" :key="day"> {{ day }} </div>
+      <div class="day-header" v-for="day in weekDays" :key="day">{{ day }}</div>
       <div 
         class="day-cell" 
         v-for="(day, idx) in monthDays" 
@@ -40,48 +41,39 @@
       </div>
     </div>
 
-    <!-- Сетка недели (получасовая клетка) -->
-    <div v-if="viewMode === 'week'" class="week-grid">
-      <div class="week-header-cell">Время</div>
-      <div class="week-header-cell" v-for="day in weekDaysList" :key="day.date" :class="{ today: day.isToday }">
-        {{ day.name }}<br>{{ day.dateStr }}
+    <!-- Сетка недели -->
+    <div v-if="viewMode === 'week'" class="week-wrapper">
+      <div class="week-grid">
+        <!-- Заголовки дней -->
+        <div class="week-header-cell">Время</div>
+        <div class="week-header-cell" v-for="day in weekDaysList" :key="day.date" :class="{ today: day.isToday }">
+          {{ day.name }}<br>{{ day.dateStr }}
+        </div>
+        
+        <!-- Фоновая сетка -->
+        <template v-for="hour in hours" :key="hour">
+          <div class="week-time-cell">{{ hour }}:00</div>
+          <div class="week-bg-cell" v-for="day in weekDaysList" :key="'bg'+day.date+hour+':00'" :class="{ today: day.isToday }"></div>
+          <div class="week-time-cell week-time-half">:30</div>
+          <div class="week-bg-cell week-bg-half" v-for="day in weekDaysList" :key="'bg'+day.date+hour+':30'" :class="{ today: day.isToday }"></div>
+        </template>
+        
+        <!-- Слоты (абсолютное позиционирование) -->
+        <div class="slots-layer">
+          <div 
+            v-for="slot in weekSlots" 
+            :key="slot.id"
+            class="slot-block"
+            :class="getSlotColor(slot.lesson_type)"
+            :style="getSlotStyle(slot)"
+            @click="editSlot(slot)"
+          >
+            <div class="slot-time-label">{{ formatTime(slot.start_time) }} - {{ formatTime(slot.end_time) }}</div>
+            <div class="slot-block-title">{{ slot.title }}</div>
+            <div class="slot-block-student">{{ slot.users?.username || (slot.group_students?.length ? '👥 Группа' : '—') }}</div>
+          </div>
+        </div>
       </div>
-      <template v-for="hour in hours" :key="hour">
-        <div class="week-time-cell">{{ hour }}:00</div>
-        <div 
-          class="week-slot-cell" 
-          v-for="day in weekDaysList" :key="day.date + hour + ':00'"
-          :class="{ today: day.isToday }"
-          @click="openSlot(day.date, hour, 0)"
-        >
-          <div 
-            v-if="getSlot(day.date, hour, 0)" 
-            class="slot-card" 
-            :class="getSlotColor(getSlot(day.date, hour, 0).lesson_type)"
-            @click.stop="editSlot(getSlot(day.date, hour, 0))"
-          >
-            <div class="slot-title">{{ getSlot(day.date, hour, 0).title }}</div>
-            <div class="slot-student">{{ getSlot(day.date, hour, 0).users?.username || '—' }}</div>
-          </div>
-        </div>
-        <div class="week-time-cell week-time-half">:30</div>
-        <div 
-          class="week-slot-cell week-slot-half" 
-          v-for="day in weekDaysList" :key="day.date + hour + ':30'"
-          :class="{ today: day.isToday }"
-          @click="openSlot(day.date, hour, 30)"
-        >
-          <div 
-            v-if="getSlot(day.date, hour, 30)" 
-            class="slot-card" 
-            :class="getSlotColor(getSlot(day.date, hour, 30).lesson_type)"
-            @click.stop="editSlot(getSlot(day.date, hour, 30))"
-          >
-            <div class="slot-title">{{ getSlot(day.date, hour, 30).title }}</div>
-            <div class="slot-student">{{ getSlot(day.date, hour, 30).users?.username || '—' }}</div>
-          </div>
-        </div>
-      </template>
     </div>
 
     <!-- История -->
@@ -90,7 +82,8 @@
       <div class="history-item" v-for="s in pastSlots.slice(0, 10)" :key="s.id">
         <span>{{ getTypeEmoji(s.lesson_type) }}</span>
         <strong>{{ s.title }}</strong>
-        <small>{{ new Date(s.start_time).toLocaleDateString('ru') }}</small>
+        <small>{{ formatDate(s.start_time) }}</small>
+        <small>{{ formatTime(s.start_time) }} - {{ formatTime(s.end_time) }}</small>
       </div>
     </div>
 
@@ -203,8 +196,24 @@ export default {
           name: ['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'][i],
           dateStr: d.toLocaleDateString('ru', { day: 'numeric', month: 'short' }),
           isToday: d.toDateString() === today.toDateString(),
+          dayIndex: i,
         };
       });
+    },
+    weekLabel() {
+      if (!this.weekDaysList.length) return '';
+      return `${this.weekDaysList[0].dateStr} — ${this.weekDaysList[6].dateStr}`;
+    },
+    weekSlots() {
+      const weekStart = this.weekDaysList[0]?.date;
+      const weekEnd = this.weekDaysList[6]?.date;
+      if (!weekStart || !weekEnd) return [];
+      return this.slots
+        .filter(s => {
+          const sd = new Date(s.start_time).toISOString().split('T')[0];
+          return sd >= weekStart && sd <= weekEnd;
+        })
+        .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
     },
     pastSlots() { return this.slots.filter(s => new Date(s.start_time) < new Date()); },
   },
@@ -215,25 +224,13 @@ export default {
     async loadSlots() { try { const r = await axios.get('/api/slots'); this.slots = r.data || []; } catch(e) {} },
     async loadStudents() { try { const r = await axios.get('/api/users'); this.allStudents = (r.data || []).filter(u => u.role !== 'admin' && u.role !== 'parent'); } catch(e) {} },
     getSlotsForDate(date) { return this.slots.filter(s => new Date(s.start_time).toISOString().split('T')[0] === date); },
-    getSlot(date, hour, minutes = 0) { 
-  const cellStart = hour * 60 + minutes;
-  const cellEnd = cellStart + 30;
-  return this.slots.find(s => { 
-    const sd = new Date(s.start_time); 
-    const slotStart = sd.getHours() * 60 + sd.getMinutes();
-    const slotEnd = slotStart + (s.duration || 30);
-    return sd.toISOString().split('T')[0] === date && 
-           slotStart < cellEnd && 
-           slotEnd >= cellStart;
-  }); 
-},
-getSlotColor(t) { 
-  if (t === 'online') return 'slot-online'; 
-  if (t === 'offline') return 'slot-offline'; 
-  if (t === 'group-online') return 'slot-group-online'; 
-  if (t === 'group-offline') return 'slot-group-offline'; 
-  return 'slot-online'; 
-},
+    getSlotColor(t) { 
+      if (t === 'online') return 'slot-online'; 
+      if (t === 'offline') return 'slot-offline'; 
+      if (t === 'group-online') return 'slot-group-online'; 
+      if (t === 'group-offline') return 'slot-group-offline'; 
+      return 'slot-online'; 
+    },
     getTypeEmoji(t) {
       if (t === 'online') return '🟢';
       if (t === 'offline') return '🔵';
@@ -241,6 +238,32 @@ getSlotColor(t) {
       if (t === 'group-offline') return '🔴';
       return '🟢';
     },
+    getSlotStyle(slot) {
+      const sd = new Date(slot.start_time);
+      const ed = new Date(slot.end_time);
+      const dayIndex = this.weekDaysList.findIndex(d => d.date === sd.toISOString().split('T')[0]);
+      if (dayIndex === -1) return { display: 'none' };
+      
+      const startHour = 8;
+      const totalMinutes = 14 * 60; // 8:00 to 22:00
+      const slotStartMinutes = (sd.getHours() - startHour) * 60 + sd.getMinutes();
+      const slotEndMinutes = (ed.getHours() - startHour) * 60 + ed.getMinutes();
+      const duration = Math.max(slotEndMinutes - slotStartMinutes, 30);
+      
+      const topPercent = (slotStartMinutes / totalMinutes) * 100;
+      const heightPercent = (duration / totalMinutes) * 100;
+      const leftPercent = ((dayIndex + 1) / 8) * 100 + 0.5;
+      const widthPercent = (1 / 8) * 100 - 1;
+      
+      return {
+        top: topPercent + '%',
+        height: heightPercent + '%',
+        left: leftPercent + '%',
+        width: widthPercent + '%',
+      };
+    },
+    formatDate(ts) { return ts ? new Date(ts).toLocaleDateString('ru', { day: 'numeric', month: 'short' }) : ''; },
+    formatTime(ts) { return ts ? new Date(ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : ''; },
     toggleGroupStudent(id) {
       const idx = this.slotForm.group_students.indexOf(id);
       if (idx === -1) {
@@ -249,15 +272,13 @@ getSlotColor(t) {
         this.slotForm.group_students.splice(idx, 1);
       }
     },
+    prevWeek() { this.currentWeek--; this.loadSlots(); },
+    nextWeek() { this.currentWeek++; this.loadSlots(); },
+    goToday() { this.currentWeek = 0; this.loadSlots(); },
     prevMonth() { if (this.currentMonth === 0) { this.currentMonth = 11; this.currentYear--; } else this.currentMonth--; },
     nextMonth() { if (this.currentMonth === 11) { this.currentMonth = 0; this.currentYear++; } else this.currentMonth++; },
     openDay(date) { this.slotForm.date = date; this.slotForm.group_students = []; this.showAddSlot = true; },
-    openSlot(date, hour, minutes = 0) { 
-      if (!this.isTutor) return; 
-      this.slotForm = { student_id: '', lesson_type: 'online', title: '', date, time: `${String(hour).padStart(2,'0')}:${String(minutes).padStart(2,'0')}`, duration: 30, notes: '', group_students: [] }; 
-      this.editingSlot = null;
-      this.showAddSlot = true; 
-    },
+    openAddSlot() { this.editingSlot = null; this.slotForm = { student_id: '', lesson_type: 'online', title: '', date: '', time: '', duration: 30, notes: '', group_students: [] }; this.showAddSlot = true; },
     editSlot(slot) { 
       this.editingSlot = slot; 
       const sd = new Date(slot.start_time); 
@@ -279,9 +300,8 @@ getSlotColor(t) {
         const st = `${this.slotForm.date}T${this.slotForm.time}:00`;
         const et = new Date(new Date(st).getTime() + (this.slotForm.duration || 30) * 60000).toISOString();
         const data = { ...this.slotForm, start_time: st, end_time: et };
-        if (!this.isGroupType) {
-          data.group_students = [];
-        }
+        if (!this.isGroupType) data.group_students = [];
+        if (this.isGroupType) data.student_id = null;
         if (this.editingSlot) {
           await axios.put(`/api/slots/${this.editingSlot.id}`, data);
         } else {
@@ -289,7 +309,7 @@ getSlotColor(t) {
         }
         this.closeModal();
         this.addToast('Сохранено! 🎉', 'success');
-        setTimeout(() => this.loadSlots(), 300);
+        setTimeout(() => this.loadSlots(), 500);
       } catch(e) {
         this.addToast('Ошибка', 'error');
       }
@@ -310,8 +330,10 @@ getSlotColor(t) {
 .calendar-container { max-width: 1280px; margin: 0 auto; padding: 24px; }
 .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
 .calendar-nav { display: flex; align-items: center; gap: 12px; }
-.calendar-title { font-weight: 800; font-size: 1.5rem; text-transform: capitalize; }
+.calendar-title { font-weight: 800; font-size: 1.5rem; }
 .calendar-actions { display: flex; gap: 8px; }
+
+/* Месяц */
 .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid var(--b); border-radius: 12px; overflow: hidden; }
 .day-header { background: var(--bg); font-weight: 700; text-align: center; padding: 10px; border-bottom: 1px solid var(--b); }
 .day-cell { min-height: 100px; padding: 6px; border-right: 1px solid var(--b); border-bottom: 1px solid var(--b); cursor: pointer; transition: background 0.2s; }
@@ -322,29 +344,81 @@ getSlotColor(t) {
 .day-number { font-weight: 600; font-size: 0.85rem; }
 .day-slots { margin-top: 4px; }
 .slot-mini { padding: 2px 6px; border-radius: 4px; color: #fff; font-size: 0.7rem; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+
+/* Цвета */
 .slot-online { background: #10b981; }
 .slot-offline { background: #6366f1; }
 .slot-group-online { background: #f59e0b; }
 .slot-group-offline { background: #ef4444; }
-.week-grid { display: grid; grid-template-columns: 70px repeat(7, 1fr); border: 1px solid var(--b); border-radius: 12px; overflow: hidden; min-width: 800px; }
+
+/* Неделя */
+.week-wrapper { overflow-x: auto; }
+.week-grid { 
+  display: grid; 
+  grid-template-columns: 70px repeat(7, 1fr); 
+  border: 1px solid var(--b); 
+  border-radius: 12px; 
+  overflow: hidden; 
+  min-width: 800px; 
+  position: relative;
+}
 .week-header-cell { background: var(--bg); font-weight: 700; text-align: center; padding: 10px 4px; border-bottom: 1px solid var(--b); font-size: 0.8rem; }
 .week-header-cell.today { background: rgba(99,102,241,0.08); }
 .week-time-cell { background: var(--bg); font-weight: 600; text-align: center; padding: 8px; border-bottom: 1px solid var(--b); font-size: 0.75rem; }
 .week-time-half { font-size: 0.65rem; color: var(--t2); }
-.week-slot-cell { min-height: 50px; padding: 4px; border-bottom: 1px solid var(--b); cursor: pointer; transition: background 0.2s; }
-.week-slot-half { border-bottom: 1px dashed rgba(0,0,0,0.05); }
-body.dark .week-slot-half { border-bottom: 1px dashed rgba(255,255,255,0.05); }
-.week-slot-cell:hover { background: rgba(99,102,241,0.03); }
-.week-slot-cell.today { background: rgba(99,102,241,0.03); }
-.slot-card { padding: 4px 6px; border-radius: 4px; color: #fff; font-size: 0.7rem; cursor: pointer; }
-.slot-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.slot-student { font-size: 0.65rem; opacity: 0.8; }
-.student-checkbox { display: flex; align-items: center; gap: 8px; padding: 6px; cursor: pointer; border-radius: 6px; }
-.student-checkbox:hover { background: rgba(99,102,241,0.05); }
-.student-checkbox input { accent-color: #6366f1; }
+.week-bg-cell { min-height: 50px; border-bottom: 1px solid var(--b); border-right: 1px solid var(--b); }
+.week-bg-half { border-bottom: 1px dashed rgba(0,0,0,0.05); }
+.week-bg-cell.today { background: rgba(99,102,241,0.02); }
+body.dark .week-bg-half { border-bottom: 1px dashed rgba(255,255,255,0.05); }
+
+/* Слоты-блоки (абсолютное позиционирование) */
+.slots-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding-top: 44px;
+  padding-left: 70px;
+  pointer-events: none;
+}
+.slot-block {
+  position: absolute;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.75rem;
+  cursor: pointer;
+  pointer-events: auto;
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+}
+.slot-block:hover {
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.5);
+  z-index: 10;
+}
+.slot-time-label {
+  font-size: 0.65rem;
+  opacity: 0.9;
+  margin-bottom: 2px;
+}
+.slot-block-title {
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.slot-block-student {
+  font-size: 0.65rem;
+  opacity: 0.8;
+}
+
+/* История */
 .history-section { margin-top: 32px; }
-.history-item { display: flex; gap: 10px; align-items: center; padding: 10px; background: var(--surface); border-radius: 8px; margin-bottom: 6px; }
+.history-item { display: flex; gap: 10px; align-items: center; padding: 10px; background: var(--surface); border-radius: 8px; margin-bottom: 6px; flex-wrap: wrap; }
 .history-item small { color: var(--t2); }
+
+/* Модалка */
 .modal-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,0.4); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; }
 .modal { background: var(--surface); border-radius: 24px; padding: 28px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
 .modal h3 { font-weight: 700; margin-bottom: 16px; }
@@ -352,6 +426,9 @@ body.dark .week-slot-half { border-bottom: 1px dashed rgba(255,255,255,0.05); }
 .type-btns { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
 .type-btn { padding: 8px 14px; border-radius: 12px; border: 2px solid var(--b); background: var(--bg); cursor: pointer; font-weight: 600; font-size: 0.85rem; }
 .type-btn.active { border-color: var(--p); background: rgba(99,102,241,0.06); }
+.student-checkbox { display: flex; align-items: center; gap: 8px; padding: 6px; cursor: pointer; border-radius: 6px; }
+.student-checkbox:hover { background: rgba(99,102,241,0.05); }
+.student-checkbox input { accent-color: #6366f1; }
 .input { width: 100%; padding: 10px 14px; border: 2px solid var(--b); border-radius: 12px; font-family: inherit; font-size: 0.9rem; background: var(--bg); color: var(--t); outline: none; margin-bottom: 8px; }
 .note-area { resize: vertical; }
 .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 20px; border-radius: 50px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border: none; font-family: inherit; transition: all 0.2s; }
