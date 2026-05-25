@@ -1,52 +1,70 @@
 <template>
   <div class="landing-sections">
-    <!-- СЕКЦИЯ 1: ОБО МНЕ -->
-    <section class="section" id="about-section">
+    <!-- СЕКЦИЯ 1: О РЕПЕТИТОРЕ -->
+    <section class="section" id="about">
+      <div class="bg-orb bg-orb-1"></div>
+      <div class="bg-orb bg-orb-2"></div>
       <div class="container">
-        <h2 class="section-title">Почему выбирают меня</h2>
         <div class="about-grid">
-          <div 
-            v-for="(card, i) in aboutCards" 
-            :key="i"
-            class="about-card neo-card"
-            :style="{ animationDelay: `${i * 0.1}s` }"
-            ref="aboutRefs"
-          >
-            <div class="about-icon-wrapper">
-              <component :is="card.icon" class="about-icon" />
+          <!-- Левая колонка -->
+          <div class="about-left">
+            <div class="photo-wrapper">
+              <img :src="tutor.photo" :alt="tutor.name" class="tutor-photo" />
             </div>
-            <h3 class="about-card-title">{{ card.title }}</h3>
-            <p class="about-card-text">{{ card.text }}</p>
+            <h2 class="tutor-name">{{ tutor.name }}</h2>
+            <p class="tutor-spec">{{ tutor.specialization }}</p>
+          </div>
+          <!-- Правая колонка -->
+          <div class="about-right">
+            <div 
+              v-for="(item, i) in aboutItems" 
+              :key="i"
+              class="glass-card about-card"
+              :style="{ animationDelay: `${i * 0.1}s` }"
+              ref="aboutRefs"
+            >
+              <span class="about-card-icon">{{ item.icon }}</span>
+              <div>
+                <h4 class="about-card-title">{{ item.title }}</h4>
+                <p class="about-card-text">{{ item.text }}</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
     <!-- СЕКЦИЯ 2: УСЛУГИ -->
-    <section class="section section-alt" id="services-section">
+    <section class="section" id="services">
+      <div class="bg-orb bg-orb-3"></div>
+      <div class="bg-orb bg-orb-4"></div>
       <div class="container">
-        <h2 class="section-title">Мои услуги</h2>
+        <h2 class="section-title">
+          <span class="gradient-text">Мои услуги</span>
+        </h2>
         <div class="services-grid">
           <div 
             v-for="(service, i) in services" 
             :key="i"
-            class="service-card neo-card"
+            class="service-card glass-card"
             :class="{ popular: service.popular }"
-            :style="{ animationDelay: `${i * 0.1}s` }"
+            :style="{ animationDelay: `${i * 0.15}s` }"
             ref="serviceRefs"
           >
-            <div class="gradient-strip"></div>
             <div v-if="service.popular" class="popular-badge">Популярный выбор</div>
+            <div class="gradient-strip"></div>
             <div class="service-content">
               <h3 class="service-name">{{ service.name }}</h3>
-              <div class="service-price">{{ service.price }}</div>
+              <div class="service-price">{{ service.price }} <span class="service-period">/ урок</span></div>
               <div class="service-duration">
                 <Clock class="w-4 h-4" />
                 <span>{{ service.duration }}</span>
               </div>
               <p class="service-desc">{{ service.desc }}</p>
-              <button class="service-btn" :class="service.popular ? 'btn-gradient' : 'btn-glass'">
-                {{ service.btnText }}
+              <button :class="service.popular ? 'btn-gradient' : 'btn-glass'">
+                <Sparkles v-if="service.popular" class="w-4 h-4" />
+                <ArrowRight v-else class="w-4 h-4" />
+                <span>{{ service.btnText }}</span>
               </button>
             </div>
           </div>
@@ -54,31 +72,89 @@
       </div>
     </section>
 
-    <!-- СЕКЦИЯ 3: ОТЗЫВЫ -->
-    <section class="section" id="testimonials-section">
+    <!-- СЕКЦИЯ 3: БОНУСЫ -->
+    <section class="section" id="bonuses">
+      <div class="bg-orb bg-orb-5"></div>
       <div class="container">
-        <h2 class="section-title">Что говорят ученики</h2>
-        <div class="testimonial-card neo-card" ref="testimonialRef">
-          <Quote class="quote-icon" />
-          <p class="testimonial-text">{{ testimonial.text }}</p>
-          <div class="testimonial-author">
-            <strong>{{ testimonial.name }}</strong>
-            <span>{{ testimonial.role }}</span>
+        <h3 class="bonuses-title">Бесплатно с каждым пакетом</h3>
+        <div class="bonuses-grid">
+          <div 
+            v-for="(bonus, i) in bonuses" 
+            :key="i"
+            class="bonus-card glass-card"
+            :style="{ animationDelay: `${i * 0.1}s` }"
+            ref="bonusRefs"
+          >
+            <component :is="bonus.icon" class="bonus-icon" />
+            <h4 class="bonus-name">{{ bonus.title }}</h4>
+            <p class="bonus-desc">{{ bonus.desc }}</p>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- СЕКЦИЯ 4: КОНТАКТЫ -->
-    <section class="section section-alt" id="contacts-section">
+    <!-- СЕКЦИЯ 4: ОТЗЫВЫ (КАРУСЕЛЬ) -->
+    <section class="section" id="testimonials">
+      <div class="bg-orb bg-orb-6"></div>
+      <div class="container">
+        <h2 class="section-title">
+          <span class="gradient-text">Что говорят ученики</span>
+        </h2>
+        <div 
+          class="carousel"
+          @mouseenter="stopAutoPlay"
+          @mouseleave="startAutoPlay"
+        >
+          <!-- Стрелка влево -->
+          <button class="carousel-arrow carousel-arrow-left" @click="prevSlide">
+            <ChevronLeft class="w-5 h-5" />
+          </button>
+
+          <!-- Слайд -->
+          <div class="carousel-track">
+            <transition :name="slideDirection" mode="out-in">
+              <div :key="currentSlide" class="testimonial-card glass-card">
+                <Quote class="quote-icon" />
+                <div class="testimonial-content">
+                  <img :src="testimonials[currentSlide].avatar" class="testimonial-avatar" />
+                  <div>
+                    <strong class="testimonial-name">{{ testimonials[currentSlide].name }}</strong>
+                    <span class="testimonial-role">{{ testimonials[currentSlide].role }}</span>
+                    <p class="testimonial-text">"{{ testimonials[currentSlide].text }}"</p>
+                  </div>
+                </div>
+              </div>
+            </transition>
+          </div>
+
+          <!-- Стрелка вправо -->
+          <button class="carousel-arrow carousel-arrow-right" @click="nextSlide">
+            <ChevronRight class="w-5 h-5" />
+          </button>
+        </div>
+
+        <!-- Точки-индикаторы -->
+        <div class="carousel-dots">
+          <span 
+            v-for="(_, i) in testimonials" 
+            :key="i"
+            class="dot"
+            :class="{ active: i === currentSlide }"
+            @click="goToSlide(i)"
+          ></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- СЕКЦИЯ 5: КОНТАКТЫ -->
+    <section class="section contacts-section" id="contacts">
       <div class="container" style="text-align:center">
-        <h2 class="section-title">Связаться со мной</h2>
         <div class="contact-buttons">
-          <a :href="telegramLink" target="_blank" class="contact-btn contact-btn-telegram">
+          <a :href="contacts.telegram" target="_blank" class="contact-btn contact-btn-telegram">
             <Send class="w-5 h-5" />
             <span>Написать в Telegram</span>
           </a>
-          <a :href="whatsappLink" target="_blank" class="contact-btn contact-btn-whatsapp">
+          <a :href="contacts.whatsapp" target="_blank" class="contact-btn contact-btn-whatsapp">
             <MessageCircle class="w-5 h-5" />
             <span>Написать в WhatsApp</span>
           </a>
@@ -90,42 +166,31 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { GraduationCap, Users, MessageCircle, Clock, Quote, Send } from 'lucide-vue-next';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { 
+  Clock, Sparkles, ArrowRight, BookOpen, StickyNote, Users, Award,
+  Quote, ChevronLeft, ChevronRight, Send, MessageCircle
+} from 'lucide-vue-next';
 
 // Моки данных
-const aboutCards = [
-  {
-    icon: GraduationCap,
-    title: '10+ лет опыта',
-    text: 'Работаю со взрослыми и подростками. Готовлю к IELTS, собеседованиям и переезду.',
-  },
-  {
-    icon: Users,
-    title: '500+ учеников',
-    text: 'Мои студенты работают в Google, Amazon, переезжают в США и Европу.',
-  },
-  {
-    icon: MessageCircle,
-    title: 'Коммуникативная методика',
-    text: '80% урока — это ваша речь. Никакой зубрёжки, только живое общение.',
-  },
+const tutor = {
+  name: 'Анна Иванова',
+  specialization: 'Репетитор английского языка. 10+ лет опыта.',
+  photo: 'https://ui-avatars.com/api/?name=Анна+И&size=300&background=6366f1&color=fff&bold=true',
+};
+
+const aboutItems = [
+  { icon: '🎓', title: 'Образование', text: 'МГЛУ, факультет английского языка. Сертификаты TESOL, CELTA.' },
+  { icon: '💼', title: 'Опыт', text: '10+ лет преподавания. 500+ учеников. Работаю со взрослыми и подростками.' },
+  { icon: '🗣', title: 'Методика', text: 'Коммуникативный подход. 80% урока — ваша речь. Индивидуальная программа под ваши цели.' },
 ];
 
 const services = [
   {
-    name: 'Пробный урок',
-    price: '0 ₽',
-    duration: '30 минут',
-    desc: 'Познакомимся, определим ваш уровень и цели. Вы получите первые рекомендации.',
-    btnText: 'Записаться',
-    popular: false,
-  },
-  {
     name: 'Индивидуальные занятия',
     price: '1 500 ₽',
     duration: '60 минут',
-    desc: 'Регулярные занятия по индивидуальной программе. Разговор, грамматика, аудирование.',
+    desc: 'Регулярные занятия по индивидуальной программе. Разговор, грамматика, аудирование — всё под ваши цели.',
     btnText: 'Выбрать пакет',
     popular: true,
   },
@@ -139,136 +204,229 @@ const services = [
   },
 ];
 
-const testimonial = {
-  text: 'За 4 месяца прошёл путь от "боюсь сказать" до прохождения собеседования в европейскую компанию. Анна не просто учит языку, она учит думать на нём.',
-  name: 'Алексей',
-  role: 'Senior Developer',
+const bonuses = [
+  { icon: BookOpen, title: '📚 Словарь', desc: 'Личный словарь с тренажёром для запоминания новых слов.' },
+  { icon: StickyNote, title: '📝 Заметки', desc: 'Личный блокнот для конспектов с автосохранением на каждом уроке.' },
+  { icon: Users, title: '👥 Группы', desc: 'Закрытые разговорные группы для практики с другими учениками.' },
+  { icon: Award, title: '🏆 Достижения', desc: 'Система достижений и наград за прогресс в обучении.' },
+];
+
+const testimonials = ref([
+  {
+    name: 'Алексей Петров',
+    role: 'Senior Developer, Google',
+    text: 'За 4 месяца прошёл путь от "боюсь сказать" до прохождения собеседования в европейскую компанию. Анна учит думать на языке, а не просто переводить.',
+    avatar: 'https://ui-avatars.com/api/?name=Алексей+П&background=6366f1&color=fff',
+  },
+  {
+    name: 'Мария Смирнова',
+    role: 'Product Manager, Amazon',
+    text: 'Готовилась к переезду в США. Анна помогла с разговорным английским и деловой перепиской. Через 3 месяца чувствовала себя уверенно на встречах.',
+    avatar: 'https://ui-avatars.com/api/?name=Мария+С&background=2dd4bf&color=fff',
+  },
+  {
+    name: 'Дмитрий Иванов',
+    role: 'Студент, IELTS 7.5',
+    text: 'Готовился к IELTS с нуля. Анна дала чёткую стратегию, научила таймингу. Результат — 7.5 с первой попытки. Очень благодарен!',
+    avatar: 'https://ui-avatars.com/api/?name=Дмитрий+И&background=8b5cf6&color=fff',
+  },
+]);
+
+const contacts = {
+  telegram: 'https://t.me/anna_english',
+  whatsapp: 'https://wa.me/79161234567',
 };
 
-const telegramLink = 'https://t.me/anna_english';
-const whatsappLink = 'https://wa.me/79161234567';
+// Карусель
+const currentSlide = ref(0);
+const slideDirection = ref('slide-right');
+let autoplayTimer = null;
 
-// Refs для анимаций
-const aboutRefs = ref([]);
-const serviceRefs = ref([]);
-const testimonialRef = ref(null);
+const nextSlide = () => {
+  slideDirection.value = 'slide-right';
+  currentSlide.value = (currentSlide.value + 1) % testimonials.value.length;
+};
 
-// Intersection Observer для появления при скролле
+const prevSlide = () => {
+  slideDirection.value = 'slide-left';
+  currentSlide.value = (currentSlide.value - 1 + testimonials.value.length) % testimonials.value.length;
+};
+
+const goToSlide = (index) => {
+  slideDirection.value = index > currentSlide.value ? 'slide-right' : 'slide-left';
+  currentSlide.value = index;
+};
+
+const startAutoPlay = () => {
+  autoplayTimer = setInterval(nextSlide, 5000);
+};
+
+const stopAutoPlay = () => {
+  clearInterval(autoplayTimer);
+};
+
 onMounted(() => {
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
-        }
-      });
-    },
-    { threshold: 0.2 }
-  );
+  startAutoPlay();
+});
 
-  aboutRefs.value.forEach((el) => el && observer.observe(el));
-  serviceRefs.value.forEach((el) => el && observer.observe(el));
-  if (testimonialRef.value) observer.observe(testimonialRef.value);
+onBeforeUnmount(() => {
+  clearInterval(autoplayTimer);
 });
 </script>
 
 <style scoped>
 .landing-sections {
-  background: #f8fafc;
+  background: #0b1120;
 }
 
 .section {
-  padding: 80px 0;
-}
-
-.section-alt {
-  background: linear-gradient(180deg, #f8fafc 0%, rgba(99,102,241,0.02) 100%);
+  position: relative;
+  padding: 100px 0;
+  overflow: hidden;
 }
 
 .container {
   max-width: 1100px;
   margin: 0 auto;
   padding: 0 24px;
+  position: relative;
+  z-index: 1;
 }
 
+/* Фоновые шары */
+.bg-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+.bg-orb-1 { width: 500px; height: 500px; background: #6366f1; top: -150px; left: -150px; animation: floatOrb1 12s ease-in-out infinite; }
+.bg-orb-2 { width: 400px; height: 400px; background: #2dd4bf; bottom: -100px; right: -100px; animation: floatOrb2 12s ease-in-out infinite; }
+.bg-orb-3 { width: 400px; height: 400px; background: #2dd4bf; top: -100px; right: -100px; animation: floatOrb2 10s ease-in-out infinite; }
+.bg-orb-4 { width: 500px; height: 500px; background: #6366f1; bottom: -150px; left: -150px; animation: floatOrb1 10s ease-in-out infinite; }
+.bg-orb-5 { width: 300px; height: 300px; background: #6366f1; top: 50%; left: -100px; animation: floatOrb1 8s ease-in-out infinite; }
+.bg-orb-6 { width: 350px; height: 350px; background: #2dd4bf; bottom: -100px; right: -80px; animation: floatOrb2 8s ease-in-out infinite; }
+
+@keyframes floatOrb1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(30px, -30px) scale(1.05); }
+}
+
+@keyframes floatOrb2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-30px, 20px) scale(1.05); }
+}
+
+/* Стеклянная карточка */
+.glass-card {
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+  box-shadow: 0 0 20px rgba(99,102,241,0.2);
+}
+
+/* Заголовок секции */
 .section-title {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 2.2rem;
+  font-size: 2.5rem;
   font-weight: 800;
   text-align: center;
-  margin-bottom: 48px;
-  letter-spacing: -1px;
-  color: #1e293b;
+  margin-bottom: 60px;
 }
 
-/* Неоморфная карточка */
-.neo-card {
-  background: #ffffff;
-  border-radius: 20px;
-  box-shadow: 8px 8px 16px #e2e8f0, -8px -8px 16px #ffffff;
-  transition: all 0.3s ease;
-  opacity: 0;
-  transform: translateY(30px);
+.gradient-text {
+  background: linear-gradient(135deg, #6366f1 0%, #2dd4bf 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-.neo-card.visible {
-  opacity: 1;
-  transform: translateY(0);
-  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.neo-card:hover {
-  box-shadow: inset 4px 4px 12px #e2e8f0, inset -4px -4px 12px #ffffff;
-}
-
-/* СЕКЦИЯ 1: ОБО МНЕ */
+/* ===== СЕКЦИЯ 1: О РЕПЕТИТОРЕ ===== */
 .about-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  display: flex;
+  gap: 60px;
+  align-items: flex-start;
+}
+
+.about-left {
+  width: 40%;
+  text-align: center;
+}
+
+.photo-wrapper {
+  display: inline-block;
+  padding: 4px;
+  background: linear-gradient(135deg, #6366f1 0%, #2dd4bf 100%);
+  border-radius: 50%;
+  margin-bottom: 20px;
+}
+
+.tutor-photo {
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.tutor-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.tutor-spec {
+  font-family: 'Inter', sans-serif;
+  color: #94a3b8;
+  margin-top: 6px;
+}
+
+.about-right {
+  width: 60%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .about-card {
-  padding: 32px 24px;
-  text-align: center;
-}
-
-.about-icon-wrapper {
-  width: 64px;
-  height: 64px;
-  background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(45,212,191,0.1));
-  border-radius: 16px;
+  padding: 20px 24px;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 16px;
+  gap: 16px;
+  align-items: flex-start;
 }
 
-.about-icon {
-  width: 32px;
-  height: 32px;
-  color: #6366f1;
+.about-card-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
 }
 
 .about-card-title {
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 700;
-  font-size: 1.1rem;
-  margin-bottom: 8px;
-  color: #1e293b;
+  color: #fff;
+  margin-bottom: 4px;
 }
 
 .about-card-text {
   font-family: 'Inter', sans-serif;
   font-size: 0.9rem;
-  color: #64748b;
+  color: #94a3b8;
   line-height: 1.6;
 }
 
-/* СЕКЦИЯ 2: УСЛУГИ */
+/* ===== СЕКЦИЯ 2: УСЛУГИ ===== */
 .services-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 24px;
 }
 
@@ -276,11 +434,23 @@ onMounted(() => {
   display: flex;
   overflow: hidden;
   position: relative;
-  min-height: 300px;
 }
 
 .service-card.popular {
-  border: 2px solid #6366f1;
+  border-color: rgba(99,102,241,0.3);
+}
+
+.popular-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: linear-gradient(135deg, #6366f1 0%, #2dd4bf 100%);
+  color: #fff;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  z-index: 1;
 }
 
 .gradient-strip {
@@ -298,32 +468,17 @@ onMounted(() => {
   50% { opacity: 0.5; box-shadow: 0 0 12px rgba(99,102,241,0.6); }
 }
 
-.popular-badge {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: linear-gradient(135deg, #6366f1 0%, #2dd4bf 100%);
-  color: #fff;
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  font-family: 'Inter', sans-serif;
-}
-
 .service-content {
   flex: 1;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
+  padding: 28px;
 }
 
 .service-name {
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 700;
-  font-size: 1.1rem;
-  margin-bottom: 8px;
-  color: #1e293b;
+  font-size: 1.2rem;
+  color: #fff;
+  margin-bottom: 12px;
 }
 
 .service-price {
@@ -333,29 +488,37 @@ onMounted(() => {
   background: linear-gradient(135deg, #6366f1 0%, #2dd4bf 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.service-period {
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: #94a3b8;
+  -webkit-text-fill-color: #94a3b8;
 }
 
 .service-duration {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.85rem;
-  color: #64748b;
+  color: #94a3b8;
+  font-size: 0.9rem;
   margin-bottom: 12px;
 }
 
 .service-desc {
   font-family: 'Inter', sans-serif;
+  color: #94a3b8;
   font-size: 0.9rem;
-  color: #64748b;
   line-height: 1.6;
-  flex: 1;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
-.service-btn {
+.btn-gradient, .btn-glass {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   padding: 12px 24px;
   border-radius: 50px;
   font-weight: 600;
@@ -364,7 +527,6 @@ onMounted(() => {
   border: none;
   font-family: 'Inter', sans-serif;
   transition: all 0.3s ease;
-  text-align: center;
 }
 
 .btn-gradient {
@@ -374,67 +536,203 @@ onMounted(() => {
   animation: pulse 2s infinite;
 }
 
-.btn-gradient:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(99,102,241,0.4);
-}
-
 @keyframes pulse {
   0%, 100% { box-shadow: 0 4px 15px rgba(99,102,241,0.3); }
   50% { box-shadow: 0 4px 30px rgba(99,102,241,0.6); }
 }
 
 .btn-glass {
-  background: rgba(255,255,255,0.6);
+  background: rgba(255,255,255,0.05);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(99,102,241,0.2);
-  color: #6366f1;
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #fff;
 }
 
 .btn-glass:hover {
   box-shadow: 0 0 20px rgba(99,102,241,0.3);
-  transform: scale(1.02);
 }
 
-/* СЕКЦИЯ 3: ОТЗЫВЫ */
-.testimonial-card {
-  max-width: 700px;
-  margin: 0 auto;
-  padding: 40px;
-  position: relative;
+/* ===== СЕКЦИЯ 3: БОНУСЫ ===== */
+.bonuses-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #fff;
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.bonuses-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.bonus-card {
+  padding: 28px 20px;
   text-align: center;
 }
 
-.quote-icon {
+.bonus-icon {
+  width: 40px;
+  height: 40px;
+  color: #6366f1;
+  margin: 0 auto 12px;
+}
+
+.bonus-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.bonus-desc {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+/* ===== СЕКЦИЯ 4: КАРУСЕЛЬ ===== */
+.carousel {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.carousel-arrow {
   width: 48px;
   height: 48px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.carousel-arrow:hover {
+  background: rgba(99,102,241,0.2);
+  box-shadow: 0 0 15px rgba(99,102,241,0.3);
+}
+
+.carousel-track {
+  flex: 1;
+  overflow: hidden;
+}
+
+.testimonial-card {
+  padding: 32px;
+  position: relative;
+}
+
+.quote-icon {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
   color: #6366f1;
-  opacity: 0.2;
-  margin-bottom: 20px;
+  opacity: 0.3;
+}
+
+.testimonial-content {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.testimonial-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid rgba(99,102,241,0.3);
+}
+
+.testimonial-name {
+  display: block;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  color: #fff;
+}
+
+.testimonial-role {
+  display: block;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin-bottom: 12px;
 }
 
 .testimonial-text {
   font-family: 'Inter', sans-serif;
-  font-size: 1.1rem;
-  line-height: 1.8;
-  color: #334155;
-  margin-bottom: 24px;
+  color: #cbd5e1;
   font-style: italic;
+  line-height: 1.7;
 }
 
-.testimonial-author strong {
-  display: block;
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 1rem;
-  color: #1e293b;
+/* Анимации карусели */
+.slide-right-enter-active,
+.slide-left-enter-active {
+  transition: all 0.4s ease;
 }
 
-.testimonial-author span {
-  font-size: 0.85rem;
-  color: #64748b;
+.slide-right-enter-from {
+  opacity: 0;
+  transform: translateX(40px);
 }
 
-/* СЕКЦИЯ 4: КОНТАКТЫ */
+.slide-right-leave-to {
+  opacity: 0;
+  transform: translateX(-40px);
+}
+
+.slide-left-enter-from {
+  opacity: 0;
+  transform: translateX(-40px);
+}
+
+.slide-left-leave-to {
+  opacity: 0;
+  transform: translateX(40px);
+}
+
+/* Точки */
+.carousel-dots {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.dot.active {
+  background: #6366f1;
+  box-shadow: 0 0 8px rgba(99,102,241,0.5);
+}
+
+/* ===== СЕКЦИЯ 5: КОНТАКТЫ ===== */
+.contacts-section {
+  padding-bottom: 60px;
+}
+
 .contact-buttons {
   display: flex;
   gap: 16px;
@@ -455,10 +753,10 @@ onMounted(() => {
   text-decoration: none;
   font-family: 'Inter', sans-serif;
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  background: rgba(255,255,255,0.6);
+  background: rgba(255,255,255,0.05);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.2);
-  color: #1e293b;
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #fff;
 }
 
 .contact-btn-telegram:hover {
@@ -474,21 +772,45 @@ onMounted(() => {
 .copyright {
   font-family: 'Inter', sans-serif;
   font-size: 0.85rem;
-  color: #94a3b8;
+  color: #64748b;
 }
 
+/* ===== АДАПТИВ ===== */
 @media (max-width: 768px) {
-  .about-grid,
+  .about-grid {
+    flex-direction: column;
+    gap: 30px;
+  }
+  .about-left, .about-right {
+    width: 100%;
+  }
+  .tutor-photo {
+    width: 150px;
+    height: 150px;
+  }
   .services-grid {
     grid-template-columns: 1fr;
   }
-  
-  .section-title {
-    font-size: 1.6rem;
+  .bonuses-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
-  
-  .testimonial-card {
-    padding: 24px;
+  .carousel {
+    gap: 10px;
+  }
+  .carousel-arrow {
+    width: 36px;
+    height: 36px;
+  }
+  .testimonial-content {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .bonuses-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
