@@ -216,18 +216,24 @@ export default {
     async loadStudents() { try { const r = await axios.get('/api/users'); this.allStudents = (r.data || []).filter(u => u.role !== 'admin' && u.role !== 'parent'); } catch(e) {} },
     getSlotsForDate(date) { return this.slots.filter(s => new Date(s.start_time).toISOString().split('T')[0] === date); },
     getSlot(date, hour, minutes = 0) { 
-      return this.slots.find(s => { 
-        const sd = new Date(s.start_time); 
-        return sd.toISOString().split('T')[0] === date && sd.getHours() === hour && sd.getMinutes() === minutes; 
-      }); 
-    },
-    getSlotColor(t) { 
-      if (t === 'online') return 'slot-online'; 
-      if (t === 'offline') return 'slot-offline'; 
-      if (t === 'group-online') return 'slot-group-online'; 
-      if (t === 'group-offline') return 'slot-group-offline'; 
-      return 'slot-online'; 
-    },
+  const cellStart = hour * 60 + minutes;
+  const cellEnd = cellStart + 30;
+  return this.slots.find(s => { 
+    const sd = new Date(s.start_time); 
+    const slotStart = sd.getHours() * 60 + sd.getMinutes();
+    const slotEnd = slotStart + (s.duration || 30);
+    return sd.toISOString().split('T')[0] === date && 
+           slotStart < cellEnd && 
+           slotEnd >= cellStart;
+  }); 
+},
+getSlotColor(t) { 
+  if (t === 'online') return 'slot-online'; 
+  if (t === 'offline') return 'slot-offline'; 
+  if (t === 'group-online') return 'slot-group-online'; 
+  if (t === 'group-offline') return 'slot-group-offline'; 
+  return 'slot-online'; 
+},
     getTypeEmoji(t) {
       if (t === 'online') return '🟢';
       if (t === 'offline') return '🔵';
