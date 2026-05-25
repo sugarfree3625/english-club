@@ -1,39 +1,37 @@
 <template>
-  <div class="flex items-center justify-center min-h-[70vh] bg-[#0f172a]">
-    <div class="text-center">
-      <!-- 3D-календарь -->
-      <div class="calendar-3d mx-auto mb-8">
-        <div class="calendar-square">
-          <div class="gradient-sphere"></div>
-        </div>
+  <div class="empty-state">
+    <div class="calendar-3d">
+      <div class="calendar-square">
+        <div class="gradient-sphere"></div>
       </div>
-
-      <!-- Текст -->
-      <h2 class="font-['Space_Grotesk'] text-2xl font-light text-gray-300 mb-3">
-        Ваш календарь свободен
-      </h2>
-      <p class="font-['Inter'] text-base text-gray-500 mb-8 max-w-md mx-auto">
-        Самое время запланировать первую встречу и начать говорить.
-      </p>
-
-      <!-- Кнопка с соединительной линией -->
-      <button class="glass-btn group relative mx-auto">
-        <Plus class="w-5 h-5" />
-        <span>Создать встречу</span>
-        <span class="connect-line"></span>
-      </button>
     </div>
+
+    <h2 class="empty-title">Ваш календарь свободен</h2>
+    <p class="empty-subtitle">Самое время запланировать первую встречу и начать говорить.</p>
+
+    <button class="glass-btn">
+      <i class="fas fa-plus"></i>
+      <span>Создать встречу</span>
+      <span class="connect-line"></span>
+    </button>
   </div>
 </template>
 
-<script setup>
-import { Plus } from 'lucide-vue-next';
-</script>
-
 <style scoped>
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 70vh;
+  background: #0f172a;
+  text-align: center;
+  padding: 40px 20px;
+}
 .calendar-3d {
   width: 120px;
   height: 120px;
+  margin-bottom: 32px;
 }
 .calendar-square {
   width: 100%;
@@ -45,7 +43,6 @@ import { Plus } from 'lucide-vue-next';
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
 }
 .gradient-sphere {
   width: 50px;
@@ -57,6 +54,19 @@ import { Plus } from 'lucide-vue-next';
 @keyframes slowSpin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+.empty-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 300;
+  color: #94a3b8;
+  margin-bottom: 12px;
+}
+.empty-subtitle {
+  font-size: 1rem;
+  color: #64748b;
+  margin-bottom: 32px;
+  max-width: 400px;
 }
 .glass-btn {
   display: inline-flex;
@@ -72,6 +82,7 @@ import { Plus } from 'lucide-vue-next';
   font-size: 1rem;
   cursor: pointer;
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
 }
 .glass-btn:hover {
   box-shadow: 0 0 20px rgba(99,102,241,0.3);
