@@ -31,18 +31,21 @@
         <div class="week-header-cell" v-for="day in weekDaysList" :key="day.date" :class="{ today: day.isToday }">{{ day.name }}<br>{{ day.dateStr }}</div>
         <template v-for="hour in hours" :key="hour">
           <div class="week-time-cell">{{ hour }}:00</div>
-          <div class="week-bg-cell" v-for="day in weekDaysList" :key="'bg'+day.date+hour+':00'" :class="{ today: day.isToday }"></div>
-          <div class="week-time-cell week-time-half">:30</div>
-          <div class="week-bg-cell week-bg-half" v-for="day in weekDaysList" :key="'bg'+day.date+hour+':30'" :class="{ today: day.isToday }"></div>
-        </template>
-        <div class="slots-layer" ref="slotsLayer">
-          <div v-for="slot in weekSlots" :key="slot.id" class="slot-block" :class="getSlotColor(slot.lesson_type)" :style="getSlotStyle(slot)" @mousedown="startDrag($event, slot)" @click.stop="editSlot(slot)">
-            <div class="slot-time-label">{{ formatTime(slot.start_time) }} - {{ formatTime(slot.end_time) }}</div>
-            <div class="slot-block-title">{{ slot.title }}</div>
-            <div class="slot-block-student">{{ slot.users?.username || (slot.group_students?.length ? '👥 Группа' : '—') }}</div>
-            <div class="resize-handle" @mousedown.stop="startResize($event, slot)"></div>
+          <div class="week-day-column" v-for="day in weekDaysList" :key="day.date + hour + ':00'" :class="{ today: day.isToday }">
+            <div class="week-bg-cell"></div>
+            <div class="week-bg-cell week-bg-half"></div>
           </div>
-        </div>
+        </template>
+        <template v-for="(day, dayIdx) in weekDaysList" :key="'col-' + day.date">
+          <div class="day-slots-column" :style="{ gridColumn: dayIdx + 2, gridRow: '1 / -1' }">
+            <div v-for="slot in getDaySlots(day.date)" :key="slot.id" class="slot-block" :class="getSlotColor(slot.lesson_type)" :style="getSlotStyle(slot)" @mousedown="startDrag($event, slot)" @click.stop="editSlot(slot)">
+              <div class="slot-time-label">{{ formatTime(slot.start_time) }} - {{ formatTime(slot.end_time) }}</div>
+              <div class="slot-block-title">{{ slot.title }}</div>
+              <div class="slot-block-student">{{ slot.users?.username || (slot.group_students?.length ? '👥 Группа' : '—') }}</div>
+              <div class="resize-handle" @mousedown.stop="startResize($event, slot)"></div>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
 
@@ -151,12 +154,6 @@ export default {
       });
     },
     weekLabel() { return this.weekDaysList.length ? `${this.weekDaysList[0].dateStr} — ${this.weekDaysList[6].dateStr}` : ''; },
-    weekSlots() {
-      const weekStart = this.weekDaysList[0]?.date;
-      const weekEnd = this.weekDaysList[6]?.date;
-      if (!weekStart || !weekEnd) return [];
-      return this.slots.filter(s => { const sd = new Date(s.start_time).toISOString().split('T')[0]; return sd >= weekStart && sd <= weekEnd; }).sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
-    },
     pastSlots() { return this.slots.filter(s => new Date(s.start_time) < new Date()); },
   },
   async mounted() {
@@ -172,36 +169,20 @@ export default {
     async loadSlots() { try { const r = await axios.get('/api/slots'); this.slots = r.data || []; } catch(e) {} },
     async loadStudents() { try { const r = await axios.get('/api/users'); this.allStudents = (r.data || []).filter(u => u.role !== 'admin' && u.role !== 'parent'); } catch(e) {} },
     getSlotsForDate(date) { return this.slots.filter(s => new Date(s.start_time).toISOString().split('T')[0] === date); },
+    getDaySlots(date) { return this.slots.filter(s => new Date(s.start_time).toISOString().split('T')[0] === date); },
     getSlotColor(t) { if (t === 'online') return 'slot-online'; if (t === 'offline') return 'slot-offline'; if (t === 'group-online') return 'slot-group-online'; if (t === 'group-offline') return 'slot-group-offline'; return 'slot-online'; },
     getTypeEmoji(t) { if (t === 'online') return '🟢'; if (t === 'offline') return '🔵'; if (t === 'group-online') return '🟠'; if (t === 'group-offline') return '🔴'; return '🟢'; },
     getSlotStyle(slot) {
       const sd = new Date(slot.start_time);
       const ed = new Date(slot.end_time);
-      
-      // Если end_time раньше start_time — меняем местами
-      if (ed < sd) {
-        [slot.start_time, slot.end_time] = [slot.end_time, slot.start_time];
-        return this.getSlotStyle(slot);
-      }
-      
-      const dayIndex = this.weekDaysList.findIndex(d => d.date === sd.toISOString().split('T')[0]);
-      if (dayIndex === -1) return { display: 'none' };
-      
-      const startHour = 8;
-      const totalMinutes = 14 * 60;
-      const slotStartMinutes = (sd.getHours() - startHour) * 60 + sd.getMinutes();
-      const slotEndMinutes = (ed.getHours() - startHour) * 60 + ed.getMinutes();
-      const duration = Math.max(slotEndMinutes - slotStartMinutes, 30);
-      const clampedStart = Math.max(0, Math.min(slotStartMinutes, totalMinutes - 30));
+      if (ed < sd) [slot.start_time, slot.end_time] = [slot.end_time, slot.start_time];
+      const startHour = 8, totalMinutes = 14 * 60;
+      const slotStart = (sd.getHours() - startHour) * 60 + sd.getMinutes();
+      const slotEnd = (ed.getHours() - startHour) * 60 + ed.getMinutes();
+      const duration = Math.max(slotEnd - slotStart, 30);
+      const clampedStart = Math.max(0, Math.min(slotStart, totalMinutes - 30));
       const clampedDuration = Math.min(duration, totalMinutes - clampedStart);
-      
-      return {
-        top: (clampedStart / totalMinutes * 100) + '%',
-        height: (clampedDuration / totalMinutes * 100) + '%',
-        left: ((dayIndex + 1) / 8 * 100 + 0.3) + '%',
-        width: (1 / 8 * 100 - 0.6) + '%',
-        minHeight: '20px',
-      };
+      return { top: (clampedStart / totalMinutes * 100) + '%', height: (clampedDuration / totalMinutes * 100) + '%', minHeight: '20px' };
     },
     formatDate(ts) { return ts ? new Date(ts).toLocaleDateString('ru', { day: 'numeric', month: 'short' }) : ''; },
     formatTime(ts) { return ts ? new Date(ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : ''; },
@@ -222,20 +203,13 @@ export default {
         const dx = e.clientX - this.dragStartX;
         const deltaMinutes = Math.round(dy * minutesPerPixel / 30) * 30;
         const deltaDays = Math.round(dx / dayWidth);
-        
         const originalStart = new Date(this.dragSlotOriginal.start_time);
         const duration = Math.max((new Date(this.dragSlotOriginal.end_time) - originalStart) / 60000, 30);
-        
         let newStart = new Date(originalStart.getTime() + deltaMinutes * 60000);
         newStart.setDate(newStart.getDate() + deltaDays);
-        
         const newStartMin = (newStart.getHours() - 8) * 60 + newStart.getMinutes();
         if (newStartMin < 0) newStart.setHours(8, 0, 0, 0);
-        if (newStartMin + duration > totalMinutes) {
-          newStart.setHours(8, 0, 0, 0);
-          newStart.setMinutes(totalMinutes - duration);
-        }
-        
+        if (newStartMin + duration > totalMinutes) { newStart.setHours(8, 0, 0, 0); newStart.setMinutes(totalMinutes - duration); }
         this.dragging.start_time = newStart.toISOString();
         this.dragging.end_time = new Date(newStart.getTime() + duration * 60000).toISOString();
       }
@@ -247,24 +221,16 @@ export default {
         let newEnd = new Date(originalEnd.getTime() + deltaMinutes * 60000);
         const minEnd = new Date(this.dragSlotOriginal.start_time).getTime() + 30 * 60000;
         if (newEnd.getTime() < minEnd) newEnd.setTime(minEnd);
-        
         const newEndMin = (newEnd.getHours() - 8) * 60 + newEnd.getMinutes();
-        if (newEndMin > totalMinutes) {
-          newEnd.setHours(8, 0, 0, 0);
-          newEnd.setMinutes(totalMinutes);
-        }
-        
+        if (newEndMin > totalMinutes) { newEnd.setHours(8, 0, 0, 0); newEnd.setMinutes(totalMinutes); }
         this.resizing.end_time = newEnd.toISOString();
       }
     },
     async onDragEnd() {
       const slot = this.dragging || this.resizing;
       if (!slot) return;
-      
-      const st = new Date(slot.start_time);
-      const et = new Date(slot.end_time);
+      const st = new Date(slot.start_time), et = new Date(slot.end_time);
       if (et <= st) slot.end_time = new Date(st.getTime() + 30 * 60000).toISOString();
-      
       try {
         await axios.put(`/api/slots/${slot.id}`, { start_time: slot.start_time, end_time: slot.end_time, lesson_type: slot.lesson_type, title: slot.title, student_id: slot.student_id, notes: slot.notes, group_students: slot.group_students });
         this.addToast(this.dragging ? 'Перемещено! 📅' : 'Длительность изменена! ⏱️', 'success');
@@ -290,8 +256,7 @@ export default {
         if (this.isGroupType) data.student_id = null;
         if (this.editingSlot) { await axios.put(`/api/slots/${this.editingSlot.id}`, data); }
         else { await axios.post('/api/slots', data); }
-        this.closeModal();
-        this.addToast('Сохранено! 🎉', 'success');
+        this.closeModal(); this.addToast('Сохранено! 🎉', 'success');
         setTimeout(() => this.loadSlots(), 500);
       } catch(e) { this.addToast(e.response?.data?.error || 'Ошибка', 'error'); }
     },
@@ -327,12 +292,13 @@ export default {
 .week-header-cell.today { background: rgba(99,102,241,0.08); }
 .week-time-cell { background: var(--bg); font-weight: 600; text-align: center; padding: 8px; border-bottom: 1px solid var(--b); font-size: 0.75rem; }
 .week-time-half { font-size: 0.65rem; color: var(--t2); }
-.week-bg-cell { min-height: 50px; border-bottom: 1px solid var(--b); border-right: 1px solid var(--b); }
+.week-day-column { position: relative; border-right: 1px solid var(--b); }
+.week-bg-cell { min-height: 50px; border-bottom: 1px solid var(--b); }
 .week-bg-half { border-bottom: 1px dashed rgba(0,0,0,0.05); }
 .week-bg-cell.today { background: rgba(99,102,241,0.02); }
 body.dark .week-bg-half { border-bottom: 1px dashed rgba(255,255,255,0.05); }
-.slots-layer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; padding-top: 44px; padding-left: 70px; pointer-events: none; }
-.slot-block { position: absolute; padding: 6px 8px; border-radius: 6px; color: #fff; font-size: 0.75rem; cursor: grab; pointer-events: auto; overflow: hidden; transition: box-shadow 0.2s; }
+.day-slots-column { position: relative; margin-top: 44px; pointer-events: none; }
+.day-slots-column .slot-block { position: absolute; left: 2px; right: 2px; padding: 6px 8px; border-radius: 6px; color: #fff; font-size: 0.75rem; cursor: grab; pointer-events: auto; overflow: hidden; transition: box-shadow 0.2s; }
 .slot-block:active { cursor: grabbing; }
 .slot-block:hover { box-shadow: 0 0 0 2px rgba(255,255,255,0.5); z-index: 10; }
 .slot-time-label { font-size: 0.65rem; opacity: 0.9; margin-bottom: 2px; }
