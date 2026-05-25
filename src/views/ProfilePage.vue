@@ -171,7 +171,14 @@ export default {
     async viewStudent(s) { try { const r = await axios.get(`/api/parent/student/${s.id}`); this.viewingStudent = r.data; } catch(e) {} },
     bindParent(s) { this.bindStudentId = s.id; this.showBindParent = true; },
     async searchParents() { try { const r = await axios.get(`/api/users?q=${this.parentSearch || ''}`); this.parentResults = r.data || []; } catch(e) {} },
-    async doBindParent(pid) { try { await axios.post('/api/parent/bind', { student_id: this.bindStudentId, parent_id: pid }); this.showBindParent = false; this.addToast('Привязан!', 'success'); } catch(e) {} },
+   async doBindParent(pid) { 
+  try { 
+    await axios.post('/api/parent/bind', { student_id: this.bindStudentId, parent_id: pid }); 
+    this.showBindParent = false; 
+    this.parentSearch = '';  // ← очищает поле поиска
+    this.addToast('Привязан!', 'success'); 
+  } catch(e) {} 
+},
     addHomework(s) { this.hwStudent = s.id; this.tab = 'homework'; },
     async createHomework() { if (!this.hwStudent || !this.hwTitle) return; try { await axios.post('/api/homework', { student_id: this.hwStudent, title: this.hwTitle, description: this.hwDesc, due_date: this.hwDueDate }); this.hwTitle = ''; this.hwDesc = ''; this.addToast('Создано! 📝', 'success'); } catch(e) {} },
     addFeedback(s) { this.fbStudentId = s.id; this.showFeedback = true; },
