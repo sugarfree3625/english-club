@@ -8,6 +8,7 @@ import NotFound from '../views/NotFound.vue';
 import Welcome from '../views/Welcome.vue';
 import ResetPassword from '../views/ResetPassword.vue';
 import SiteEditor from '../views/SiteEditor.vue';
+import FullCalendar from '../views/FullCalendar.vue';
 
 const routes = [
   { path: '/', component: Home },
@@ -18,6 +19,7 @@ const routes = [
   { path: '/groups', component: GroupChatPage, meta: { requiresAuth: true } },
   { path: '/admin', component: SiteEditor, meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/reset-password', component: ResetPassword },
+  { path: '/calendar', component: FullCalendar, meta: { requiresAuth: true } },
   { path: '/:pathMatch(.*)*', component: NotFound }
 ];
 
