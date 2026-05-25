@@ -175,13 +175,33 @@ export default {
     getSlotColor(t) { if (t === 'online') return 'slot-online'; if (t === 'offline') return 'slot-offline'; if (t === 'group-online') return 'slot-group-online'; if (t === 'group-offline') return 'slot-group-offline'; return 'slot-online'; },
     getTypeEmoji(t) { if (t === 'online') return '🟢'; if (t === 'offline') return '🔵'; if (t === 'group-online') return '🟠'; if (t === 'group-offline') return '🔴'; return '🟢'; },
     getSlotStyle(slot) {
-      const sd = new Date(slot.start_time), ed = new Date(slot.end_time);
+      const sd = new Date(slot.start_time);
+      const ed = new Date(slot.end_time);
+      
+      // Если end_time раньше start_time — меняем местами
+      if (ed < sd) {
+        [slot.start_time, slot.end_time] = [slot.end_time, slot.start_time];
+        return this.getSlotStyle(slot);
+      }
+      
       const dayIndex = this.weekDaysList.findIndex(d => d.date === sd.toISOString().split('T')[0]);
       if (dayIndex === -1) return { display: 'none' };
-      const startHour = 8, totalMinutes = 14 * 60;
-      const slotStart = (sd.getHours() - startHour) * 60 + sd.getMinutes();
-      const slotEnd = (ed.getHours() - startHour) * 60 + ed.getMinutes();
-      return { top: (slotStart / totalMinutes * 100) + '%', height: (Math.max(slotEnd - slotStart, 30) / totalMinutes * 100) + '%', left: ((dayIndex + 1) / 8 * 100 + 0.3) + '%', width: (1 / 8 * 100 - 0.6) + '%' };
+      
+      const startHour = 8;
+      const totalMinutes = 14 * 60;
+      const slotStartMinutes = (sd.getHours() - startHour) * 60 + sd.getMinutes();
+      const slotEndMinutes = (ed.getHours() - startHour) * 60 + ed.getMinutes();
+      const duration = Math.max(slotEndMinutes - slotStartMinutes, 30);
+      const clampedStart = Math.max(0, Math.min(slotStartMinutes, totalMinutes - 30));
+      const clampedDuration = Math.min(duration, totalMinutes - clampedStart);
+      
+      return {
+        top: (clampedStart / totalMinutes * 100) + '%',
+        height: (clampedDuration / totalMinutes * 100) + '%',
+        left: ((dayIndex + 1) / 8 * 100 + 0.3) + '%',
+        width: (1 / 8 * 100 - 0.6) + '%',
+        minHeight: '20px',
+      };
     },
     formatDate(ts) { return ts ? new Date(ts).toLocaleDateString('ru', { day: 'numeric', month: 'short' }) : ''; },
     formatTime(ts) { return ts ? new Date(ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : ''; },
@@ -204,13 +224,17 @@ export default {
         const deltaDays = Math.round(dx / dayWidth);
         
         const originalStart = new Date(this.dragSlotOriginal.start_time);
-        const duration = (new Date(this.dragSlotOriginal.end_time) - originalStart) / 60000;
+        const duration = Math.max((new Date(this.dragSlotOriginal.end_time) - originalStart) / 60000, 30);
         
         let newStart = new Date(originalStart.getTime() + deltaMinutes * 60000);
         newStart.setDate(newStart.getDate() + deltaDays);
         
-        if (newStart.getHours() < 8) newStart.setHours(8, 0, 0, 0);
-        if (newStart.getHours() >= 22) { newStart.setHours(21, 30, 0, 0); duration > 30 ? null : null; }
+        const newStartMin = (newStart.getHours() - 8) * 60 + newStart.getMinutes();
+        if (newStartMin < 0) newStart.setHours(8, 0, 0, 0);
+        if (newStartMin + duration > totalMinutes) {
+          newStart.setHours(8, 0, 0, 0);
+          newStart.setMinutes(totalMinutes - duration);
+        }
         
         this.dragging.start_time = newStart.toISOString();
         this.dragging.end_time = new Date(newStart.getTime() + duration * 60000).toISOString();
@@ -223,13 +247,24 @@ export default {
         let newEnd = new Date(originalEnd.getTime() + deltaMinutes * 60000);
         const minEnd = new Date(this.dragSlotOriginal.start_time).getTime() + 30 * 60000;
         if (newEnd.getTime() < minEnd) newEnd.setTime(minEnd);
-        if (newEnd.getHours() >= 22) newEnd.setHours(21, 30, 0, 0);
+        
+        const newEndMin = (newEnd.getHours() - 8) * 60 + newEnd.getMinutes();
+        if (newEndMin > totalMinutes) {
+          newEnd.setHours(8, 0, 0, 0);
+          newEnd.setMinutes(totalMinutes);
+        }
+        
         this.resizing.end_time = newEnd.toISOString();
       }
     },
     async onDragEnd() {
       const slot = this.dragging || this.resizing;
       if (!slot) return;
+      
+      const st = new Date(slot.start_time);
+      const et = new Date(slot.end_time);
+      if (et <= st) slot.end_time = new Date(st.getTime() + 30 * 60000).toISOString();
+      
       try {
         await axios.put(`/api/slots/${slot.id}`, { start_time: slot.start_time, end_time: slot.end_time, lesson_type: slot.lesson_type, title: slot.title, student_id: slot.student_id, notes: slot.notes, group_students: slot.group_students });
         this.addToast(this.dragging ? 'Перемещено! 📅' : 'Длительность изменена! ⏱️', 'success');
