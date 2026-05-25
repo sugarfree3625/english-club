@@ -1,27 +1,92 @@
 <template>
   <div id="page-home">
-    <!-- Hero секция с анимированным градиентом -->
-    <section class="hero">
-      <div class="hero-bg"></div>
-      <div class="container hero-content">
-        <h1 class="fade-in-up">
-          <span class="gradient-text">{{ settings.hero_title || 'Speak English Freely' }}</span>
-        </h1>
-        <p class="fade-in-up" style="animation-delay:0.2s">{{ settings.hero_subtitle || 'Разговорный клуб для практики языка' }}</p>
-        <div class="hero-btns fade-in-up" style="animation-delay:0.4s">
-          <button class="btn btn-p btn-pulse" @click="$router.push('/dashboard')">🚀 Начать</button>
-          <button class="btn btn-o" @click="scrollToSection('services-section')">📦 Услуги</button>
+    <section class="hero-new">
+      <div class="hero-orb hero-orb-1"></div>
+      <div class="hero-orb hero-orb-2"></div>
+      <div class="hero-content-new">
+        <div class="hero-layout">
+          <div class="hero-text">
+            <h1 class="hero-title">
+              <span class="gradient-text-animated">{{ settings.hero_title || 'Speak English Freely' }}</span>
+            </h1>
+            <p class="hero-subtitle">{{ settings.hero_subtitle || 'Разговорный клуб нового поколения' }}</p>
+            <div class="hero-actions">
+              <button class="glass-btn" @click="scrollToSection('about-section')"><span class="glass-btn-icon">👩‍🏫</span> Познакомиться</button>
+              <button class="glass-btn-secondary" @click="scrollToSection('services-section')">Услуги</button>
+            </div>
+            <div class="hero-stats">
+              <div class="hero-stat" v-for="stat in stats" :key="stat.label">
+                <span class="hero-stat-value">{{ stat.value }}+</span>
+                <span class="hero-stat-label">{{ stat.label }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="hero-photo-wrapper">
+            <div class="hero-photo-ring"></div>
+            <img :src="tutorPhoto" class="hero-photo" alt="Репетитор">
+            <div class="hero-photo-badge">⭐ 10+ лет опыта</div>
+          </div>
+        </div>
+      </div>
+      <div class="scroll-indicator-new" @click="scrollToSection('about-section')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 13l5 5 5-5M7 6l5 5 5-5"/></svg>
+      </div>
+    </section>
+    <section class="section" id="about-section">
+      <div class="container">
+        <div class="about-layout">
+          <div class="about-photo-col">
+            <img :src="tutorPhoto" class="about-photo" alt="Репетитор">
+            <div class="about-experience">
+              <span class="about-years">10+</span>
+              <span class="about-years-label">лет преподавания</span>
+            </div>
+          </div>
+          <div class="about-text-col">
+            <h2 class="section-title" style="text-align:left">Привет! Я Анна — ваш преподаватель</h2>
+            <p class="about-intro">Сертифицированный преподаватель английского (TESOL, CELTA). Помогла 500+ ученикам заговорить на английском свободно. Жила и работала в Лондоне 5 лет.</p>
+            <div class="about-features">
+              <div class="about-feature"><span>🎓</span><div><strong>TESOL/CELTA</strong><small>Международные сертификаты</small></div></div>
+              <div class="about-feature"><span>🇬🇧</span><div><strong>5 лет в Лондоне</strong><small>Опыт жизни в языковой среде</small></div></div>
+              <div class="about-feature"><span>👩‍🎓</span><div><strong>500+ учеников</strong><small>От A1 до C2</small></div></div>
+              <div class="about-feature"><span>💡</span><div><strong>Авторская методика</strong><small>Быстрый прогресс без скуки</small></div></div>
+            </div>
+            <button class="glass-btn" @click="scrollToSection('services-section')"><span class="glass-btn-icon">🚀</span> Записаться на пробный урок</button>
+          </div>
         </div>
       </div>
     </section>
-
-    <!-- Услуги -->
-    <section class="section" id="services-section">
+    <section class="section section-alt" id="certs-section">
       <div class="container">
-        <h2 class="section-title">Мои услуги</h2>
+        <h2 class="section-title">Мои сертификаты</h2>
+        <div class="certs-grid">
+          <div class="cert-card fade-in-up" v-for="(cert, i) in certificates" :key="i" :style="{ animationDelay: `${i * 0.1}s` }">
+            <div class="cert-icon">{{ cert.icon }}</div>
+            <h4>{{ cert.title }}</h4>
+            <p>{{ cert.from }}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="section" id="how-section">
+      <div class="container">
+        <h2 class="section-title">Как это работает</h2>
+        <div class="steps-grid">
+          <div class="step-card fade-in-up" v-for="(step, i) in steps" :key="i" :style="{ animationDelay: `${i * 0.15}s` }">
+            <div class="step-number">{{ i + 1 }}</div>
+            <div class="step-icon">{{ step.icon }}</div>
+            <h3>{{ step.title }}</h3>
+            <p>{{ step.text }}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="section section-alt" id="services-section">
+      <div class="container">
+        <h2 class="section-title">Услуги и цены</h2>
         <div class="grid">
-          <div class="glass-card fade-in-up" v-for="(s, i) in services" :key="s.id" :style="{ animationDelay: (i * 0.1) + 's' }">
-            <div class="card-icon">{{ s.icon || '📦' }}</div>
+          <div class="glass-card fade-in-up" v-for="(s, i) in services" :key="s.id" :style="{ animationDelay: `${i * 0.1}s` }">
+            <div class="card-icon-wrapper"><span class="card-icon">{{ s.icon || '📦' }}</span></div>
             <h3>{{ s.title }}</h3>
             <p>{{ s.desc }}</p>
             <div class="price">{{ s.price }}</div>
@@ -30,206 +95,103 @@
         <p v-if="!services.length" class="empty-text fade-in">Услуги скоро появятся</p>
       </div>
     </section>
-
-    <!-- Контакты -->
-    <section class="section" id="contacts-section">
+    <section class="cta-section">
       <div class="container" style="text-align:center">
-        <h2 class="section-title">Связаться</h2>
-        <div class="contact-icons fade-in-up">
-          <a v-if="settings.vk" :href="settings.vk" target="_blank" class="contact-link">
-            <i class="fab fa-vk"></i>
-          </a>
-          <a v-if="settings.tg" :href="settings.tg" target="_blank" class="contact-link">
-            <i class="fab fa-telegram"></i>
-          </a>
-          <a v-if="settings.wa" :href="settings.wa" target="_blank" class="contact-link">
-            <i class="fab fa-whatsapp"></i>
-          </a>
+        <h2>Готовы начать говорить?</h2>
+        <p>Запишитесь на бесплатный пробный урок уже сегодня!</p>
+        <button class="glass-btn" @click="scrollToSection('contacts-section')"><span class="glass-btn-icon">💬</span> Связаться</button>
+      </div>
+    </section>
+    <section class="section">
+      <div class="container">
+        <h2 class="section-title">Что говорят ученики</h2>
+        <div class="reviews-grid">
+          <div class="review-card fade-in-up" v-for="(r, i) in reviews" :key="i" :style="{ animationDelay: `${i * 0.12}s` }">
+            <div class="review-stars">{{ '⭐'.repeat(r.stars) }}</div>
+            <p class="review-text">"{{ r.text }}"</p>
+            <div class="review-author">
+              <img :src="r.avatar" class="review-avatar">
+              <div><strong>{{ r.name }}</strong><small>{{ r.role }}</small></div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
-
-    <footer><p>© 2026 {{ settings.club_name || 'English Club' }} — Разговорный клуб</p></footer>
+    <section class="section section-alt" id="faq-section">
+      <div class="container" style="max-width:800px">
+        <h2 class="section-title">Частые вопросы</h2>
+        <div class="faq-list">
+          <div class="faq-item" v-for="(faq, i) in faqs" :key="i" @click="faq.open = !faq.open">
+            <div class="faq-header"><span>{{ faq.q }}</span><span class="faq-arrow" :class="{ open: faq.open }">▾</span></div>
+            <div class="faq-body" v-show="faq.open"><p>{{ faq.a }}</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="section" id="contacts-section">
+      <div class="container" style="text-align:center">
+        <h2 class="section-title">Связаться со мной</h2>
+        <p style="color:var(--t2);margin-bottom:30px">Есть вопросы? Я на связи!</p>
+        <div class="contact-icons fade-in-up">
+          <a v-if="settings.tg" :href="settings.tg" target="_blank" class="contact-link"><i class="fab fa-telegram"></i></a>
+          <a v-if="settings.wa" :href="settings.wa" target="_blank" class="contact-link"><i class="fab fa-whatsapp"></i></a>
+          <a v-if="settings.vk" :href="settings.vk" target="_blank" class="contact-link"><i class="fab fa-vk"></i></a>
+        </div>
+      </div>
+    </section>
+    <footer class="footer-new">
+      <div class="container">
+        <div class="footer-grid">
+          <div class="footer-col"><h4>{{ settings.club_name || 'English Club' }}</h4><p>Разговорный клуб нового поколения. Практикуй английский с удовольствием.</p></div>
+          <div class="footer-col"><h4>Навигация</h4><a @click="scrollToSection('about-section')">Обо мне</a><a @click="scrollToSection('how-section')">Как это работает</a><a @click="scrollToSection('services-section')">Услуги</a><a @click="scrollToSection('faq-section')">Частые вопросы</a></div>
+          <div class="footer-col"><h4>Контакты</h4><a :href="settings.tg" target="_blank">Telegram</a><a :href="settings.wa" target="_blank">WhatsApp</a><a href="mailto:hello@english-club.ru">hello@english-club.ru</a></div>
+        </div>
+        <div class="footer-bottom"><p>© 2026 {{ settings.club_name || 'English Club' }}. Все права защищены.</p></div>
+      </div>
+    </footer>
   </div>
 </template>
 
 <script>
 import axios from 'axios';
-
 export default {
   name: 'Home',
   props: ['settings'],
-  data() { return { services: [] }; },
-  async mounted() {
-    try { const r = await axios.get('/api/services'); this.services = r.data; } catch(e) {}
+  data() { 
+    return { 
+      services: [],
+      tutorPhoto: 'https://ui-avatars.com/api/?name=Анна+П&size=400&background=6366f1&color=fff&bold=true',
+      stats: [
+        { value: '500', label: 'Учеников' },
+        { value: '50', label: 'Встреч/мес' },
+        { value: '98', label: '% довольны' }
+      ],
+      certificates: [
+        { icon: '🎓', title: 'TESOL Certificate', from: 'Arizona State University' },
+        { icon: '📜', title: 'CELTA Certificate', from: 'Cambridge University' },
+        { icon: '🏆', title: 'IELTS Examiner', from: 'British Council' },
+        { icon: '🌟', title: 'TEFL Advanced', from: 'International TEFL Academy' }
+      ],
+      steps: [
+        { icon: '📝', title: 'Регистрируешься', text: 'Создай аккаунт за 1 минуту' },
+        { icon: '📅', title: 'Выбираешь встречу', text: 'Удобное время и тема' },
+        { icon: '🚀', title: 'Начинаешь говорить', text: 'Живое общение с носителями' }
+      ],
+      reviews: [
+        { stars: 5, text: 'Отличный клуб! За 2 месяца поднял уровень с A1 до B1.', name: 'Иван П.', role: 'Ученик', avatar: 'https://ui-avatars.com/api/?name=Иван+П&background=6366f1&color=fff' },
+        { stars: 5, text: 'Дочь ходит с удовольствием! Анна даёт обратную связь после каждого урока.', name: 'Анна С.', role: 'Родитель', avatar: 'https://ui-avatars.com/api/?name=Анна+С&background=2dd4bf&color=fff' },
+        { stars: 5, text: 'Лучший преподаватель! Индивидуальный подход и крутая атмосфера.', name: 'Мария К.', role: 'Ученик', avatar: 'https://ui-avatars.com/api/?name=Мария+К&background=8b5cf6&color=fff' }
+      ],
+      faqs: [
+        { q: 'Как проходят встречи?', a: 'Встречи проходят в формате видеозвонков через Jitsi Meet. Вы подключаетесь по ссылке в назначенное время и общаетесь с преподавателем и другими учениками.', open: false },
+        { q: 'Сколько это стоит?', a: 'Цены зависят от выбранного тарифа. Есть бесплатные пробные встречи. Актуальные цены смотрите в разделе "Услуги".', open: false },
+        { q: 'Кто ведёт занятия?', a: 'Занятия веду лично я — Анна, сертифицированный преподаватель TESOL/CELTA с 10+ летним опытом.', open: false },
+        { q: 'Нужен ли микрофон и камера?', a: 'Желательно иметь микрофон для общения. Камера приветствуется, но не обязательна — главное ваше участие!', open: false },
+        { q: 'Можно ли учиться с нуля?', a: 'Да! У нас есть группы для начинающих (уровень A1). Вы быстро освоите базовые фразы и начнёте говорить.', open: false }
+      ]
+    }; 
   },
-  methods: {
-    scrollToSection(id) {
-      const el = document.getElementById(id);
-      if (el) el.scrollIntoView({ behavior: 'smooth' });
-    }
-  }
+  async mounted() { try { const r = await axios.get('/api/services'); this.services = r.data; } catch(e) {} },
+  methods: { scrollToSection(id) { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: 'smooth' }); } }
 };
 </script>
-
-<style scoped>
-/* Hero */
-.hero {
-  min-height: 80vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-}
-.hero-bg {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 20% 50%, rgba(99,102,241,0.08) 0%, transparent 50%),
-              radial-gradient(circle at 80% 50%, rgba(139,92,246,0.06) 0%, transparent 50%),
-              radial-gradient(circle at 50% 80%, rgba(236,72,153,0.04) 0%, transparent 50%);
-  animation: gradientShift 8s ease infinite;
-}
-@keyframes gradientShift {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-}
-.hero-content { position: relative; z-index: 1; }
-.hero h1 { font-size: clamp(2rem, 6vw, 4rem); font-weight: 800; margin-bottom: 16px; }
-.gradient-text {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899);
-  background-size: 200% 200%;
-  animation: gradientMove 3s ease infinite;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-@keyframes gradientMove {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-.hero p { font-size: 1.3rem; color: #64748b; margin-bottom: 24px; max-width: 500px; margin-left: auto; margin-right: auto; }
-.hero-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-
-/* Анимации */
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-.fade-in-up { animation: fadeInUp 0.6s ease-out both; }
-.fade-in { animation: fadeIn 0.5s ease-out both; }
-
-/* Секции */
-.section { padding: 80px 0; }
-.section-title {
-  font-size: 2.2rem;
-  font-weight: 800;
-  text-align: center;
-  margin-bottom: 32px;
-  background: linear-gradient(135deg, #1e293b, #6366f1);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.container { max-width: 1280px; margin: 0 auto; padding: 0 24px; }
-.empty-text { text-align: center; color: #94a3b8; padding: 40px; }
-
-/* Сетка услуг */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 24px;
-}
-
-/* Стеклянные карточки */
-.glass-card {
-  background: rgba(255,255,255,0.8);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.3);
-  border-radius: 24px;
-  padding: 28px;
-  text-align: center;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
-  transition: all 0.3s ease;
-}
-.glass-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.1);
-}
-.card-icon { font-size: 2.5rem; margin-bottom: 12px; }
-.glass-card h3 { font-weight: 700; font-size: 1.2rem; margin-bottom: 8px; }
-.glass-card p { color: #64748b; font-size: 0.9rem; margin-bottom: 12px; }
-.price { font-size: 1.5rem; font-weight: 800; color: #6366f1; }
-
-/* Контакты */
-.contact-icons { display: flex; gap: 20px; justify-content: center; margin-top: 20px; }
-.contact-link {
-  width: 60px; height: 60px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  color: #fff;
-  font-size: 1.5rem;
-  text-decoration: none;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(99,102,241,0.3);
-}
-.contact-link:hover {
-  transform: translateY(-3px) scale(1.05);
-  box-shadow: 0 8px 25px rgba(99,102,241,0.5);
-}
-
-/* Кнопки */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 14px 28px;
-  border-radius: 50px;
-  font-weight: 600;
-  font-size: 1rem;
-  cursor: pointer;
-  border: none;
-  font-family: inherit;
-  transition: all 0.3s ease;
-}
-.btn-p {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  color: #fff;
-  box-shadow: 0 4px 15px rgba(99,102,241,0.3);
-}
-.btn-p:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(99,102,241,0.5); }
-.btn-o {
-  border: 2px solid #6366f1;
-  color: #6366f1;
-  background: transparent;
-}
-.btn-o:hover { background: #eef0ff; transform: translateY(-2px); }
-.btn-pulse { animation: pulse 2s infinite; }
-.btn-pulse:hover { animation: none; }
-@keyframes pulse {
-  0%, 100% { box-shadow: 0 4px 15px rgba(99,102,241,0.3); }
-  50% { box-shadow: 0 8px 30px rgba(99,102,241,0.6); }
-}
-
-footer { text-align: center; padding: 40px 0; color: #94a3b8; border-top: 1px solid #e2e8f0; font-size: 0.85rem; }
-
-/* Тёмная тема */
-body.dark .glass-card { background: rgba(30,41,59,0.8); border-color: rgba(255,255,255,0.05); }
-body.dark .glass-card p { color: #94a3b8; }
-body.dark .section-title { background: linear-gradient(135deg, #e2e8f0, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-body.dark .hero p { color: #94a3b8; }
-
-@media (max-width: 768px) {
-  .hero { min-height: 60vh; }
-  .section { padding: 50px 0; }
-  .section-title { font-size: 1.6rem; }
-}
-</style>
