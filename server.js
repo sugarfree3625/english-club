@@ -253,18 +253,33 @@ app.post('/api/parent/bind', auth, async (req, res) => {
 });
 
   app.post('/api/slots', auth, async (req, res) => {
-    if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' });
-    const { student_id, start_time, end_time, lesson_type, title, notes, meeting_link } = req.body;
-    const slot = { tutor_id: req.session.userId, student_id, start_time, end_time, lesson_type: lesson_type || 'online', title: title || 'Занятие', notes, meeting_link: meeting_link || (lesson_type === 'online' ? `https://meet.jit.si/english-club-${Date.now()}` : null) };
-    await supabase.from('schedule_slots').insert(slot);
-    if (student_id) {
-      const typeLabel = lesson_type === 'online' ? '🟢 Онлайн' : lesson_type === 'offline' ? '🔵 Очно' : '🟡 Групповое';
-      notifyUser(student_id, `📅 Новое занятие!`, { lesson: { title: title || 'Занятие', time: new Date(start_time).toLocaleString('ru'), type: typeLabel } });
-      const { data: parents } = await supabase.from('student_parents').select('parent_id').eq('student_id', student_id);
-      if (parents) for (const p of parents) notifyUser(p.parent_id, `📅 Занятие для ребёнка`, { lesson: { title: title || 'Занятие', time: new Date(start_time).toLocaleString('ru'), type: typeLabel } });
+  if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' });
+  const { student_id, start_time, end_time, lesson_type, title, notes, meeting_link, group_students } = req.body;
+  const slot = { 
+    tutor_id: req.session.userId, 
+    student_id: lesson_type?.startsWith('group') ? null : student_id, 
+    start_time, 
+    end_time, 
+    lesson_type: lesson_type || 'online', 
+    title: title || 'Занятие', 
+    notes, 
+    meeting_link: meeting_link || (lesson_type === 'online' || lesson_type === 'group-online' ? `https://meet.jit.si/english-club-${Date.now()}` : null),
+    group_students: group_students || []
+  };
+  await supabase.from('schedule_slots').insert(slot);
+  if (student_id && !lesson_type?.startsWith('group')) {
+    const typeLabel = lesson_type === 'online' ? '🟢 Онлайн' : '🔵 Очно';
+    notifyUser(student_id, `📅 Новое занятие!`, { lesson: { title: title || 'Занятие', time: new Date(start_time).toLocaleString('ru'), type: typeLabel } });
+    const { data: parents } = await supabase.from('student_parents').select('parent_id').eq('student_id', student_id);
+    if (parents) for (const p of parents) notifyUser(p.parent_id, `📅 Занятие для ребёнка`, { lesson: { title: title || 'Занятие', time: new Date(start_time).toLocaleString('ru'), type: typeLabel } });
+  }
+  if (group_students?.length) {
+    for (const gs of group_students) {
+      notifyUser(gs, `📅 Новое групповое занятие!`, { lesson: { title: title || 'Занятие', time: new Date(start_time).toLocaleString('ru'), type: '👥 Группа' } });
     }
-    res.json({ success: true });
-  });
+  }
+  res.json({ success: true });
+});
 
   app.put('/api/slots/:id', auth, async (req, res) => {
     if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' });
