@@ -30,6 +30,7 @@
     "vue-router": "^4.6.4",
     "three": "^0.170.0",
     "animejs": "^3.2.2",
+    "lucide-vue-next": "^0.344.0",
     "lucide-vue-next": "^0.344.0"
   },
   "devDependencies": {
