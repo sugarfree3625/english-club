@@ -1,353 +1,555 @@
-const express = require('express');
-const session = require('express-session');
-const bodyParser = require('body-parser');
-const bcrypt = require('bcrypt');
-const path = require('path');
-const fs = require('fs');
-const http = require('http');
-const { Server } = require('socket.io');
-const multer = require('multer');
-const { createClient } = require('@supabase/supabase-js');
+<template>
+  <div class="calendar-container">
+    <!-- Заголовок -->
+    <div class="calendar-header">
+      <div class="calendar-nav">
+        <button class="btn btn-o btn-sm" @click="prevWeek">←</button>
+        <h2 class="calendar-title">{{ weekLabel }}</h2>
+        <button class="btn btn-o btn-sm" @click="nextWeek">→</button>
+        <button class="btn btn-o btn-sm" @click="goToday">Сегодня</button>
+      </div>
+      <div class="calendar-actions">
+        <button class="btn btn-o btn-sm" @click="viewMode = 'month'">📅 Месяц</button>
+        <button class="btn btn-o btn-sm" @click="viewMode = 'week'">📆 Неделя</button>
+        <button class="btn btn-o btn-sm" @click="exportICS">📤 Экспорт</button>
+        <button class="btn btn-p btn-sm" @click="openAddSlot" v-if="isTutor">+ Занятие</button>
+      </div>
+    </div>
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
-  transports: ['websocket', 'polling']
-});
+    <!-- Сетка месяца -->
+    <div v-if="viewMode === 'month'" class="month-grid">
+      <div class="day-header" v-for="day in weekDays" :key="day">{{ day }}</div>
+      <div 
+        class="day-cell" 
+        v-for="(day, idx) in monthDays" 
+        :key="idx"
+        :class="{ today: day.isToday, otherMonth: day.isOtherMonth }"
+        @click="openDay(day.date)"
+      >
+        <span class="day-number">{{ day.day }}</span>
+        <div class="day-slots">
+          <div 
+            v-for="slot in getSlotsForDate(day.date)" 
+            :key="slot.id"
+            class="slot-mini"
+            :class="getSlotColor(slot.lesson_type)"
+            @click.stop="editSlot(slot)"
+          >
+            {{ slot.title }}
+          </div>
+        </div>
+      </div>
+    </div>
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-console.log('📊 Supabase инициализирован');
+    <!-- Сетка недели -->
+    <div v-if="viewMode === 'week'" class="week-wrapper">
+      <div class="week-grid" ref="weekGrid">
+        <!-- Заголовки дней -->
+        <div class="week-header-cell">Время</div>
+        <div class="week-header-cell" v-for="day in weekDaysList" :key="day.date" :class="{ today: day.isToday }">
+          {{ day.name }}<br>{{ day.dateStr }}
+        </div>
+        
+        <!-- Фоновая сетка -->
+        <template v-for="hour in hours" :key="hour">
+          <div class="week-time-cell">{{ hour }}:00</div>
+          <div class="week-bg-cell" v-for="day in weekDaysList" :key="'bg'+day.date+hour+':00'" :class="{ today: day.isToday }"></div>
+          <div class="week-time-cell week-time-half">:30</div>
+          <div class="week-bg-cell week-bg-half" v-for="day in weekDaysList" :key="'bg'+day.date+hour+':30'" :class="{ today: day.isToday }"></div>
+        </template>
+        
+        <!-- Слоты (абсолютное позиционирование) -->
+        <div class="slots-layer" ref="slotsLayer">
+          <div 
+            v-for="slot in weekSlots" 
+            :key="slot.id"
+            class="slot-block"
+            :class="getSlotColor(slot.lesson_type)"
+            :style="getSlotStyle(slot)"
+            @mousedown="startDrag($event, slot)"
+            @click.stop="editSlot(slot)"
+          >
+            <div class="slot-time-label">{{ formatTime(slot.start_time) }} - {{ formatTime(slot.end_time) }}</div>
+            <div class="slot-block-title">{{ slot.title }}</div>
+            <div class="slot-block-student">{{ slot.users?.username || (slot.group_students?.length ? '👥 Группа' : '—') }}</div>
+            <!-- Ручка растягивания -->
+            <div class="resize-handle" @mousedown.stop="startResize($event, slot)"></div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-const TG_TOKEN = process.env.TG_TOKEN || '';
-const TG_BOT = 'English_Language_Class_Bot';
+    <!-- История -->
+    <div v-if="pastSlots.length" class="history-section">
+      <h3>📋 История занятий</h3>
+      <div class="history-item" v-for="s in pastSlots.slice(0, 10)" :key="s.id">
+        <span>{{ getTypeEmoji(s.lesson_type) }}</span>
+        <strong>{{ s.title }}</strong>
+        <small>{{ formatDate(s.start_time) }}</small>
+        <small>{{ formatTime(s.start_time) }} - {{ formatTime(s.end_time) }}</small>
+      </div>
+    </div>
 
-function sanitizeHtml(str) {
-  if (!str) return '';
-  return str.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/on\w+\s*=\s*"[^"]*"/gi, '').replace(/on\w+\s*=\s*'[^']*'/gi, '')
-    .replace(/on\w+\s*=\s*[^\s>]+/gi, '').replace(/javascript\s*:/gi, '')
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
-}
+    <!-- Модалка -->
+    <div class="modal-overlay" v-if="showAddSlot || editingSlot" @click.self="closeModal">
+      <div class="modal">
+        <h3>{{ editingSlot ? '✏️ Редактировать' : '➕ Новое занятие' }}</h3>
+        
+        <label>Тип</label>
+        <div class="type-btns">
+          <button class="type-btn" :class="{ active: slotForm.lesson_type === 'online' }" @click="slotForm.lesson_type = 'online'">🟢 Онлайн</button>
+          <button class="type-btn" :class="{ active: slotForm.lesson_type === 'offline' }" @click="slotForm.lesson_type = 'offline'">🔵 Очно</button>
+          <button class="type-btn" :class="{ active: slotForm.lesson_type === 'group-online' }" @click="slotForm.lesson_type = 'group-online'">👥 Группа онлайн</button>
+          <button class="type-btn" :class="{ active: slotForm.lesson_type === 'group-offline' }" @click="slotForm.lesson_type = 'group-offline'">👥 Группа очно</button>
+        </div>
 
-const nwStorage = multer.diskStorage({
-  destination: (r, f, cb) => { const d = 'uploads/tmp'; if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); cb(null, d); },
-  filename: (r, f, cb) => cb(null, `nw-${Date.now()}${path.extname(f.originalname)}`)
-});
-const upNw = multer({ storage: nwStorage, limits: { fileSize: 10 * 1024 * 1024 } });
+        <label v-if="!isGroupType">Ученик</label>
+        <select v-if="!isGroupType" class="input" v-model="slotForm.student_id">
+          <option value="">Выберите</option>
+          <option v-for="s in allStudents" :key="s.id" :value="s.id">{{ s.username }}</option>
+        </select>
+        <div v-if="isGroupType">
+          <label>Ученики</label>
+          <div v-for="s in allStudents" :key="s.id" class="student-checkbox" @click="toggleGroupStudent(s.id)">
+            <input type="checkbox" :checked="slotForm.group_students.includes(s.id)" />
+            <span>{{ s.username }}</span>
+          </div>
+        </div>
 
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
-app.use(express.static('dist'));
-app.use(session({ secret: 'sp-club-2026', resave: false, saveUninitialized: false, cookie: { maxAge: 30 * 24 * 3600000, sameSite: 'lax', secure: false } }));
-['uploads/tmp'].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
+        <label>Название</label>
+        <input class="input" v-model="slotForm.title">
 
-function auth(req, res, next) { req.session.userId ? next() : res.status(401).json({ error: 'Войдите' }); }
+        <div style="display:flex;gap:8px">
+          <div style="flex:1">
+            <label>Дата</label>
+            <input class="input" type="date" v-model="slotForm.date">
+          </div>
+          <div style="flex:1">
+            <label>Время</label>
+            <input class="input" type="time" v-model="slotForm.time">
+          </div>
+        </div>
 
-function sendTelegram(chatId, text, extra = {}) {
-  if (!TG_TOKEN) return;
-  let message = text;
-  if (extra.homework) message += `\n\n📝 <b>Задание:</b> ${extra.homework}`;
-  if (extra.feedback) message += `\n\n📊 <b>Фидбек:</b>\n⭐ ${'⭐'.repeat(extra.feedback.rating || 0)}\n📌 ${extra.feedback.topic || 'Урок'}`;
-  if (extra.student) message += `\n👨‍🎓 <b>Ученик:</b> ${extra.student}`;
-  if (extra.lesson) message += `\n📅 <b>Занятие:</b> ${extra.lesson.title}\n🕐 ${extra.lesson.time}\n📍 ${extra.lesson.type}`;
-  fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(message)}&parse_mode=HTML`).catch(() => {});
-}
+        <label>Длительность (мин)</label>
+        <input class="input" type="number" v-model="slotForm.duration" placeholder="30">
 
-async function notifyUser(userId, text, extra = {}) {
-  const { data } = await supabase.from('tg_users').select('chat_id').eq('user_id', userId).single();
-  if (data) sendTelegram(data.chat_id, text, extra);
-}
+        <label>Заметки</label>
+        <textarea class="input note-area" v-model="slotForm.notes" rows="2"></textarea>
 
-function getLevel(rating) {
-  if (rating >= 5000) return 'C2'; if (rating >= 3000) return 'C1'; if (rating >= 1500) return 'B2';
-  if (rating >= 700) return 'B1'; if (rating >= 300) return 'A2'; return 'A1';
-}
+        <div class="modal-actions">
+          <button class="btn btn-p btn-sm" @click="saveSlot">💾 Сохранить</button>
+          <button v-if="editingSlot" class="btn btn-o btn-sm" style="color:#ef4444" @click="deleteSlot(editingSlot.id)">🗑</button>
+          <button class="btn btn-o btn-sm" @click="closeModal">Отмена</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
 
-async function updateRating(userId, points) {
-  const { data: user } = await supabase.from('users').select('rating, level').eq('id', userId).single();
-  if (!user) return;
-  const newRating = (user.rating || 0) + points;
-  const newLevel = getLevel(newRating);
-  await supabase.from('users').update({ rating: newRating, level: newLevel }).eq('id', userId);
-  if (newLevel !== user.level && newLevel > user.level) notifyUser(userId, `🎉 Уровень повышен до ${newLevel}!`);
-}
+<script>
+import axios from 'axios';
 
-async function getStreak(userId) {
-  const { data: bookings } = await supabase.from('bookings').select('created_at').eq('user_id', userId).order('created_at', { ascending: false });
-  if (!bookings?.length) return 0;
-  let streak = 0; const today = new Date(); today.setHours(0, 0, 0, 0);
-  for (let i = 0; i < 365; i++) {
-    const d = new Date(today); d.setDate(d.getDate() - i);
-    if (bookings.some(b => new Date(b.created_at).setHours(0,0,0,0) === d.getTime())) streak++; else break;
-  }
-  return streak;
-}
-
-async function ensureTutorChat(userId) {
-  const { data: admins } = await supabase.from('users').select('id').eq('role', 'admin').limit(1);
-  if (!admins?.length) return;
-  const adminId = admins[0].id;
-  const { data: existing } = await supabase.from('msg').select('id').or(`and(sender_id.eq.${userId},receiver_id.eq.${adminId}),and(sender_id.eq.${adminId},receiver_id.eq.${userId})`).limit(1);
-  if (!existing?.length) {
-    await supabase.from('msg').insert({ sender_id: adminId, receiver_id: userId, message: '👋 Добро пожаловать! Я ваш репетитор.', read: false });
-  }
-}
-
-(async () => {
-  const { data: admin } = await supabase.from('users').select('id').eq('role', 'admin').single();
-  if (!admin) { const hash = await bcrypt.hash('changeme123', 10); await supabase.from('users').insert({ username: 'Admin', email: 'admin@club.com', password: hash, role: 'admin', level: 'C1', rating: 9999 }); console.log('✅ Админ создан'); }
-  const { data: settings } = await supabase.from('settings').select('key').eq('key', 'hero_title').single();
-  if (!settings) { await supabase.from('settings').insert([{ key: 'hero_title', value: 'Speak English Freely' }, { key: 'hero_subtitle', value: 'Разговорный клуб' }, { key: 'primary_color', value: '#6366f1' }, { key: 'club_name', value: 'English Club' }]); }
-
-  // AUTH
-  app.post('/api/reg', async (req, res) => { const { username, email, password, level } = req.body; const { data: exists } = await supabase.from('users').select('id').eq('email', email).single(); if (exists) return res.status(400).json({ error: 'Email занят' }); const hash = await bcrypt.hash(password, 10); const { data: newUser } = await supabase.from('users').insert({ username, email, password: hash, level: level || 'B1' }).select('id').single(); if (newUser) ensureTutorChat(newUser.id); res.json({ success: true }); });
-  app.post('/api/login', async (req, res) => { const { data: u } = await supabase.from('users').select('*').eq('email', req.body.email).single(); if (!u || !(await bcrypt.compare(req.body.password, u.password))) return res.status(400).json({ error: 'Неверно' }); req.session.userId = u.id; req.session.role = u.role; ensureTutorChat(u.id); res.json({ success: true, user: { id: u.id, username: u.username, role: u.role, level: u.level, rating: u.rating, avatar_url: u.avatar_url, bio: u.bio } }); });
-  app.get('/api/me', async (req, res) => { if (!req.session.userId) return res.json({ ok: false }); const { data: u } = await supabase.from('users').select('id,username,role,level,rating,avatar_url,bio').eq('id', req.session.userId).single(); res.json({ ok: true, user: u }); });
-  app.put('/api/me', auth, async (req, res) => { const u = {}; if (req.body.avatar_url) u.avatar_url = req.body.avatar_url; if (req.body.bio !== undefined) u.bio = req.body.bio; if (req.body.level) u.level = req.body.level; await supabase.from('users').update(u).eq('id', req.session.userId); res.json({ success: true }); });
-  app.post('/api/out', (req, res) => { req.session.destroy(); res.json({ success: true }); });
-  app.post('/api/reset-password', async (req, res) => { console.log(`🔑 Сброс для ${req.body.email}`); res.json({ success: true }); });
-
-  // FILES
-  app.post('/api/nimg', auth, upNw.single('img'), async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: 'Нет файла' });
-    try { const buf = fs.readFileSync(req.file.path); const name = `nw-${Date.now()}${path.extname(req.file.originalname)}`; const { error } = await supabase.storage.from('uploads').upload(name, buf, { contentType: req.file.mimetype, upsert: true }); fs.unlinkSync(req.file.path); if (error) return res.status(500).json({ error: error.message }); res.json({ success: true, url: supabase.storage.from('uploads').getPublicUrl(name).data.publicUrl }); } catch(e) { res.status(500).json({ error: e.message }); }
-  });
-
-  // POSTS
-  app.get('/api/posts', auth, async (req, res) => { const page = parseInt(req.query.page) || 0; const limit = 20; const { data } = await supabase.from('posts').select('*, users!author_id(username, avatar_url), categories(name)').order('pinned', { ascending: false }).order('ts', { ascending: false }).range(page*limit, (page+1)*limit-1); res.json(data?.map(p => ({ ...p, an: p.users?.username, aa: p.users?.avatar_url, category: p.categories?.name })) || []); });
-  app.post('/api/posts', auth, async (req, res) => { if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' }); await supabase.from('posts').insert({ author_id: req.session.userId, title: sanitizeHtml(req.body.title), content: sanitizeHtml(req.body.content), items: req.body.items || '[]', category_id: req.body.category_id || null }); await updateRating(req.session.userId, 10); res.json({ success: true }); });
-  app.put('/api/posts/:id', auth, async (req, res) => { if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' }); const { data: p } = await supabase.from('posts').select('author_id').eq('id', req.params.id).single(); if (!p) return res.status(404).json({ error: 'Не найден' }); if (p.author_id !== req.session.userId && req.session.role !== 'admin') return res.status(403).json({ error: 'Нет прав' }); const u = {}; if (req.body.title) u.title = sanitizeHtml(req.body.title); if (req.body.content !== undefined) u.content = sanitizeHtml(req.body.content); if (req.body.items !== undefined) u.items = req.body.items; await supabase.from('posts').update(u).eq('id', req.params.id); res.json({ success: true }); });
-  app.post('/api/posts/:id/pin', auth, async (req, res) => { if (req.session.role !== 'admin') return res.status(403).json({ error: 'Нет прав' }); await supabase.from('posts').update({ pinned: true }).eq('id', req.params.id); res.json({ success: true }); });
-  app.post('/api/posts/:id/unpin', auth, async (req, res) => { if (req.session.role !== 'admin') return res.status(403).json({ error: 'Нет прав' }); await supabase.from('posts').update({ pinned: false }).eq('id', req.params.id); res.json({ success: true }); });
-  app.delete('/api/posts/:id', auth, async (req, res) => { const { data: p } = await supabase.from('posts').select('author_id').eq('id', req.params.id).single(); if (!p) return res.status(404).json({ error: 'Не найден' }); if (p.author_id !== req.session.userId && req.session.role !== 'admin') return res.status(403).json({ error: 'Нет прав' }); await supabase.from('posts').delete().eq('id', req.params.id); res.json({ success: true }); });
-  app.post('/api/posts/:id/like', auth, async (req, res) => { const { data: ex } = await supabase.from('likes').select('id').eq('post_id', req.params.id).eq('user_id', req.session.userId).single(); if (ex) await supabase.from('likes').delete().eq('id', ex.id); else await supabase.from('likes').insert({ post_id: parseInt(req.params.id), user_id: req.session.userId }); const { count } = await supabase.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', req.params.id); res.json({ liked: !ex, count: count || 0 }); });
-  app.post('/api/posts/:id/react', auth, async (req, res) => { const { emoji } = req.body; if (!['👍','❤️','😂','😮','🔥'].includes(emoji)) return res.status(400).json({ error: 'Неверно' }); const pid = parseInt(req.params.id); const uid = req.session.userId; const { data: ex } = await supabase.from('reactions').select('id').eq('post_id', pid).eq('user_id', uid).eq('emoji', emoji).single(); if (ex) await supabase.from('reactions').delete().eq('id', ex.id); else await supabase.from('reactions').insert({ post_id: pid, user_id: uid, emoji }); const { data: cnt } = await supabase.from('reactions').select('emoji').eq('post_id', pid); const rc = {}; cnt?.forEach(r => { rc[r.emoji] = (rc[r.emoji]||0)+1; }); res.json({ success: true, reactions: rc }); });
-  app.get('/api/posts/:id/reactions', auth, async (req, res) => { const { data: cnt } = await supabase.from('reactions').select('emoji').eq('post_id', parseInt(req.params.id)); const rc = {}; cnt?.forEach(r => { rc[r.emoji] = (rc[r.emoji]||0)+1; }); res.json({ reactions: rc }); });
-  app.get('/api/posts/:id/comments', auth, async (req, res) => { const { data } = await supabase.from('comments').select('*, users!user_id(username, avatar_url)').eq('post_id', req.params.id).order('ts', { ascending: true }); res.json(data || []); });
-  app.post('/api/posts/:id/comments', auth, async (req, res) => { await supabase.from('comments').insert({ post_id: parseInt(req.params.id), user_id: req.session.userId, message: req.body.msg }); await updateRating(req.session.userId, 5); res.json({ success: true }); });
-  app.get('/api/categories', async (req, res) => { const { data } = await supabase.from('categories').select('*').order('name'); res.json(data || []); });
-
-  // SESSIONS (групповые)
-  app.get('/api/ses', auth, async (req, res) => { const { data } = await supabase.from('sessions').select('*, users!host_id(username, avatar_url)').order('date', { ascending: true }); res.json(data || []); });
-  app.post('/api/ses', auth, async (req, res) => { if (req.session.role !== 'host' && req.session.role !== 'admin') return res.status(403).json({ error: 'Нет прав' }); const ml = req.body.meeting_link || `https://meet.jit.si/english-club-${Date.now()}`; await supabase.from('sessions').insert({ title: req.body.title, description: req.body.description, host_id: req.session.userId, date: req.body.date, duration: req.body.duration, max_participants: req.body.max_participants, meeting_link: ml }); await updateRating(req.session.userId, 15); res.json({ success: true, meeting_link: ml }); });
-  app.get('/api/ses/:id/ics', auth, async (req, res) => { const { data: s } = await supabase.from('sessions').select('*').eq('id', req.params.id).single(); if (!s) return res.status(404).json({ error: 'Нет' }); const st = new Date(s.date).toISOString().replace(/[-:]/g,'').substring(0,15)+'Z'; const en = new Date(new Date(s.date).getTime()+(s.duration||60)*60000).toISOString().replace(/[-:]/g,'').substring(0,15)+'Z'; res.setHeader('Content-Type','text/calendar'); res.send(`BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:${st}\nDTEND:${en}\nSUMMARY:${s.title}\nDESCRIPTION:${s.description||''}\nLOCATION:${s.meeting_link||''}\nEND:VEVENT\nEND:VCALENDAR`); });
-  app.get('/api/myb', auth, async (req, res) => { const { data } = await supabase.from('bookings').select('id, status, sessions(title, date, meeting_link)').eq('user_id', req.session.userId); res.json(data?.map(b => ({ bid: b.id, status: b.status, title: b.sessions?.title, date: b.sessions?.date, meeting_link: b.sessions?.meeting_link })) || []); });
-  app.get('/api/my-ses', auth, async (req, res) => { if (req.session.role !== 'host' && req.session.role !== 'admin') return res.json([]); const { data } = await supabase.from('sessions').select('*').eq('host_id', req.session.userId).order('date', { ascending: false }); res.json(data || []); });
-  app.post('/api/ses/:id/book', auth, async (req, res) => { await supabase.from('bookings').insert({ user_id: req.session.userId, session_id: parseInt(req.params.id) }); await updateRating(req.session.userId, 20); res.json({ success: true }); });
-  app.delete('/api/ses/:id', auth, async (req, res) => { const { data: s } = await supabase.from('sessions').select('host_id').eq('id', req.params.id).single(); if (!s) return res.status(404).json({ error: 'Нет' }); if (s.host_id !== req.session.userId && req.session.role !== 'admin') return res.status(403).json({ error: 'Нет прав' }); await supabase.from('sessions').delete().eq('id', req.params.id); res.json({ success: true }); });
-
-  // GROUPS
-  app.post('/api/groups', auth, async (req, res) => { const { data: g } = await supabase.from('groups').insert({ name: req.body.name, created_by: req.session.userId }).select('id').single(); if (!g) return res.status(500).json({ error: 'Ошибка' }); await supabase.from('group_members').insert({ group_id: g.id, user_id: req.session.userId, role: 'admin' }); res.json({ success: true, id: g.id }); });
-  app.get('/api/groups', auth, async (req, res) => { const { data: gm } = await supabase.from('group_members').select('group_id').eq('user_id', req.session.userId); const ids = gm?.map(d => d.group_id) || []; if (!ids.length) return res.json([]); const { data: gr } = await supabase.from('groups').select('*').in('id', ids); res.json(gr || []); });
-  app.get('/api/groups/:id/messages', auth, async (req, res) => { const { data } = await supabase.from('group_messages').select('*, users!sender_id(username, avatar_url)').eq('group_id', req.params.id).order('ts', { ascending: true }).limit(50); res.json(data || []); });
-  app.post('/api/groups/:id/members', auth, async (req, res) => { await supabase.from('group_members').insert({ group_id: parseInt(req.params.id), user_id: req.body.user_id }); res.json({ success: true }); });
-
-  // CHAT
-  app.get('/api/dialogs', auth, async (req, res) => { const uid = req.session.userId; const { data: msgs } = await supabase.from('msg').select('*').or(`sender_id.eq.${uid},receiver_id.eq.${uid}`).order('ts', { ascending: false }); const seen = new Set(), result = []; msgs?.forEach(m => { const pid = m.sender_id === uid ? m.receiver_id : m.sender_id; if (pid && !seen.has(pid)) { seen.add(pid); result.push({ partner_id: pid, message: m.message, ts: m.ts }); } }); for (let r of result) { const { data: u } = await supabase.from('users').select('username, avatar_url').eq('id', r.partner_id).single(); if (u) { r.username = u.username; r.avatar_url = u.avatar_url; } } res.json(result); });
-  app.get('/api/messages/:userId', auth, async (req, res) => { const { data } = await supabase.from('msg').select('*').or(`and(sender_id.eq.${req.session.userId},receiver_id.eq.${req.params.userId}),and(sender_id.eq.${req.params.userId},receiver_id.eq.${req.session.userId})`).order('ts', { ascending: true }); res.json(data || []); });
-  app.get('/api/unread', auth, async (req, res) => { const { count } = await supabase.from('msg').select('*', { count: 'exact', head: true }).eq('receiver_id', req.session.userId).eq('read', false); res.json({ count: count || 0 }); });
-  app.post('/api/msg/:id/read', auth, async (req, res) => { await supabase.from('msg').update({ read: true }).eq('id', req.params.id).eq('receiver_id', req.session.userId); res.json({ success: true }); });
-  app.delete('/api/msg/:id', auth, async (req, res) => { await supabase.from('msg').delete().eq('id', req.params.id).eq('sender_id', req.session.userId); res.json({ success: true }); });
-  app.get('/api/users', auth, async (req, res) => { const q = (req.query.q || '').toLowerCase(); const uid = req.session.userId; const { data: u } = await supabase.from('users').select('id,username,avatar_url,level,rating,role').neq('id', uid); if (!u) return res.json([]); let filtered = u; if (req.session.role !== 'admin' && req.session.role !== 'host') filtered = u.filter(x => x.role === 'admin' || x.role === 'host'); if (q.length >= 1) filtered = filtered.filter(x => x.username?.toLowerCase().includes(q)); res.json(filtered.slice(0, 50)); });
-  app.get('/api/top', async (req, res) => { const { data } = await supabase.from('users').select('id, username, level, rating, avatar_url').order('rating', { ascending: false }).limit(20); res.json(data || []); });
-  app.get('/api/search', auth, async (req, res) => { const q = req.query.q || ''; if (q.length < 2) return res.json({ posts:[], sessions:[] }); const [p, s] = await Promise.all([supabase.from('posts').select('id,title,content,ts').ilike('title',`%${q}%`).limit(5), supabase.from('sessions').select('id,title,date').ilike('title',`%${q}%`).limit(5)]); res.json({ posts: p.data||[], sessions: s.data||[] }); });
-  app.get('/api/settings', async (req, res) => { const { data } = await supabase.from('settings').select('*'); const s = {}; data?.forEach(r => s[r.key]=r.value); res.json(s); });
-  app.put('/api/settings', auth, async (req, res) => { if (req.session.role !== 'admin') return res.status(403).json({ error: 'Нет прав' }); for (const k in req.body) await supabase.from('settings').upsert({ key: k, value: req.body[k] }); res.json({ success: true }); });
-  app.get('/api/services', async (req, res) => { const { data } = await supabase.from('services').select('*').order('id'); res.json(data || []); });
-  app.get('/api/words', auth, async (req, res) => { const { data } = await supabase.from('words').select('*').eq('user_id', req.session.userId).order('id', { ascending: false }); res.json(data || []); });
-  app.post('/api/words', auth, async (req, res) => { await supabase.from('words').insert({ user_id: req.session.userId, en: req.body.en, ru: req.body.ru }); await updateRating(req.session.userId, 3); res.json({ success: true }); });
-  app.delete('/api/words/:id', auth, async (req, res) => { await supabase.from('words').delete().eq('id', req.params.id).eq('user_id', req.session.userId); res.json({ success: true }); });
-  app.get('/api/notes', auth, async (req, res) => { const { data } = await supabase.from('notes').select('note').eq('user_id', req.session.userId).single(); res.json({ note: data?.note || '' }); });
-  app.put('/api/notes', auth, async (req, res) => { await supabase.from('notes').upsert({ user_id: req.session.userId, note: req.body.note }); res.json({ success: true }); });
-  app.get('/api/tg-link', auth, (req, res) => { res.json({ link: `https://t.me/${TG_BOT}?start=${req.session.userId}` }); });
-  app.get('/api/streak', auth, async (req, res) => { res.json({ streak: await getStreak(req.session.userId) }); });
-
-  // ACHIEVEMENTS
-  app.get('/api/achievements', auth, async (req, res) => {
-    try { const uid = req.session.userId; const [b, m, w] = await Promise.all([supabase.from('bookings').select('*',{count:'exact',head:true}).eq('user_id',uid), supabase.from('msg').select('*',{count:'exact',head:true}).eq('sender_id',uid), supabase.from('words').select('*',{count:'exact',head:true}).eq('user_id',uid)]); const { data: top } = await supabase.from('users').select('id').order('rating',{ascending:false}).limit(50); const rank = top?.findIndex(u=>u.id===uid)+1||50; const { data: ud } = await supabase.from('users').select('created_at').eq('id',uid).single(); const age = ud?.created_at?Math.floor((Date.now()-new Date(ud.created_at).getTime())/86400000):0; const { data: all } = await supabase.from('achievements').select('*'); const { data: earned } = await supabase.from('user_achievements').select('achievement_id').eq('user_id',uid); const ids = earned?.map(e=>e.achievement_id)||[]; for (const a of all||[]) { if (ids.includes(a.id)) continue; let ok=false; switch(a.condition_field){case'meetings_count':ok=b.count>=a.condition_value;break;case'messages_count':ok=m.count>=a.condition_value;break;case'words_count':ok=w.count>=a.condition_value;break;case'rating_rank':ok=rank<=a.condition_value;break;case'account_age_days':ok=age>=a.condition_value;break;} if(ok){await supabase.from('user_achievements').insert({user_id:uid,achievement_id:a.id});ids.push(a.id);} } const { data: fresh } = await supabase.from('user_achievements').select('achievement_id,earned_at').eq('user_id',uid); const map = {}; fresh?.forEach(e=>{map[e.achievement_id]=e.earned_at;}); const result = (all||[]).map(a=>{const earned=!!map[a.id];let cv=0;switch(a.condition_field){case'meetings_count':cv=b.count||0;break;case'messages_count':cv=m.count||0;break;case'words_count':cv=w.count||0;break;case'rating_rank':cv=rank;break;case'account_age_days':cv=age;break;} return{...a,earned,earned_at:map[a.id]||null,current_value:cv,condition_value:a.condition_value,progress_percent:earned?100:Math.round((cv/a.condition_value)*100)};}); res.json(result); } catch(e) { res.json([]); }
-  });
-  app.post('/api/check-achievements', auth, async (req, res) => { try { const uid=req.session.userId; const na=[]; const[b,m,w]=await Promise.all([supabase.from('bookings').select('*',{count:'exact',head:true}).eq('user_id',uid),supabase.from('msg').select('*',{count:'exact',head:true}).eq('sender_id',uid),supabase.from('words').select('*',{count:'exact',head:true}).eq('user_id',uid)]); const{data:top}=await supabase.from('users').select('id').order('rating',{ascending:false}).limit(50); const rank=top?.findIndex(u=>u.id===uid)+1||50; const{data:ud}=await supabase.from('users').select('created_at').eq('id',uid).single(); const age=ud?.created_at?Math.floor((Date.now()-new Date(ud.created_at).getTime())/86400000):0; const{data:all}=await supabase.from('achievements').select('*'); const{data:earned}=await supabase.from('user_achievements').select('achievement_id').eq('user_id',uid); const ids=earned?.map(e=>e.achievement_id)||[]; for(const a of all||[]){if(ids.includes(a.id))continue;let ok=false;switch(a.condition_field){case'meetings_count':ok=b.count>=a.condition_value;break;case'messages_count':ok=m.count>=a.condition_value;break;case'words_count':ok=w.count>=a.condition_value;break;case'rating_rank':ok=rank<=a.condition_value;break;case'account_age_days':ok=age>=a.condition_value;break;} if(ok){await supabase.from('user_achievements').insert({user_id:uid,achievement_id:a.id});na.push(a);}} res.json({newAchievements:na}); } catch(e) { res.json({newAchievements:[]}); } });
-
-  // РОДИТЕЛЬСКИЙ КАБИНЕТ
-  app.get('/api/parent/students', auth, async (req, res) => {
-    if (req.session.role !== 'parent') return res.json([]);
-    const { data: links } = await supabase.from('student_parents').select('student_id').eq('parent_id', req.session.userId);
-    if (!links?.length) return res.json([]);
-    const ids = links.map(l => l.student_id);
-    const { data: students } = await supabase.from('users').select('id, username, level, rating, avatar_url').in('id', ids);
-    for (let s of (students||[])) { s.streak = await getStreak(s.id); const { count: wc } = await supabase.from('words').select('*',{count:'exact',head:true}).eq('user_id',s.id); s.words = wc||0; }
-    res.json(students || []);
-  });
-  app.get('/api/parent/student/:id', auth, async (req, res) => { /* без изменений */ });
-
-  // ДЗ
-  app.post('/api/homework', auth, async (req, res) => {
-    if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' });
-    const { student_id, title, description, due_date, files, voice_url, links } = req.body;
-    await supabase.from('homework').insert({ student_id, title, description, due_date, files, voice_url, links, created_by: req.session.userId });
-    notifyUser(student_id, `📝 Новое задание!`, { homework: title });
-    const { data: parents } = await supabase.from('student_parents').select('parent_id').eq('student_id', student_id);
-    if (parents) for (const p of parents) notifyUser(p.parent_id, `📝 ДЗ для ребёнка`, { homework: title });
-    res.json({ success: true });
-  });
-  app.get('/api/homework/my', auth, async (req, res) => { const { data } = await supabase.from('homework').select('*').eq('student_id', req.session.userId).order('created_at', { ascending: false }); res.json(data || []); });
-  app.put('/api/homework/:id', auth, async (req, res) => { /* без изменений */ });
-
-  // ФИДБЕКИ
-  app.post('/api/feedback', auth, async (req, res) => {
-    if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' });
-    const { student_id, rating, topic, good, improve, voice_url, files } = req.body;
-    await supabase.from('feedbacks').insert({ student_id, rating, topic, good, improve, voice_url, files, created_by: req.session.userId });
-    const { data: links } = await supabase.from('student_parents').select('parent_id').eq('student_id', student_id);
-    if (links) for (const l of links) notifyUser(l.parent_id, `📊 Новый фидбек!`, { feedback: { rating, topic } });
-    res.json({ success: true });
-  });
-    app.get('/api/feedback/:studentId', auth, async (req, res) => { /* без изменений */ });
-
-  // ПРИВЯЗКА РОДИТЕЛЯ
-app.post('/api/parent/bind', auth, async (req, res) => {
-  const { student_id, parent_id } = req.body;
-  if (!student_id || !parent_id) return res.status(400).json({ error: 'Нет данных' });
-  const { error } = await supabase.from('student_parents').insert({ student_id, parent_id });
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true });
-});
-
-  // ========== НОВЫЙ КАЛЕНДАРЬ (SLOTS) ==========
-  app.get('/api/slots', auth, async (req, res) => {
-  try {
-    const uid = req.session.userId;
-    console.log('📅 Запрос слотов от user:', uid, 'role:', req.session.role);
-    
-    let query = supabase.from('schedule_slots').select('*, users!student_id(username, avatar_url, level)');
-    
-    if (req.session.role === 'admin' || req.session.role === 'host') {
-      query = query.eq('tutor_id', parseInt(uid));
-    } else if (req.session.role === 'parent') {
-      const { data: links } = await supabase.from('student_parents').select('student_id').eq('parent_id', uid);
-      const ids = (links || []).map(l => l.student_id);
-      if (ids.length > 0) {
-        query = query.in('student_id', ids);
-      } else {
-        return res.json([]);
+export default {
+  name: 'FullCalendar',
+  props: ['user'],
+  inject: ['addToast'],
+  data() {
+    return {
+      viewMode: 'week',
+      currentMonth: new Date().getMonth(),
+      currentYear: new Date().getFullYear(),
+      currentWeek: 0,
+      hours: Array.from({ length: 14 }, (_, i) => i + 8),
+      slots: [],
+      allStudents: [],
+      showAddSlot: false,
+      editingSlot: null,
+      slotForm: { student_id: '', lesson_type: 'online', title: '', date: '', time: '', duration: 30, notes: '', group_students: [] },
+      dragging: null,
+      resizing: null,
+      dragStartY: 0,
+      dragSlotOriginal: null,
+    };
+  },
+  computed: {
+    isTutor() { return this.user?.role === 'admin' || this.user?.role === 'host'; },
+    isGroupType() { return this.slotForm.lesson_type === 'group-online' || this.slotForm.lesson_type === 'group-offline'; },
+    weekDays() { return ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС']; },
+    currentMonthName() { return new Date(this.currentYear, this.currentMonth).toLocaleDateString('ru', { month: 'long' }); },
+    monthDays() {
+      const days = [];
+      const firstDay = new Date(this.currentYear, this.currentMonth, 1);
+      const lastDay = new Date(this.currentYear, this.currentMonth + 1, 0);
+      const startDay = firstDay.getDay() || 7;
+      for (let i = 1; i < startDay; i++) {
+        const d = new Date(this.currentYear, this.currentMonth, 1 - (startDay - i));
+        days.push({ day: d.getDate(), date: d.toISOString().split('T')[0], isOtherMonth: true, isToday: false });
       }
-    } else {
-      query = query.eq('student_id', uid);
-    }
+      for (let i = 1; i <= lastDay.getDate(); i++) {
+        const d = new Date(this.currentYear, this.currentMonth, i);
+        days.push({ day: i, date: d.toISOString().split('T')[0], isOtherMonth: false, isToday: d.toDateString() === new Date().toDateString() });
+      }
+      return days;
+    },
+    weekDaysList() {
+      const today = new Date();
+      const monday = new Date(today);
+      monday.setDate(today.getDate() - (today.getDay() || 7) + 1 + this.currentWeek * 7);
+      return Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        return {
+          date: d.toISOString().split('T')[0],
+          name: ['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'][i],
+          dateStr: d.toLocaleDateString('ru', { day: 'numeric', month: 'short' }),
+          isToday: d.toDateString() === today.toDateString(),
+          dayIndex: i,
+        };
+      });
+    },
+    weekLabel() {
+      if (!this.weekDaysList.length) return '';
+      return `${this.weekDaysList[0].dateStr} — ${this.weekDaysList[6].dateStr}`;
+    },
+    weekSlots() {
+      const weekStart = this.weekDaysList[0]?.date;
+      const weekEnd = this.weekDaysList[6]?.date;
+      if (!weekStart || !weekEnd) return [];
+      return this.slots
+        .filter(s => {
+          const sd = new Date(s.start_time).toISOString().split('T')[0];
+          return sd >= weekStart && sd <= weekEnd;
+        })
+        .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+    },
+    pastSlots() { return this.slots.filter(s => new Date(s.start_time) < new Date()); },
+  },
+  async mounted() {
+    await Promise.all([this.loadSlots(), this.loadStudents()]);
+    document.addEventListener('mousemove', this.onDragMove);
+    document.addEventListener('mouseup', this.onDragEnd);
+  },
+  beforeUnmount() {
+    document.removeEventListener('mousemove', this.onDragMove);
+    document.removeEventListener('mouseup', this.onDragEnd);
+  },
+  methods: {
+    async loadSlots() { try { const r = await axios.get('/api/slots'); this.slots = r.data || []; } catch(e) {} },
+    async loadStudents() { try { const r = await axios.get('/api/users'); this.allStudents = (r.data || []).filter(u => u.role !== 'admin' && u.role !== 'parent'); } catch(e) {} },
+    getSlotsForDate(date) { return this.slots.filter(s => new Date(s.start_time).toISOString().split('T')[0] === date); },
+    getSlotColor(t) { 
+      if (t === 'online') return 'slot-online'; 
+      if (t === 'offline') return 'slot-offline'; 
+      if (t === 'group-online') return 'slot-group-online'; 
+      if (t === 'group-offline') return 'slot-group-offline'; 
+      return 'slot-online'; 
+    },
+    getTypeEmoji(t) {
+      if (t === 'online') return '🟢';
+      if (t === 'offline') return '🔵';
+      if (t === 'group-online') return '🟠';
+      if (t === 'group-offline') return '🔴';
+      return '🟢';
+    },
+    getSlotStyle(slot) {
+      const sd = new Date(slot.start_time);
+      const ed = new Date(slot.end_time);
+      const dayIndex = this.weekDaysList.findIndex(d => d.date === sd.toISOString().split('T')[0]);
+      if (dayIndex === -1) return { display: 'none' };
+      
+      const startHour = 8;
+      const totalMinutes = 14 * 60;
+      const slotStartMinutes = (sd.getHours() - startHour) * 60 + sd.getMinutes();
+      const slotEndMinutes = (ed.getHours() - startHour) * 60 + ed.getMinutes();
+      const duration = Math.max(slotEndMinutes - slotStartMinutes, 30);
+      
+      const topPercent = (slotStartMinutes / totalMinutes) * 100;
+      const heightPercent = (duration / totalMinutes) * 100;
+      const leftPercent = ((dayIndex + 1) / 8) * 100 + 0.3;
+      const widthPercent = (1 / 8) * 100 - 0.6;
+      
+      return {
+        top: topPercent + '%',
+        height: heightPercent + '%',
+        left: leftPercent + '%',
+        width: widthPercent + '%',
+      };
+    },
+    formatDate(ts) { return ts ? new Date(ts).toLocaleDateString('ru', { day: 'numeric', month: 'short' }) : ''; },
+    formatTime(ts) { return ts ? new Date(ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : ''; },
     
-    const { data, error } = await query.order('start_time', { ascending: true });
+    // DRAG & DROP
+    startDrag(e, slot) {
+      if (!this.isTutor) return;
+      e.preventDefault();
+      this.dragging = slot;
+      this.dragStartY = e.clientY;
+      this.dragSlotOriginal = { ...slot };
+    },
+    startResize(e, slot) {
+      if (!this.isTutor) return;
+      e.preventDefault();
+      this.resizing = slot;
+      this.dragStartY = e.clientY;
+      this.dragSlotOriginal = { ...slot };
+    },
+    onDragMove(e) {
+      if (!this.dragging && !this.resizing) return;
+      const dy = e.clientY - this.dragStartY;
+      const totalMinutes = 14 * 60;
+      const gridHeight = this.$refs.weekGrid?.clientHeight || 600;
+      const minutesPerPixel = totalMinutes / (gridHeight - 44);
+      const deltaMinutes = Math.round(dy * minutesPerPixel / 30) * 30;
+      
+      if (this.dragging && deltaMinutes !== 0) {
+        const originalStart = new Date(this.dragSlotOriginal.start_time);
+        const newStart = new Date(originalStart.getTime() + deltaMinutes * 60000);
+        // Не даём уйти за границы 8:00-22:00
+        if (newStart.getHours() < 8) newStart.setHours(8, 0, 0, 0);
+        if (newStart.getHours() >= 22) newStart.setHours(21, 30, 0, 0);
+        
+        this.dragging.start_time = newStart.toISOString();
+        const duration = (new Date(this.dragSlotOriginal.end_time) - originalStart) / 60000;
+        this.dragging.end_time = new Date(newStart.getTime() + duration * 60000).toISOString();
+      }
+      
+      if (this.resizing && deltaMinutes !== 0) {
+        const originalEnd = new Date(this.dragSlotOriginal.end_time);
+        const newEnd = new Date(originalEnd.getTime() + deltaMinutes * 60000);
+        const minEnd = new Date(this.dragSlotOriginal.start_time).getTime() + 30 * 60000;
+        if (newEnd.getTime() < minEnd) newEnd.setTime(minEnd);
+        if (newEnd.getHours() >= 22) newEnd.setHours(21, 30, 0, 0);
+        
+        this.resizing.end_time = newEnd.toISOString();
+      }
+    },
+    async onDragEnd() {
+      if (this.dragging) {
+        const slot = this.dragging;
+        try {
+          await axios.put(`/api/slots/${slot.id}`, {
+            start_time: slot.start_time,
+            end_time: slot.end_time,
+            lesson_type: slot.lesson_type,
+            title: slot.title,
+            student_id: slot.student_id,
+            notes: slot.notes,
+            group_students: slot.group_students,
+          });
+          this.addToast('Перемещено! 📅', 'success');
+        } catch(e) {
+          this.addToast('Ошибка перемещения', 'error');
+        }
+        this.dragging = null;
+        this.dragSlotOriginal = null;
+        this.loadSlots();
+      }
+      
+      if (this.resizing) {
+        const slot = this.resizing;
+        try {
+          await axios.put(`/api/slots/${slot.id}`, {
+            start_time: slot.start_time,
+            end_time: slot.end_time,
+            lesson_type: slot.lesson_type,
+            title: slot.title,
+            student_id: slot.student_id,
+            notes: slot.notes,
+            group_students: slot.group_students,
+          });
+          this.addToast('Длительность изменена! ⏱️', 'success');
+        } catch(e) {
+          this.addToast('Ошибка изменения', 'error');
+        }
+        this.resizing = null;
+        this.dragSlotOriginal = null;
+        this.loadSlots();
+      }
+    },
     
-    if (error) {
-      console.error('Ошибка слотов:', error);
-      return res.json([]);
-    }
-    
-    console.log('📅 Найдено слотов:', data?.length || 0);
-    console.log('🔍 Слоты из БД:', JSON.stringify(data));
-    res.json(data || []);
-  } catch(e) {
-    console.error('Крах слотов:', e);
-    res.json([]);
+    toggleGroupStudent(id) {
+      const idx = this.slotForm.group_students.indexOf(id);
+      if (idx === -1) {
+        this.slotForm.group_students.push(id);
+      } else {
+        this.slotForm.group_students.splice(idx, 1);
+      }
+    },
+    prevWeek() { this.currentWeek--; this.loadSlots(); },
+    nextWeek() { this.currentWeek++; this.loadSlots(); },
+    goToday() { this.currentWeek = 0; this.loadSlots(); },
+    prevMonth() { if (this.currentMonth === 0) { this.currentMonth = 11; this.currentYear--; } else this.currentMonth--; },
+    nextMonth() { if (this.currentMonth === 11) { this.currentMonth = 0; this.currentYear++; } else this.currentMonth++; },
+    openDay(date) { this.slotForm.date = date; this.slotForm.group_students = []; this.showAddSlot = true; },
+    openAddSlot() { this.editingSlot = null; this.slotForm = { student_id: '', lesson_type: 'online', title: '', date: '', time: '', duration: 30, notes: '', group_students: [] }; this.showAddSlot = true; },
+    editSlot(slot) { 
+      this.editingSlot = slot; 
+      const sd = new Date(slot.start_time); 
+      this.slotForm = { 
+        student_id: slot.student_id || '', 
+        lesson_type: slot.lesson_type || 'online', 
+        title: slot.title || '', 
+        date: sd.toISOString().split('T')[0], 
+        time: sd.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }), 
+        duration: Math.round((new Date(slot.end_time) - sd) / 60000) || 30, 
+        notes: slot.notes || '', 
+        group_students: slot.group_students || [] 
+      }; 
+      this.showAddSlot = true; 
+    },
+    closeModal() { this.showAddSlot = false; this.editingSlot = null; this.slotForm.group_students = []; },
+    async saveSlot() {
+      try {
+        const st = `${this.slotForm.date}T${this.slotForm.time}:00`;
+        const et = new Date(new Date(st).getTime() + (this.slotForm.duration || 30) * 60000).toISOString();
+        const data = { ...this.slotForm, start_time: st, end_time: et };
+        if (!this.isGroupType) data.group_students = [];
+        if (this.isGroupType) data.student_id = null;
+        if (this.editingSlot) {
+          await axios.put(`/api/slots/${this.editingSlot.id}`, data);
+        } else {
+          await axios.post('/api/slots', data);
+        }
+        this.closeModal();
+        this.addToast('Сохранено! 🎉', 'success');
+        setTimeout(() => this.loadSlots(), 500);
+      } catch(e) {
+        this.addToast('Ошибка', 'error');
+      }
+    },
+    async deleteSlot(id) {
+      if (confirm('Удалить занятие?')) {
+        await axios.delete(`/api/slots/${id}`);
+        this.closeModal();
+        this.loadSlots();
+      }
+    },
+    exportICS() { window.open('/api/slots/export', '_blank'); },
   }
-});
+};
+</script>
 
-  app.post('/api/slots', auth, async (req, res) => {
-  if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' });
-  const { student_id, start_time, end_time, lesson_type, title, notes, meeting_link, group_students } = req.body;
-  const slot = { 
-    tutor_id: req.session.userId, 
-    student_id: lesson_type?.startsWith('group') ? null : student_id, 
-    start_time, 
-    end_time, 
-    lesson_type: lesson_type || 'online', 
-    title: title || 'Занятие', 
-    notes, 
-    meeting_link: meeting_link || (lesson_type === 'online' || lesson_type === 'group-online' ? `https://meet.jit.si/english-club-${Date.now()}` : null),
-    group_students: group_students || []
-  };
-  await supabase.from('schedule_slots').insert(slot);
-  if (student_id && !lesson_type?.startsWith('group')) {
-    const typeLabel = lesson_type === 'online' ? '🟢 Онлайн' : '🔵 Очно';
-    notifyUser(student_id, `📅 Новое занятие!`, { lesson: { title: title || 'Занятие', time: new Date(start_time).toLocaleString('ru'), type: typeLabel } });
-    const { data: parents } = await supabase.from('student_parents').select('parent_id').eq('student_id', student_id);
-    if (parents) for (const p of parents) notifyUser(p.parent_id, `📅 Занятие для ребёнка`, { lesson: { title: title || 'Занятие', time: new Date(start_time).toLocaleString('ru'), type: typeLabel } });
-  }
-  if (group_students?.length) {
-    for (const gs of group_students) {
-      notifyUser(gs, `📅 Новое групповое занятие!`, { lesson: { title: title || 'Занятие', time: new Date(start_time).toLocaleString('ru'), type: '👥 Группа' } });
-    }
-  }
-  res.json({ success: true });
-});
+<style scoped>
+.calendar-container { max-width: 1280px; margin: 0 auto; padding: 24px; }
+.calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+.calendar-nav { display: flex; align-items: center; gap: 12px; }
+.calendar-title { font-weight: 800; font-size: 1.5rem; }
+.calendar-actions { display: flex; gap: 8px; }
 
-  app.put('/api/slots/:id', auth, async (req, res) => {
-    if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' });
-    const { student_id, start_time, end_time, lesson_type, title, notes, status } = req.body;
-    await supabase.from('schedule_slots').update({ student_id, start_time, end_time, lesson_type, title, notes, status }).eq('id', req.params.id);
-    res.json({ success: true });
-  });
+/* Месяц */
+.month-grid { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid var(--b); border-radius: 12px; overflow: hidden; }
+.day-header { background: var(--bg); font-weight: 700; text-align: center; padding: 10px; border-bottom: 1px solid var(--b); }
+.day-cell { min-height: 100px; padding: 6px; border-right: 1px solid var(--b); border-bottom: 1px solid var(--b); cursor: pointer; transition: background 0.2s; }
+.day-cell:nth-child(7n) { border-right: none; }
+.day-cell:hover { background: rgba(99,102,241,0.03); }
+.day-cell.today { background: rgba(99,102,241,0.05); }
+.day-cell.otherMonth { opacity: 0.4; }
+.day-number { font-weight: 600; font-size: 0.85rem; }
+.day-slots { margin-top: 4px; }
+.slot-mini { padding: 2px 6px; border-radius: 4px; color: #fff; font-size: 0.7rem; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 
-  app.delete('/api/slots/:id', auth, async (req, res) => {
-    if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' });
-    await supabase.from('schedule_slots').delete().eq('id', req.params.id);
-    res.json({ success: true });
-  });
+/* Цвета */
+.slot-online { background: #10b981; }
+.slot-offline { background: #6366f1; }
+.slot-group-online { background: #f59e0b; }
+.slot-group-offline { background: #ef4444; }
 
-  // Экспорт в ICS (Яндекс.Календарь)
-  app.get('/api/slots/export', auth, async (req, res) => {
-    const uid = req.session.userId;
-    let query = supabase.from('schedule_slots').select('*');
-    if (req.session.role === 'admin' || req.session.role === 'host') query = query.eq('tutor_id', uid);
-    else if (req.session.role === 'parent') { const { data: links } = await supabase.from('student_parents').select('student_id').eq('parent_id', uid); const ids = (links || []).map(l => l.student_id); if (ids.length) query = query.in('student_id', ids); else return res.json([]); }
-    else query = query.eq('student_id', uid);
-    const { data: slots } = await query;
-    let ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n';
-    slots?.forEach(s => {
-      const st = new Date(s.start_time).toISOString().replace(/[-:]/g,'').substring(0,15)+'Z';
-      const en = new Date(s.end_time || new Date(s.start_time).getTime()+3600000).toISOString().replace(/[-:]/g,'').substring(0,15)+'Z';
-      ics += `BEGIN:VEVENT\nDTSTART:${st}\nDTEND:${en}\nSUMMARY:${s.title || 'Занятие'}\nDESCRIPTION:${s.notes||''} ${s.meeting_link||''}\nLOCATION:${s.lesson_type==='online'?s.meeting_link||'Онлайн':s.notes||'Очно'}\nEND:VEVENT\n`;
-    });
-    ics += 'END:VCALENDAR';
-    res.setHeader('Content-Type','text/calendar; charset=utf-8');
-    res.setHeader('Content-Disposition','attachment; filename="schedule.ics"');
-    res.send(ics);
-  });
+/* Неделя */
+.week-wrapper { overflow-x: auto; }
+.week-grid { 
+  display: grid; 
+  grid-template-columns: 70px repeat(7, 1fr); 
+  border: 1px solid var(--b); 
+  border-radius: 12px; 
+  overflow: hidden; 
+  min-width: 800px; 
+  position: relative;
+  user-select: none;
+}
+.week-header-cell { background: var(--bg); font-weight: 700; text-align: center; padding: 10px 4px; border-bottom: 1px solid var(--b); font-size: 0.8rem; }
+.week-header-cell.today { background: rgba(99,102,241,0.08); }
+.week-time-cell { background: var(--bg); font-weight: 600; text-align: center; padding: 8px; border-bottom: 1px solid var(--b); font-size: 0.75rem; }
+.week-time-half { font-size: 0.65rem; color: var(--t2); }
+.week-bg-cell { min-height: 50px; border-bottom: 1px solid var(--b); border-right: 1px solid var(--b); }
+.week-bg-half { border-bottom: 1px dashed rgba(0,0,0,0.05); }
+.week-bg-cell.today { background: rgba(99,102,241,0.02); }
+body.dark .week-bg-half { border-bottom: 1px dashed rgba(255,255,255,0.05); }
 
-  // SOCKET.IO
-  const onlineUsers = new Map();
-  io.on('connection', s => {
-    s.on('join', d => { s.uid = d.uid; s.uname = d.uname; s.join(`u:${d.uid}`); onlineUsers.set(d.uid, true); supabase.from('msg').select('*', { count: 'exact', head: true }).eq('receiver_id', d.uid).eq('read', false).then(({ count }) => { s.emit('unread', { count: count || 0 }); }); });
-    s.on('disconnect', () => { if (s.uid) onlineUsers.delete(s.uid); });
-    s.on('dm', async d => { if (!s.uid) return; const files = d.files || null; const msg = { id: Date.now(), from: s.uid, fn: s.uname, msg: d.msg || '', files, reply_to: d.replyTo || null, ts: new Date().toISOString() }; io.to(`u:${d.to}`).emit('dm', msg); s.emit('dm', msg); await supabase.from('msg').insert({ sender_id: s.uid, receiver_id: d.to, message: d.msg || '', files: files ? JSON.stringify(files) : null, read: false, reply_to: d.replyTo || null }); await updateRating(s.uid, 2); if (!onlineUsers.has(d.to)) notifyUser(d.to, `💬 ${s.uname}: ${(d.msg||'📎 Файл').substring(0, 50)}`, { sender: s.uname }); });
-    s.on('joinGroup', gid => { s.join(`group:${gid}`); });
-    s.on('groupMsg', async d => { if (!s.uid) return; const msg = { id: Date.now(), from: s.uid, fn: s.uname, msg: d.msg || '', ts: new Date().toISOString() }; io.to(`group:${d.groupId}`).emit('groupMsg', msg); await supabase.from('group_messages').insert({ group_id: d.groupId, sender_id: s.uid, message: d.msg || '' }); await updateRating(s.uid, 3); });
-  });
+/* Слоты */
+.slots-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding-top: 44px;
+  padding-left: 70px;
+  pointer-events: none;
+}
+.slot-block {
+  position: absolute;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.75rem;
+  cursor: grab;
+  pointer-events: auto;
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+}
+.slot-block:active { cursor: grabbing; }
+.slot-block:hover {
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.5);
+  z-index: 10;
+}
+.slot-time-label {
+  font-size: 0.65rem;
+  opacity: 0.9;
+  margin-bottom: 2px;
+}
+.slot-block-title {
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.slot-block-student {
+  font-size: 0.65rem;
+  opacity: 0.8;
+}
+.resize-handle {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: ns-resize;
+  background: transparent;
+}
+.resize-handle:hover {
+  background: rgba(255,255,255,0.3);
+}
 
-  setInterval(async () => { try { const { data: files } = await supabase.storage.from('uploads').list(); if (files) { const now = new Date(); for (const f of files) { if ((now - new Date(f.created_at)) / 86400000 > 180) await supabase.storage.from('uploads').remove([f.name]); } } } catch(e) {} }, 86400000);
+/* История */
+.history-section { margin-top: 32px; }
+.history-item { display: flex; gap: 10px; align-items: center; padding: 10px; background: var(--surface); border-radius: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.history-item small { color: var(--t2); }
 
-  app.get('*', (req, res) => { if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io')) return res.status(404).json({ error: 'Not found' }); res.sendFile(path.join(__dirname, 'dist', 'index.html')); });
-  server.listen(process.env.PORT || 3000, () => { console.log('🚀 Сервер запущен'); });
-  setInterval(async () => { try { const now = new Date(); const inOneHour = new Date(now.getTime() + 3600000); const { data: sessions } = await supabase.from('sessions').select('*, users!host_id(username)').gte('date', now.toISOString()).lte('date', inOneHour.toISOString()); if (sessions) for (const s of sessions) { notifyUser(s.host_id, `🔔 Через час: "${s.title}"`); const { data: bookings } = await supabase.from('bookings').select('user_id').eq('session_id', s.id).eq('status', 'active'); if (bookings) for (const b of bookings) { if (b.user_id !== s.host_id) notifyUser(b.user_id, `🔔 Через час: "${s.title}"`); } } } catch(e) {} }, 1800000);
-
-  // TELEGRAM BOT
-  if (TG_TOKEN) {
-    let lastUpdateId = 0;
-    const mainKeyboard = { keyboard: [['📅 Расписание', '📝 Задания'], ['📊 Статистика', '👤 Профиль'], ['📊 Фидбеки', '📚 Слова'], ['🏆 Топ', '❓ Помощь']], resize_keyboard: true };
-    async function sendMsg(chatId, text, keyboard = null) { const body = { chat_id: chatId, text, parse_mode: 'HTML' }; if (keyboard) body.reply_markup = JSON.stringify(keyboard); await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => {}); }
-    async function getUserByChatId(chatId) { const { data } = await supabase.from('tg_users').select('user_id').eq('chat_id', chatId.toString()).single(); if (!data) return null; const { data: user } = await supabase.from('users').select('*').eq('id', data.user_id).single(); return user; }
-    setInterval(async () => { try { const r = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/getUpdates?offset=${lastUpdateId + 1}`); const d = await r.json(); for (const up of d.result || []) { lastUpdateId = up.update_id; const msg = up.message; if (!msg?.text) continue; const chatId = msg.chat.id; const text = msg.text.trim();
-          if (text.startsWith('/start')) { const [_, userId] = text.split(' '); if (userId) { await supabase.from('tg_users').upsert({ user_id: parseInt(userId), chat_id: chatId.toString() }); const { data: user } = await supabase.from('users').select('username').eq('id', parseInt(userId)).single(); await sendMsg(chatId, `✅ Привет, ${user?.username || 'друг'}!`, mainKeyboard); } else await sendMsg(chatId, '👋 Добро пожаловать!'); }
-          else if (text === '/schedule' || text === '📅 Расписание') { const user = await getUserByChatId(chatId); if (!user) { await sendMsg(chatId, '❌ Не привязан.'); continue; } const { data: slots } = await supabase.from('schedule_slots').select('title,start_time,lesson_type').eq('student_id', user.id).gte('start_time', new Date().toISOString()).order('start_time').limit(5); if (!slots?.length) { await sendMsg(chatId, '📅 Нет занятий.'); continue; } let resp = '<b>📅 Твои занятия:</b>\n\n'; slots.forEach((s,i) => { const d = new Date(s.start_time); const type = s.lesson_type === 'online' ? '🟢' : s.lesson_type === 'offline' ? '🔵' : '🟡'; resp += `${i+1}. ${type} <b>${s.title}</b>\n📆 ${d.toLocaleDateString('ru')} в ${d.toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}\n\n`; }); await sendMsg(chatId, resp); }
-          else if (text === '/homework' || text === '📝 Задания') { /* ... */ }
-          else if (text === '/profile' || text === '👤 Профиль') { /* ... */ }
-          else if (text === '/stats' || text === '📊 Статистика') { /* ... */ }
-          else if (text === '/feedbacks' || text === '📊 Фидбеки') { /* ... */ }
-          else if (text === '/words' || text === '📚 Слова') { /* ... */ }
-          else if (text === '/top' || text === '🏆 Топ') { /* ... */ }
-          else if (text === '/help' || text === '❓ Помощь') { await sendMsg(chatId, '<b>Команды:</b>\n📅 Расписание\n📝 Задания\n📊 Статистика\n👤 Профиль\n📊 Фидбеки\n📚 Слова\n🏆 Топ'); }
-          else if (text.startsWith('/')) { await sendMsg(chatId, '❓ /help', mainKeyboard); }
-        } } catch(e) {} }, 2000);
-    console.log('🤖 Telegram бот запущен');
-  }
-})();
+/* Модалка */
+.modal-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,0.4); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; }
+.modal { background: var(--surface); border-radius: 24px; padding: 28px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
+.modal h3 { font-weight: 700; margin-bottom: 16px; }
+.modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+.type-btns { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.type-btn { padding: 8px 14px; border-radius: 12px; border: 2px solid var(--b); background: var(--bg); cursor: pointer; font-weight: 600; font-size: 0.85rem; }
+.type-btn.active { border-color: var(--p); background: rgba(99,102,241,0.06); }
+.student-checkbox { display: flex; align-items: center; gap: 8px; padding: 6px; cursor: pointer; border-radius: 6px; }
+.student-checkbox:hover { background: rgba(99,102,241,0.05); }
+.student-checkbox input { accent-color: #6366f1; }
+.input { width: 100%; padding: 10px 14px; border: 2px solid var(--b); border-radius: 12px; font-family: inherit; font-size: 0.9rem; background: var(--bg); color: var(--t); outline: none; margin-bottom: 8px; }
+.note-area { resize: vertical; }
+.btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 20px; border-radius: 50px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border: none; font-family: inherit; transition: all 0.2s; }
+.btn-p { background: linear-gradient(135deg, var(--p), var(--p2)); color: #fff; }
+.btn-o { border: 2px solid var(--b); color: var(--t); background: transparent; }
+.btn-sm { padding: 7px 16px; font-size: 0.8rem; }
+</style>
