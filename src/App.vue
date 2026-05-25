@@ -24,7 +24,7 @@
             <transition name="dropdown-fade">
               <div v-if="menuOpen" class="dropdown">
                 <a @click="$router.push('/groups');menuOpen=false"><i class="fas fa-users"></i> Группы</a>
-                <a @click="$router.push('/dashboard');menuOpen=false"><i class="fas fa-calendar"></i> Дашборд</a>
+                <a @click="$router.push('/calendar');menuOpen=false"><i class="fas fa-calendar"></i> Календарь</a>
                 <a @click="$router.push('/messages');menuOpen=false"><i class="fas fa-comments"></i> Сообщения</a>
                 <a @click="$router.push('/profile');menuOpen=false"><i class="fas fa-user"></i> Профиль</a>
                 <a @click="$router.push('/admin');menuOpen=false" v-if="user?.role === 'admin'"><i class="fas fa-sliders-h"></i> Управление сайтом</a>
@@ -45,8 +45,8 @@
       <div class="global-search-modal">
         <div class="global-search-header"><i class="fas fa-search"></i><input ref="globalSearchInput" v-model="globalSearchQuery" @input="globalSearch" placeholder="Поиск по сайту... (Esc для закрытия)" class="global-search-input" @keydown.esc="showGlobalSearch = false"><span class="search-shortcut-badge">ESC</span></div>
         <div class="global-search-results" v-if="globalResults.posts?.length || globalResults.sessions?.length">
-          <div v-if="globalResults.posts?.length" class="search-section"><h4>📰 Посты</h4><div v-for="p in globalResults.posts" :key="'p'+p.id" class="search-result-item" @click="showGlobalSearch = false; $router.push('/dashboard')"><span class="search-result-title">{{ p.title }}</span><span class="search-result-badge">Пост</span></div></div>
-          <div v-if="globalResults.sessions?.length" class="search-section"><h4>📅 Встречи</h4><div v-for="s in globalResults.sessions" :key="'s'+s.id" class="search-result-item" @click="showGlobalSearch = false; $router.push('/dashboard')"><span class="search-result-title">{{ s.title }}</span><span class="search-result-badge">Встреча</span></div></div>
+          <div v-if="globalResults.posts?.length" class="search-section"><h4>📰 Посты</h4><div v-for="p in globalResults.posts" :key="'p'+p.id" class="search-result-item" @click="showGlobalSearch = false; $router.push('/calendar')"><span class="search-result-title">{{ p.title }}</span><span class="search-result-badge">Пост</span></div></div>
+          <div v-if="globalResults.sessions?.length" class="search-section"><h4>📅 Встречи</h4><div v-for="s in globalResults.sessions" :key="'s'+s.id" class="search-result-item" @click="showGlobalSearch = false; $router.push('/calendar')"><span class="search-result-title">{{ s.title }}</span><span class="search-result-badge">Встреча</span></div></div>
         </div>
         <div v-else-if="globalSearchQuery.length >= 2" class="search-empty">Ничего не найдено</div>
       </div>
