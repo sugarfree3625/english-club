@@ -1,37 +1,8 @@
 <template>
   <div id="page-home">
-    <section class="hero-new">
-      <div class="hero-orb hero-orb-1"></div>
-      <div class="hero-orb hero-orb-2"></div>
-      <div class="hero-content-new">
-        <div class="hero-layout">
-          <div class="hero-text">
-            <h1 class="hero-title">
-              <span class="gradient-text-animated">{{ settings.hero_title || 'Speak English Freely' }}</span>
-            </h1>
-            <p class="hero-subtitle">{{ settings.hero_subtitle || 'Разговорный клуб нового поколения' }}</p>
-            <div class="hero-actions">
-              <button class="glass-btn" @click="scrollToSection('about-section')"><span class="glass-btn-icon">👩‍🏫</span> Познакомиться</button>
-              <button class="glass-btn-secondary" @click="scrollToSection('services-section')">Услуги</button>
-            </div>
-            <div class="hero-stats">
-              <div class="hero-stat" v-for="stat in stats" :key="stat.label">
-                <span class="hero-stat-value">{{ stat.value }}+</span>
-                <span class="hero-stat-label">{{ stat.label }}</span>
-              </div>
-            </div>
-          </div>
-          <div class="hero-photo-wrapper">
-            <div class="hero-photo-ring"></div>
-            <img :src="tutorPhoto" class="hero-photo" alt="Репетитор">
-            <div class="hero-photo-badge">⭐ 10+ лет опыта</div>
-          </div>
-        </div>
-      </div>
-      <div class="scroll-indicator-new" @click="scrollToSection('about-section')">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 13l5 5 5-5M7 6l5 5 5-5"/></svg>
-      </div>
-    </section>
+    <!-- Новый 3D Hero -->
+    <HeroSection />
+
     <section class="section" id="about-section">
       <div class="container">
         <div class="about-layout">
@@ -154,8 +125,11 @@
 
 <script>
 import axios from 'axios';
+import HeroSection from '../components/HeroSection.vue';
+
 export default {
   name: 'Home',
+  components: { HeroSection },
   props: ['settings'],
   data() { 
     return { 
