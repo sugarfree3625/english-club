@@ -168,7 +168,15 @@ export default {
     async loadStudents() { try { const r = await axios.get('/api/users'); this.allStudents = (r.data || []).filter(u => u.role !== 'admin'); } catch(e) {} },
     async loadTop() { try { const r = await axios.get('/api/top'); this.topUsers = r.data || []; } catch(e) {} },
     async loadStreak() { try { const r = await axios.get('/api/streak'); this.streak = r.data?.streak || 0; } catch(e) {} },
-    getSlot(date, hour) { return this.slots.find(s => { const sd = new Date(s.start_time); return sd.toISOString().split('T')[0] === date && sd.getHours() === hour; }); },
+    getSlot(date, hour) { 
+  return this.slots.find(s => { 
+    const sd = new Date(s.start_time); 
+    const ed = new Date(s.end_time); 
+    const cellStart = new Date(`${date}T${String(hour).padStart(2,'0')}:00:00`); 
+    const cellEnd = new Date(`${date}T${String(hour).padStart(2,'0')}:59:59`); 
+    return sd.toISOString().split('T')[0] === date && sd < cellEnd && ed > cellStart; 
+  }); 
+},
     getSlotColor(t) { return t === 'online' ? 'slot-online' : 'slot-offline'; },
     isPast(date, hour) { return new Date(`${date}T${String(hour).padStart(2,'0')}:00:00`) < new Date(); },
     formatHour(ts) { return ts ? new Date(ts).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}) : ''; },
