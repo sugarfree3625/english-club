@@ -1,144 +1,113 @@
 <template>
-    <div id="app-root">
-      <header class="header">
-        <div class="header-inner">
-          <div class="logo" @click="$router.push('/')">
-            <span>{{ settings.club_name || 'English Club' }}</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <button class="btn btn-o btn-sm" @click="toggleTheme">{{ isDark ? '☀️' : '🌙' }}</button>
-            <div v-if="!user">
-              <button class="btn btn-p btn-sm" @click="showLogin = true">Войти</button>
-            </div>
-            <div v-else style="position:relative">
-              <button class="btn btn-o btn-sm" @click="menuOpen = !menuOpen">
-                <img :src="user.avatar_url || 'https://ui-avatars.com/api/?name='+user.username" style="width:22px;height:22px;border-radius:50%"> {{ user.username }}
-              </button>
-              <div v-if="menuOpen" class="dropdown">
-                <a @click="$router.push('/dashboard');menuOpen=false">📅 Дашборд</a>
-                <a @click="$router.push('/profile');menuOpen=false">👤 Профиль</a>
-                <a @click="logout();menuOpen=false">🚪 Выйти</a>
-              </div>
-            </div>
-          </div>
+  <div id="app-root" @keydown="handleGlobalKeydown">
+    <header class="header">
+      <div class="header-inner">
+        <div class="logo" @click="$router.push('/')">
+          <span class="logo-text">{{ settings.club_name || 'English Club' }}</span>
         </div>
-      </header>
-  
-      <router-view :user="user" :settings="settings" @update-user="user = $event" />
-  
-      <!-- Модалка входа -->
-      <div class="modal-overlay" v-if="showLogin" @click.self="showLogin = false">
-        <div class="modal">
-          <h3>Войти</h3>
-          <input class="input" v-model="loginEmail" placeholder="Email">
-          <input class="input" v-model="loginPassword" placeholder="Пароль" type="password">
-          <button class="btn btn-p w-100" @click="login">Войти</button>
-          <p style="margin-top:10px;text-align:center;font-size:0.85rem">
-            Нет аккаунта? <a href="#" @click.prevent="showLogin = false; showReg = true">Регистрация</a>
-          </p>
-          <button class="btn btn-o w-100 mt-2" @click="showLogin = false">Закрыть</button>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="btn btn-o btn-sm search-trigger" @click="showGlobalSearch = true" title="Поиск (Ctrl+K)">
+            <i class="fas fa-search"></i>
+            <span class="search-shortcut">Ctrl+K</span>
+          </button>
+          <button class="btn btn-o btn-sm theme-btn" @click="toggleTheme">
+            <span class="theme-icon-wrapper">
+              <span class="theme-icon" :class="{ dark: isDark }">{{ isDark ? '☀️' : '🌙' }}</span>
+            </span>
+          </button>
+          <div v-if="!user"><button class="btn btn-p btn-sm ripple" @click="showLogin = true">Войти</button></div>
+          <div v-else style="position:relative">
+            <button class="btn btn-o btn-sm user-btn" @click="menuOpen = !menuOpen">
+              <img :src="user.avatar_url || 'https://ui-avatars.com/api/?name='+user.username" class="user-avatar">
+              <span>{{ user.username }}</span>
+            </button>
+            <transition name="dropdown-fade">
+              <div v-if="menuOpen" class="dropdown">
+                <a @click="$router.push('/groups');menuOpen=false"><i class="fas fa-users"></i> Группы</a>
+                <a @click="$router.push('/dashboard');menuOpen=false"><i class="fas fa-calendar"></i> Дашборд</a>
+                <a @click="$router.push('/messages');menuOpen=false"><i class="fas fa-comments"></i> Сообщения</a>
+                <a @click="$router.push('/profile');menuOpen=false"><i class="fas fa-user"></i> Профиль</a>
+                <a @click="$router.push('/admin');menuOpen=false" v-if="user?.role === 'admin'"><i class="fas fa-sliders-h"></i> Управление сайтом</a>
+                <a @click="logout();menuOpen=false"><i class="fas fa-sign-out-alt"></i> Выйти</a>
+              </div>
+            </transition>
+          </div>
         </div>
       </div>
-  
-      <!-- Модалка регистрации -->
-      <div class="modal-overlay" v-if="showReg" @click.self="showReg = false">
-        <div class="modal">
-          <h3>Регистрация</h3>
-          <input class="input" v-model="regUsername" placeholder="Имя">
-          <input class="input" v-model="regEmail" placeholder="Email">
-          <input class="input" v-model="regPassword" placeholder="Пароль" type="password">
-          <select class="input" v-model="regLevel">
-            <option value="A1">Beginner</option>
-            <option value="B1" selected>Intermediate</option>
-            <option value="C1">Advanced</option>
-          </select>
-          <button class="btn btn-p w-100" @click="register">Зарегистрироваться</button>
-          <p style="margin-top:10px;text-align:center;font-size:0.85rem">
-            Есть аккаунт? <a href="#" @click.prevent="showReg = false; showLogin = true">Войти</a>
-          </p>
-          <button class="btn btn-o w-100 mt-2" @click="showReg = false">Закрыть</button>
+    </header>
+    <router-view v-slot="{ Component }">
+      <transition name="page-fade" mode="out-in">
+        <component :is="Component" :user="user" :settings="settings" @update-user="user = $event" />
+      </transition>
+    </router-view>
+    <ScrollToTop />
+    <div class="modal-overlay" v-if="showGlobalSearch" @click.self="showGlobalSearch = false">
+      <div class="global-search-modal">
+        <div class="global-search-header"><i class="fas fa-search"></i><input ref="globalSearchInput" v-model="globalSearchQuery" @input="globalSearch" placeholder="Поиск по сайту... (Esc для закрытия)" class="global-search-input" @keydown.esc="showGlobalSearch = false"><span class="search-shortcut-badge">ESC</span></div>
+        <div class="global-search-results" v-if="globalResults.posts?.length || globalResults.sessions?.length">
+          <div v-if="globalResults.posts?.length" class="search-section"><h4>📰 Посты</h4><div v-for="p in globalResults.posts" :key="'p'+p.id" class="search-result-item" @click="showGlobalSearch = false; $router.push('/dashboard')"><span class="search-result-title">{{ p.title }}</span><span class="search-result-badge">Пост</span></div></div>
+          <div v-if="globalResults.sessions?.length" class="search-section"><h4>📅 Встречи</h4><div v-for="s in globalResults.sessions" :key="'s'+s.id" class="search-result-item" @click="showGlobalSearch = false; $router.push('/dashboard')"><span class="search-result-title">{{ s.title }}</span><span class="search-result-badge">Встреча</span></div></div>
         </div>
+        <div v-else-if="globalSearchQuery.length >= 2" class="search-empty">Ничего не найдено</div>
       </div>
     </div>
-  </template>
-  
-  <script>
-  import axios from 'axios';
-  
-  export default {
-    name: 'App',
-    data() {
-      return {
-        user: null,
-        settings: {},
-        isDark: false,
-        menuOpen: false,
-        showLogin: false,
-        showReg: false,
-        loginEmail: '',
-        loginPassword: '',
-        regUsername: '',
-        regEmail: '',
-        regPassword: '',
-        regLevel: 'B1'
-      };
-    },
-    async created() {
-      try { const r = await axios.get('/api/me'); if (r.data.ok) this.user = r.data.user; } catch(e) {}
-      try { const s = await axios.get('/api/settings'); this.settings = s.data; } catch(e) {}
-      this.isDark = localStorage.getItem('theme') === 'dark';
-      if (this.isDark) document.body.classList.add('dark');
-    },
-    methods: {
-      toggleTheme() {
-        this.isDark = !this.isDark;
-        document.body.classList.toggle('dark', this.isDark);
-        localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
-      },
-      async login() {
-        try {
-          const r = await axios.post('/api/login', { email: this.loginEmail, password: this.loginPassword });
-          if (r.data.success) { this.user = r.data.user; this.showLogin = false; this.loginEmail = ''; this.loginPassword = ''; this.$router.push('/dashboard'); }
-        } catch(e) { alert('Ошибка входа'); }
-      },
-      async register() {
-        try {
-          const r = await axios.post('/api/reg', { username: this.regUsername, email: this.regEmail, password: this.regPassword, level: this.regLevel });
-          if (r.data.success) { this.showReg = false; this.showLogin = true; alert('Регистрация успешна! Войдите.'); }
-        } catch(e) { alert('Ошибка регистрации'); }
-      },
-      async logout() {
-        try { await axios.post('/api/out'); } catch(e) {}
-        this.user = null; this.menuOpen = false; this.$router.push('/');
-      }
-    }
-  };
-  </script>
-  
-  <style>
-  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-  :root { --p: #6366f1; --bg: #f8fafc; --t: #1e293b; --b: #e2e8f0; --r: 16px; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: var(--t); min-height: 100vh; }
-  body.dark { background: #0f172a; color: #e2e8f0; }
-  body.dark .header { background: rgba(30,41,59,0.9); border-color: #334155; }
-  body.dark .modal { background: #1e293b; color: #e2e8f0; }
-  body.dark .input { background: #334155; border-color: #475569; color: #e2e8f0; }
-  body.dark .dropdown { background: #1e293b; border-color: #334155; }
-  body.dark .dropdown a { color: #e2e8f0; }
-  .header { position: sticky; top: 0; z-index: 1000; background: #fff; border-bottom: 1px solid var(--b); }
-  .header-inner { max-width: 1280px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; }
-  .logo { font-size: 1.2rem; font-weight: 800; cursor: pointer; }
-  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 50px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border: none; font-family: inherit; }
-  .btn-p { background: var(--p); color: #fff; }
-  .btn-o { border: 2px solid var(--p); color: var(--p); background: transparent; }
-  .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
-  .w-100 { width: 100%; }
-  .dropdown { position: absolute; top: 100%; right: 0; background: #fff; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); min-width: 160px; padding: 6px 0; border: 1px solid var(--b); z-index: 100; }
-  .dropdown a { display: block; padding: 8px 14px; cursor: pointer; font-size: 0.85rem; color: var(--t); }
-  .dropdown a:hover { background: #f1f5f9; }
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
-  .modal { background: #fff; border-radius: var(--r); padding: 24px; max-width: 400px; width: 90%; }
-  .input { width: 100%; padding: 10px; border: 2px solid var(--b); border-radius: 10px; font-family: inherit; font-size: 0.9rem; margin-bottom: 10px; }
-  .input:focus { outline: none; border-color: var(--p); }
-  </style>
+    <div class="onboarding-overlay" v-if="showOnboarding">
+      <div class="onboarding-card"><div class="onboarding-icon">{{ onboardingSteps[currentOnboardingStep].icon }}</div><h2>{{ onboardingSteps[currentOnboardingStep].title }}</h2><p>{{ onboardingSteps[currentOnboardingStep].text }}</p><div class="onboarding-steps"><div v-for="(step, i) in onboardingSteps" :key="i" class="onboarding-step-dot" :class="{ active: i === currentOnboardingStep }"></div></div><div class="onboarding-actions"><button v-if="currentOnboardingStep > 0" class="btn btn-o btn-sm" @click="currentOnboardingStep--">← Назад</button><button class="btn btn-p btn-sm" @click="nextOnboardingStep">{{ currentOnboardingStep < onboardingSteps.length - 1 ? 'Далее →' : 'Понятно! 🎉' }}</button></div><button class="onboarding-skip" @click="showOnboarding = false">Пропустить</button></div>
+    </div>
+    <div class="toast-container">
+      <transition-group name="toast-list">
+        <div v-for="toast in toasts" :key="toast.id" class="toast" :class="toast.type" @click="removeToast(toast.id)"><span class="toast-icon">{{ toast.type === 'error' ? '❌' : toast.type === 'success' ? '✅' : 'ℹ️' }}</span><span class="toast-msg">{{ toast.message }}</span></div>
+      </transition-group>
+    </div>
+    <div class="modal-overlay" v-if="showLogin" @click.self="showLogin = false"><div class="modal"><h3>👋 Войти</h3><input class="input" v-model="loginEmail" placeholder="Email"><input class="input" v-model="loginPassword" placeholder="Пароль" type="password"><button class="btn btn-p w-100 ripple" @click="login">Войти</button><p style="margin-top:14px;text-align:center;font-size:0.85rem;color:var(--t2)">Нет аккаунта? <a href="#" @click.prevent="showLogin=false;showReg=true" style="color:var(--p);font-weight:600">Регистрация</a></p><button class="btn btn-o w-100 mt-2" @click="showLogin=false">Закрыть</button></div></div>
+    <div class="modal-overlay" v-if="showReg" @click.self="showReg = false"><div class="modal"><h3>✨ Регистрация</h3><input class="input" v-model="regUsername" placeholder="Имя"><input class="input" v-model="regEmail" placeholder="Email"><input class="input" v-model="regPassword" placeholder="Пароль" type="password"><select class="input" v-model="regLevel"><option value="A1">🟢 Beginner</option><option value="B1" selected>🔵 Intermediate</option><option value="C1">🟣 Advanced</option></select><button class="btn btn-p w-100 ripple" @click="register">Зарегистрироваться</button><p style="margin-top:14px;text-align:center;font-size:0.85rem;color:var(--t2)">Есть аккаунт? <a href="#" @click.prevent="showReg=false;showLogin=true" style="color:var(--p);font-weight:600">Войти</a></p><button class="btn btn-o w-100 mt-2" @click="showReg=false">Закрыть</button></div></div>
+  </div>
+</template>
+
+<script>
+import axios from 'axios';
+import ScrollToTop from './components/ScrollToTop.vue';
+
+export default {
+  name: 'App',
+  components: { ScrollToTop },
+  data() { 
+    return { 
+      user: null, settings: {}, isDark: false, menuOpen: false, 
+      showLogin: false, showReg: false, 
+      loginEmail: '', loginPassword: '', regUsername: '', regEmail: '', regPassword: '', regLevel: 'B1',
+      toasts: [], toastId: 0,
+      showGlobalSearch: false, globalSearchQuery: '', globalResults: { posts: [], sessions: [] },
+      showOnboarding: false, currentOnboardingStep: 0,
+      onboardingSteps: [
+        { icon: '👋', title: 'Добро пожаловать в English Club!', text: 'Разговорный клуб для практики английского языка.' },
+        { icon: '📅', title: 'Записывайся на встречи', text: 'Выбирай удобное время и присоединяйся к видеозвонкам.' },
+        { icon: '💬', title: 'Общайся в чатах', text: 'Личные сообщения, групповые чаты и голосовые сообщения.' },
+        { icon: '🏆', title: 'Получай достижения', text: 'За активность ты получаешь достижения и повышаешь уровень.' },
+        { icon: '🚀', title: 'Ты готов!', text: 'Запишись на первую встречу или напиши сообщение в чате. Удачи!' }
+      ]
+    }; 
+  },
+  methods: {
+    addToast(m, t='info', d=3000) { const id=++this.toastId; this.toasts.push({id,message:m,type:t}); setTimeout(()=>this.removeToast(id),d); },
+    removeToast(id) { this.toasts=this.toasts.filter(t=>t.id!==id); },
+    toggleTheme() { this.isDark=!this.isDark; document.body.classList.toggle('dark',this.isDark); document.body.classList.toggle('light',!this.isDark); localStorage.setItem('theme',this.isDark?'dark':'light'); },
+    async globalSearch() { if(this.globalSearchQuery.length<2){this.globalResults={posts:[],sessions:[]};return;} try{const r=await axios.get(`/api/search?q=${this.globalSearchQuery}`);this.globalResults=r.data;}catch(e){this.globalResults={posts:[],sessions:[]};} },
+    handleGlobalKeydown(e) { if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();this.showGlobalSearch=true;this.$nextTick(()=>this.$refs.globalSearchInput?.focus());} if(e.key==='Escape'){this.showGlobalSearch=false;this.menuOpen=false;} },
+    nextOnboardingStep() { if(this.currentOnboardingStep<this.onboardingSteps.length-1){this.currentOnboardingStep++;}else{this.showOnboarding=false;localStorage.setItem('onboarding_done','true');} },
+    checkOnboarding() { if(!localStorage.getItem('onboarding_done')&&this.user){setTimeout(()=>{this.showOnboarding=true;},1000);} },
+    async login() { try{const r=await axios.post('/api/login',{email:this.loginEmail,password:this.loginPassword});if(r.data.success){this.user=r.data.user;this.showLogin=false;this.loginEmail='';this.loginPassword='';this.addToast('Добро пожаловать! 👋','success');this.$router.push('/dashboard');this.checkOnboarding();}}catch(e){this.addToast(e.response?.data?.error||'Ошибка входа','error');} },
+    async register() { try{const r=await axios.post('/api/reg',{username:this.regUsername,email:this.regEmail,password:this.regPassword,level:this.regLevel});if(r.data.success){this.showReg=false;this.showLogin=true;this.addToast('Регистрация успешна! ✨','success');}}catch(e){this.addToast(e.response?.data?.error||'Ошибка регистрации','error');} },
+    async logout() { if(!confirm('Выйти из аккаунта?'))return; try{await axios.post('/api/out');this.addToast('До встречи! 👋','info');}catch(e){} this.user=null;this.menuOpen=false;this.$router.push('/'); }
+  },
+  async created() {
+    try{const r=await axios.get('/api/me');if(r.data.ok){this.user=r.data.user;this.checkOnboarding();}}catch(e){}
+    try{const s=await axios.get('/api/settings');this.settings=s.data;}catch(e){}
+    const saved=localStorage.getItem('theme');
+    if(saved==='dark'){this.isDark=true;document.body.classList.add('dark');}
+    else if(saved==='light'){this.isDark=false;document.body.classList.add('light');}
+    else if(window.matchMedia('(prefers-color-scheme:dark)').matches){this.isDark=true;document.body.classList.add('dark');}
+  },
+  provide() { return { addToast:this.addToast }; }
+};
+</script>
