@@ -89,13 +89,3 @@ export default {
   }
 };
 </script>
-
-<style scoped>
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
-.modal { background: #fff; border-radius: 16px; padding: 24px; width: 100%; max-height: 80vh; overflow-y: auto; }
-.input { width: 100%; padding: 10px; border: 2px solid #e2e8f0; border-radius: 10px; font-family: inherit; font-size: 0.9rem; margin-bottom: 10px; }
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 20px; border-radius: 50px; font-weight: 600; font-size: 0.9rem; cursor: pointer; border: none; font-family: inherit; }
-.btn-p { background: #6366f1; color: #fff; }
-.btn-o { border: 2px solid #6366f1; color: #6366f1; background: transparent; }
-.w-100 { width: 100%; }
-</style>
