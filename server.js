@@ -206,19 +206,13 @@ async function ensureTutorChat(userId) {
     app.get('/api/feedback/:studentId', auth, async (req, res) => { /* без изменений */ });
 
   // ПРИВЯЗКА РОДИТЕЛЯ
-  app.post('/api/parent/bind', auth, async (req, res) => {
-    const { student_id, parent_id } = req.body;
-    if (!student_id || !parent_id) return res.status(400).json({ error: 'Укажите ученика и родителя' });
-    if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' });
-    
-    const { data: exist } = await supabase.from('student_parents').select('id').eq('student_id', student_id).eq('parent_id', parent_id).maybeSingle();
-    if (exist) return res.status(400).json({ error: 'Уже привязан' });
-    
-    const { error } = await supabase.from('student_parents').insert({ student_id, parent_id });
-    if (error) return res.status(500).json({ error: error.message });
-    
-    res.json({ success: true });
-  });
+app.post('/api/parent/bind', auth, async (req, res) => {
+  const { student_id, parent_id } = req.body;
+  if (!student_id || !parent_id) return res.status(400).json({ error: 'Нет данных' });
+  const { error } = await supabase.from('student_parents').insert({ student_id, parent_id });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
 
   // ========== НОВЫЙ КАЛЕНДАРЬ (SLOTS) ==========
   app.get('/api/slots', auth, async (req, res) => {
