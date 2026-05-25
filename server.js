@@ -244,6 +244,7 @@ app.post('/api/parent/bind', auth, async (req, res) => {
     }
     
     console.log('📅 Найдено слотов:', data?.length || 0);
+    console.log('🔍 Слоты из БД:', JSON.stringify(data));
     res.json(data || []);
   } catch(e) {
     console.error('Крах слотов:', e);
