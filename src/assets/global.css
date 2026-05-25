@@ -74,6 +74,7 @@ body {
 .fade-in-up { animation: fadeInUp 0.5s ease-out; }
 .fade-in { animation: fadeIn 0.4s ease-out; }
 
+/* ХЕДЕР */
 .header {
   position: sticky;
   top: 0;
@@ -96,72 +97,47 @@ body.dark .header {
   align-items: center;
 }
 
-.gradient-text {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899);
-  background-size: 200% 200%;
-  animation: gradientShift 3s ease infinite;
+/* ЛОГО */
+.logo {
+  cursor: pointer;
+}
+.logo-text {
+  font-weight: 800;
+  font-size: 1.2rem;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 
-.glass-card {
-  background: rgba(255,255,255,0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: var(--radius);
-  padding: 24px;
-  box-shadow: var(--shadow);
-  transition: all var(--transition);
-}
-.glass-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-}
-body.dark .glass-card {
-  background: rgba(30,41,59,0.7);
-  border-color: rgba(255,255,255,0.05);
-}
-
-.btn-pulse {
-  animation: pulse 2s infinite;
-}
-.btn-pulse:hover {
-  animation: none;
-  transform: scale(1.05);
-}
-
-.card, .modal, .profile-sidebar, .chat-sidebar, .chat-header, .feed-card, .session {
+/* ДРОПДАУН */
+.dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  transition: all var(--transition);
-}
-
-.card:hover, .feed-card:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-1px);
-}
-
-.input, .search-input, textarea, select {
-  background: var(--input-bg);
-  border: 2px solid var(--border);
   border-radius: var(--radius-sm);
+  padding: 8px 0;
+  min-width: 180px;
+  box-shadow: var(--shadow-lg);
+  z-index: 200;
+}
+.dropdown a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
   color: var(--text);
-  padding: 12px 16px;
-  font-family: inherit;
+  text-decoration: none;
   font-size: 0.9rem;
-  transition: all var(--transition);
-  outline: none;
+  transition: background var(--transition);
+  cursor: pointer;
+}
+.dropdown a:hover {
+  background: var(--hover);
 }
 
-.input:focus, textarea:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
-}
-
+/* КНОПКИ */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -176,7 +152,6 @@ body.dark .glass-card {
   font-family: inherit;
   transition: all var(--transition);
 }
-
 .btn-p {
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
   color: #fff;
@@ -186,7 +161,6 @@ body.dark .glass-card {
   transform: translateY(-1px);
   box-shadow: 0 8px 25px rgba(99,102,241,0.4);
 }
-
 .btn-o {
   border: 2px solid var(--primary);
   color: var(--primary);
@@ -195,69 +169,85 @@ body.dark .glass-card {
 .btn-o:hover {
   background: var(--primary-light);
 }
-
 .btn-sm { padding: 8px 16px; font-size: 0.8rem; }
 .w-100 { width: 100%; }
 
-.section-title {
-  font-size: 2rem;
-  font-weight: 800;
-  text-align: center;
-  margin-bottom: 16px;
-  background: linear-gradient(135deg, var(--text), var(--text-secondary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.container {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 32px 24px;
-}
-
-.dropdown {
+/* КАРТОЧКИ, МОДАЛКИ, САЙДБАРЫ */
+.card, .modal, .profile-sidebar, .chat-sidebar, .chat-header, .feed-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 8px 0;
-  min-width: 180px;
-  box-shadow: var(--shadow-lg);
-  animation: slideDown 0.2s ease-out;
-}
-
-.dropdown a {
-  display: block;
-  padding: 10px 16px;
+  border-radius: var(--radius);
   color: var(--text);
-  text-decoration: none;
-  font-size: 0.9rem;
-  transition: background var(--transition);
+  transition: all var(--transition);
 }
-.dropdown a:hover {
-  background: var(--hover);
+.card:hover, .feed-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-1px);
 }
 
-.hero {
-  min-height: 70vh;
+/* ИНПУТЫ */
+.input, .search-input, textarea, select {
+  background: var(--input-bg);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 12px 16px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  transition: all var(--transition);
+  outline: none;
+  width: 100%;
+}
+.input:focus, textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+}
+
+/* МОДАЛКИ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
 }
-.hero::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle at 30% 50%, rgba(99,102,241,0.08) 0%, transparent 50%),
-              radial-gradient(circle at 70% 50%, rgba(139,92,246,0.05) 0%, transparent 50%);
-  animation: gradientShift 10s ease infinite;
+.modal {
+  background: var(--surface);
+  border-radius: 24px;
+  padding: 28px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+.modal h3 {
+  font-weight: 700;
+  margin-bottom: 16px;
 }
 
+/* АВАТАР ПОЛЬЗОВАТЕЛЯ */
+.user-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.user-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--primary);
+  transition: all 0.3s;
+}
+.user-btn:hover .user-avatar {
+  transform: scale(1.1);
+  box-shadow: 0 0 12px rgba(99,102,241,0.4);
+}
+
+/* ТОСТЫ */
 .toast {
   position: fixed;
   bottom: 24px;
@@ -271,7 +261,13 @@ body.dark .glass-card {
   animation: fadeInUp 0.3s ease-out;
 }
 
+/* КОНТЕЙНЕР */
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
 @media (max-width: 768px) {
   .container { padding: 20px 12px; }
-  .section-title { font-size: 1.5rem; }
 }
