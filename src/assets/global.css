@@ -327,3 +327,82 @@ body.dark .glass-card p { color: #94a3b8; }
   .container { padding: 20px 14px; }
   .search-shortcut { display: none; }
 }
+/* МОДАЛКИ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal {
+  background: var(--surface);
+  border-radius: 24px;
+  padding: 28px;
+  max-width: 400px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  animation: modalPop 0.25s ease;
+}
+.modal h3 {
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+/* ГЛОБАЛЬНЫЙ ПОИСК */
+.global-search-modal {
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 0;
+  max-width: 560px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  overflow: hidden;
+  animation: modalPop 0.25s ease;
+}
+.global-search-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--b);
+  color: var(--t2);
+}
+.global-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 1rem;
+  color: var(--t);
+  outline: none;
+}
+
+/* АНИМАЦИИ */
+@keyframes modalPop {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes toastSlideIn {
+  from { transform: translateX(120%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes toastSlideOut {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(120%); opacity: 0; }
+}
+
+/* ТЁМНАЯ ТЕМА ДЛЯ МОДАЛОК */
+body.dark .modal {
+  background: #1e1e1e;
+  color: #e2e8f0;
+}
+body.dark .global-search-modal {
+  background: #1e1e1e;
+  color: #e2e8f0;
+}
