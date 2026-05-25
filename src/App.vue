@@ -23,9 +23,9 @@
             </button>
             <transition name="dropdown-fade">
               <div v-if="menuOpen" class="dropdown">
-                <a @click="$router.push('/groups');menuOpen=false"><i class="fas fa-users"></i> Группы</a>
                 <a @click="$router.push('/calendar');menuOpen=false"><i class="fas fa-calendar"></i> Календарь</a>
                 <a @click="$router.push('/messages');menuOpen=false"><i class="fas fa-comments"></i> Сообщения</a>
+                <a @click="$router.push('/dashboard');menuOpen=false"><i class="fas fa-chart-line"></i> Главная</a>
                 <a @click="$router.push('/profile');menuOpen=false"><i class="fas fa-user"></i> Профиль</a>
                 <a @click="$router.push('/admin');menuOpen=false" v-if="user?.role === 'admin'"><i class="fas fa-sliders-h"></i> Управление сайтом</a>
                 <a @click="logout();menuOpen=false"><i class="fas fa-sign-out-alt"></i> Выйти</a>
