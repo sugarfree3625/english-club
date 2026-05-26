@@ -111,30 +111,83 @@ export default {
   data() { return { dialogs: [], messages: [], filteredMessages: [], activeChat: null, activeChatName: '', partnerAvatar: null, currentUserId: null, msgText: '', unreadCount: 0, socket: null, lightbox: null, searchQuery: '', searchResults: [], showEmoji: false, pendingFiles: [], recording: false, mediaRecorder: null, isPartnerOnline: false, chunks: [], showSidebar: true, showMsgSearch: false, msgSearchQuery: '', showTranslate: false, selectedWord: '', translatedText: '', translating: false, recordingTime: 0, recordingTimer: null, soundEnabled: false, emojis: ['😀','😂','🤣','😍','🥰','😘','😜','😎','🤩','😇','🤔','😴','🥳','❤️','🔥','🎉','⭐','✅','💯','🙏','💪','🚀','🌈'] }; },
   computed: { isDark() { return document.body.classList.contains('dark'); } },
   async mounted() {
-    if (!this.user?.id) return; this.currentUserId = this.user.id; await this.loadDialogs();
+    if (!this.user?.id) return; 
+    this.currentUserId = this.user.id; 
+    console.log('👤 [CHAT] Пользователь:', this.user.username, 'ID:', this.currentUserId);
+    await this.loadDialogs();
+    console.log('📋 [CHAT] Диалоги загружены:', this.dialogs.length);
+    
     if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+    
+    console.log('🔌 [CHAT] Подключаю сокет...');
     this.socket = io('https://english-club-v1.onrender.com', { transports: ['websocket', 'polling'] });
-    this.socket.on('connect', () => this.socket.emit('join', { uid: this.currentUserId, uname: this.user.username, role: this.user.role }));
-    this.socket.on('unread', ({ count }) => { this.unreadCount = count; });
-    this.socket.on('dm', (msg) => { if (typeof msg.files === 'string') { try { msg.files = JSON.parse(msg.files); } catch(e) { msg.files = null; } } if (msg.from === this.currentUserId) { this.loadDialogs(); return; } if (this.activeChat === msg.from) { if (!this.messages.find(m => m.id === msg.id)) { this.messages.push(msg); this.filterMessages(); this.$nextTick(() => this.scrollToBottom()); } } if (document.hidden && msg.from !== this.currentUserId) this.sendBrowserNotification(msg); this.loadDialogs(); });
+    
+    this.socket.on('connect', () => {
+      console.log('🟢 [SOCKET] Подключён, ID:', this.socket.id);
+      this.socket.emit('join', { uid: this.currentUserId, uname: this.user.username, role: this.user.role });
+    });
+    this.socket.on('disconnect', (reason) => console.log('🔴 [SOCKET] Отключён:', reason));
+    this.socket.on('connect_error', (e) => console.log('❌ [SOCKET] Ошибка:', e.message));
+    
+    this.socket.on('unread', ({ count }) => { 
+      console.log('📬 [SOCKET] Непрочитанных:', count);
+      this.unreadCount = count; 
+    });
+    
+    this.socket.on('dm', (msg) => { 
+      console.log('💬 [SOCKET] Входящее от:', msg.from, 'текст:', (msg.msg || msg.message || '').substring(0, 30));
+      if (typeof msg.files === 'string') { try { msg.files = JSON.parse(msg.files); } catch(e) { msg.files = null; } } 
+      if (msg.from === this.currentUserId) { this.loadDialogs(); return; } 
+      if (this.activeChat === msg.from) { 
+        if (!this.messages.find(m => m.id === msg.id)) { 
+          this.messages.push(msg); 
+          this.filterMessages(); 
+          this.$nextTick(() => this.scrollToBottom()); 
+        } 
+      } 
+      if (document.hidden && msg.from !== this.currentUserId) this.sendBrowserNotification(msg); 
+      this.loadDialogs(); 
+    });
+    
     this.searchUsers = useDebounce(this.searchUsers, 300);
     document.addEventListener('click', (e) => { if (!e.target.closest('.translate-popup') && !e.target.closest('.msg-actions')) this.showTranslate = false; });
   },
   beforeUnmount() { if (this.socket) { this.socket.disconnect(); this.socket = null; } },
   methods: {
     playSendSound() { if (!this.soundEnabled) return; try { const ctx = new (window.AudioContext || window.webkitAudioContext)(); const osc = ctx.createOscillator(); const gain = ctx.createGain(); osc.connect(gain); gain.connect(ctx.destination); osc.frequency.value = 1200; osc.type = 'sine'; gain.gain.setValueAtTime(0.08, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1); osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.1); } catch(e) {} },
-    toggleAudio(e, url) { const btn = e.target; const existing = document.querySelector('audio.voice-audio'); if (existing) { existing.pause(); existing.remove(); } if (btn.dataset.playing === 'true') { btn.dataset.playing = 'false'; btn.textContent = '▶️'; return; } const audio = new Audio(url); audio.classList.add('voice-audio'); audio.onended = () => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; audio.remove(); }; audio.play(); btn.dataset.playing = 'true'; btn.textContent = '⏸️'; document.body.appendChild(audio); },
+    toggleAudio(e, url) { 
+      console.log('🔊 [AUDIO] toggleAudio, URL:', url?.substring(0, 60));
+      const btn = e.target; 
+      const existing = document.querySelector('audio.voice-audio'); 
+      if (existing) { existing.pause(); existing.remove(); } 
+      if (btn.dataset.playing === 'true') { btn.dataset.playing = 'false'; btn.textContent = '▶️'; return; } 
+      const audio = new Audio(url); 
+      audio.classList.add('voice-audio'); 
+      audio.onended = () => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; audio.remove(); }; 
+      audio.play().then(() => {
+        console.log('✅ [AUDIO] Воспроизведение начато');
+        btn.dataset.playing = 'true'; 
+        btn.textContent = '⏸️';
+      }).catch(e => {
+        console.log('❌ [AUDIO] Ошибка воспроизведения:', e.message);
+        btn.dataset.playing = 'false'; 
+        btn.textContent = '▶️';
+      });
+      document.body.appendChild(audio); 
+    },
     async translateMsg(m) { if (!m.message) return; const word = m.message.split(' ').find(w => /^[a-zA-Z]+$/.test(w)); if (!word) { this.addToast('Нет английских слов', 'info'); return; } this.selectedWord = word; this.showTranslate = true; this.translating = true; this.translatedText = ''; try { this.translatedText = await translateWord(word); } catch(e) { this.translatedText = 'Ошибка'; } finally { this.translating = false; } },
     async copyTranslation() { try { await navigator.clipboard.writeText(this.translatedText); this.addToast('Перевод скопирован 📋', 'success'); } catch(e) {} },
     formatTime(ts) { if (!ts) return ''; return new Date(ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }); },
     proxifyUrl(url) {
       if (!url) return '';
-      return url.replace(
+      const proxied = url.replace(
         'https://qmoxemhstzfxirpskext.supabase.co/storage/v1/object/public/uploads/',
         '/api/file/'
       );
+      console.log('🖼️ [PROXY]', url.substring(url.lastIndexOf('/') + 1), '→', proxied.substring(0, 50) + '...');
+      return proxied;
     },
-    sendBrowserNotification(msg) { if ('Notification' in window && Notification.permission === 'granted') { try { new Notification(`💬 ${msg.fn || 'Новое сообщение'}`, { body: (msg.msg || '📎 Файл').substring(0, 100), icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🗣️</text></svg>', tag: 'engclub' }); } catch(e) {} } },
+    sendBrowserNotification(msg) { if ('Notification' in window && Notification.permission === 'granted') { try { new Notification(`💬 ${msg.fn || 'Новое сообщение'}`, { body: (msg.msg || msg.message || '📎 Файл').substring(0, 100), icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🗣️</text></svg>', tag: 'engclub' }); } catch(e) {} } },
     linkify(text) { if (!text) return ''; return text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:#818cf8;text-decoration:underline">$1</a>'); },
     filterMessages() { const q = this.msgSearchQuery.toLowerCase(); this.filteredMessages = q ? this.messages.filter(m => m.message?.toLowerCase().includes(q)) : this.messages; },
     getFileType(file) { if (!file) return 'file'; if (file.type) { if (file.type.startsWith('image/')) return 'image'; if (file.type.startsWith('audio/')) return 'audio'; if (file.type.startsWith('video/')) return 'video'; } const ext = (file.name || '').split('.').pop()?.toLowerCase(); if (['mp3','wav','ogg','aac','m4a','flac','webm'].includes(ext)) return 'audio'; if (['mp4','webm','mov','avi'].includes(ext)) return 'video'; if (['jpg','jpeg','png','gif','webp','svg','bmp'].includes(ext)) return 'image'; return 'file'; },
@@ -143,11 +196,97 @@ export default {
     async startChat(u) { this.activeChat = u.id; this.activeChatName = u.username; this.partnerAvatar = u.avatar_url; this.searchQuery = ''; this.searchResults = []; this.showSidebar = false; try { const r = await axios.get(`/api/messages/${u.id}`); this.messages = (r.data || []).map(m => this.parseFiles(m)); this.filterMessages(); this.$nextTick(() => this.scrollToBottom()); } catch(e) {} this.loadDialogs(); },
     async openChat(d) { const pid = d.partner_id || d.id; this.activeChat = pid; this.activeChatName = d.username; this.partnerAvatar = d.avatar_url; this.showSidebar = false; try { const r = await axios.get(`/api/messages/${pid}`); this.messages = (r.data || []).map(m => this.parseFiles(m)); this.filterMessages(); this.$nextTick(() => this.scrollToBottom()); } catch(e) {} },
     parseFiles(m) { if (!m.files) return m; if (typeof m.files === 'string') { try { m.files = JSON.parse(m.files); } catch(e) { m.files = null; } } return m; },
-    replyTo(msg) { this.msgText = `↩ ${msg.fn || ''}: ${(msg.msg || '').substring(0, 50)}\n`; this.$nextTick(() => { const ta = this.$el.querySelector('textarea'); if (ta) ta.focus(); }); },
+    replyTo(msg) { this.msgText = `↩ ${msg.fn || ''}: ${(msg.msg || msg.message || '').substring(0, 50)}\n`; this.$nextTick(() => { const ta = this.$el.querySelector('textarea'); if (ta) ta.focus(); }); },
     async deleteMsg(id) { if (confirm('Удалить?')) { try { await axios.delete(`/api/msg/${id}`); this.messages = this.messages.filter(m => m.id !== id); this.filterMessages(); this.addToast('Удалено 🗑', 'success'); } catch(e) {} } },
-    async sendMsg() { const text = this.msgText.trim(); if ((!text && !this.pendingFiles.length) || !this.activeChat || !this.socket?.connected) return; const replyTo = text.startsWith('↩') ? text.split('\n')[0] : null; const cleanText = replyTo ? text.split('\n').slice(1).join('\n').trim() : text; if (cleanText) { const m = { id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: cleanText, ts: new Date().toISOString() }; this.messages.push(m); this.filterMessages(); this.socket.emit('dm', { to: this.activeChat, msg: cleanText, replyTo }); } for (const file of this.pendingFiles) { const form = new FormData(); form.append('img', file); try { const r = await axios.post('/api/nimg', form); if (r.data?.url) { const type = this.getFileType(file); const icon = type === 'image' ? '🖼️' : type === 'audio' ? '🎤' : type === 'video' ? '🎬' : '📎'; const msgText = type === 'audio' ? '🎤 Голосовое' : icon + ' ' + file.name; const fm = { id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: msgText, files: [{ url: r.data.url, type, name: file.name }], ts: new Date().toISOString() }; this.messages.push(fm); this.filterMessages(); this.socket.emit('dm', { to: this.activeChat, msg: msgText, files: [{ url: r.data.url, type, name: file.name }] }); } } catch(e) {} } this.playSendSound(); this.msgText = ''; this.pendingFiles = []; this.$nextTick(() => this.scrollToBottom()); },
+    async sendMsg() { 
+      const text = this.msgText.trim(); 
+      console.log('📤 [SEND] Текст:', text.substring(0, 30), '| Файлов:', this.pendingFiles.length, '| Сокет:', this.socket?.connected);
+      
+      if ((!text && !this.pendingFiles.length) || !this.activeChat || !this.socket?.connected) {
+        console.log('⛔ [SEND] Блокировано: нет текста/файлов, нет чата или сокет отключён');
+        return;
+      }
+      
+      const replyTo = text.startsWith('↩') ? text.split('\n')[0] : null; 
+      const cleanText = replyTo ? text.split('\n').slice(1).join('\n').trim() : text; 
+      
+      if (cleanText) { 
+        console.log('📝 [SEND] Отправка текста:', cleanText.substring(0, 30));
+        const m = { id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: cleanText, ts: new Date().toISOString() }; 
+        this.messages.push(m); 
+        this.filterMessages(); 
+        this.socket.emit('dm', { to: this.activeChat, msg: cleanText, replyTo }); 
+      } 
+      
+      for (const file of this.pendingFiles) { 
+        console.log('📎 [SEND] Загружаю файл:', file.name, 'тип:', file.type, 'размер:', file.size);
+        const form = new FormData(); 
+        form.append('img', file); 
+        try { 
+          const r = await axios.post('/api/nimg', form); 
+          console.log('✅ [SEND] /api/nimg ответ:', r.data?.url ? 'URL получен' : 'Без URL');
+          if (r.data?.url) { 
+            console.log('🔗 [SEND] URL файла:', r.data.url);
+            const type = this.getFileType(file); 
+            const icon = type === 'image' ? '🖼️' : type === 'audio' ? '🎤' : type === 'video' ? '🎬' : '📎'; 
+            const msgText = type === 'audio' ? '🎤 Голосовое' : icon + ' ' + file.name; 
+            const fm = { id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: msgText, files: [{ url: r.data.url, type, name: file.name }], ts: new Date().toISOString() }; 
+            this.messages.push(fm); 
+            this.filterMessages(); 
+            this.socket.emit('dm', { to: this.activeChat, msg: msgText, files: [{ url: r.data.url, type, name: file.name }] }); 
+          } 
+        } catch(e) { 
+          console.log('❌ [SEND] Ошибка загрузки:', e.message, e.response?.status);
+        } 
+      } 
+      
+      this.playSendSound(); 
+      this.msgText = ''; 
+      this.pendingFiles = []; 
+      this.$nextTick(() => this.scrollToBottom()); 
+    },
     handleFiles(e) { if (e.target.files?.length) { for (const file of e.target.files) { if (file.type.startsWith('image/')) file.preview = URL.createObjectURL(file); this.pendingFiles.push(file); } } e.target.value = ''; },
-    async startRecord() { try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); this.recording = true; this.recordingTime = 0; this.recordingTimer = setInterval(() => this.recordingTime++, 1000); this.mediaRecorder = new MediaRecorder(stream); this.chunks = []; this.mediaRecorder.ondataavailable = e => this.chunks.push(e.data); this.mediaRecorder.onstop = async () => { clearInterval(this.recordingTimer); const blob = new Blob(this.chunks, { type: 'audio/webm' }); const form = new FormData(); form.append('img', blob, 'voice.webm'); try { const r = await axios.post('/api/nimg', form); if (r.data?.url) { const vm = { id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }], ts: new Date().toISOString() }; this.messages.push(vm); this.filterMessages(); this.socket.emit('dm', { to: this.activeChat, msg: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }] }); } } catch(e) {} stream.getTracks().forEach(t => t.stop()); this.recording = false; this.recordingTime = 0; this.$nextTick(() => this.scrollToBottom()); }; this.mediaRecorder.start(); } catch(e) { this.recording = false; this.addToast('Нет доступа к микрофону 🎤', 'error'); } },
+    async startRecord() { 
+      console.log('🎤 [RECORD] Начало записи...');
+      try { 
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); 
+        this.recording = true; 
+        this.recordingTime = 0; 
+        this.recordingTimer = setInterval(() => this.recordingTime++, 1000); 
+        this.mediaRecorder = new MediaRecorder(stream); 
+        this.chunks = []; 
+        this.mediaRecorder.ondataavailable = e => this.chunks.push(e.data); 
+        this.mediaRecorder.onstop = async () => { 
+          console.log('🎤 [RECORD] Запись остановлена, размер:', this.chunks.length, 'чанков');
+          clearInterval(this.recordingTimer); 
+          const blob = new Blob(this.chunks, { type: 'audio/webm' }); 
+          console.log('🎤 [RECORD] Blob создан, размер:', blob.size);
+          const form = new FormData(); 
+          form.append('img', blob, 'voice.webm'); 
+          try { 
+            const r = await axios.post('/api/nimg', form); 
+            console.log('✅ [RECORD] /api/nimg ответ:', r.data?.url ? 'URL получен' : 'Без URL');
+            if (r.data?.url) { 
+              const vm = { id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }], ts: new Date().toISOString() }; 
+              this.messages.push(vm); 
+              this.filterMessages(); 
+              this.socket.emit('dm', { to: this.activeChat, msg: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }] }); 
+            } 
+          } catch(e) { 
+            console.log('❌ [RECORD] Ошибка загрузки:', e.message);
+          } 
+          stream.getTracks().forEach(t => t.stop()); 
+          this.recording = false; 
+          this.recordingTime = 0; 
+          this.$nextTick(() => this.scrollToBottom()); 
+        }; 
+        this.mediaRecorder.start(); 
+      } catch(e) { 
+        console.log('❌ [RECORD] Ошибка доступа к микрофону:', e.message);
+        this.recording = false; 
+        this.addToast('Нет доступа к микрофону 🎤', 'error'); 
+      } 
+    },
     stopRecord() { if (this.mediaRecorder?.state === 'recording') this.mediaRecorder.stop(); },
     scrollToBottom() { const el = this.$refs.msgContainer; if (el) el.scrollTop = el.scrollHeight; }
   }
