@@ -187,7 +187,23 @@ export default {
     async addWord() { if (!this.wordEn || !this.wordRu) return; await axios.post('/api/words', { en: this.wordEn, ru: this.wordRu }); this.wordEn = ''; this.wordRu = ''; this.words = (await axios.get('/api/words')).data; },
     async delWord(id) { await axios.delete(`/api/words/${id}`); this.words = (await axios.get('/api/words')).data; },
     async saveNote() { clearTimeout(this._t); this._t = setTimeout(async () => { await axios.put('/api/notes', { note: this.note }); }, 500); },
-    async uploadAvatar(e) { const file = e.target.files[0]; if (!file) return; const form = new FormData(); form.append('img', file); try { const r = await axios.post('/api/nimg', form); if (r.data.url) { await axios.put('/api/me', { avatar_url: r.data.url }); this.$emit('update-user', { ...this.user, avatar_url: r.data.url }); this.addToast('Фото обновлено! 📸', 'success'); } } catch(e) {} },
+    async uploadAvatar(e) { 
+  const file = e.target.files[0]; 
+  if (!file) return; 
+  const form = new FormData(); 
+  form.append('img', file); 
+  try { 
+    const r = await axios.post('/api/nimg', form); 
+    if (r.data.url) { 
+      await axios.put('/api/me', { avatar_url: r.data.url }); 
+      this.user.avatar_url = r.data.url;
+      this.$emit('update-user', { ...this.user, avatar_url: r.data.url }); 
+      this.addToast('Фото обновлено! 📸', 'success'); 
+    } 
+  } catch(e) {
+    this.addToast('Ошибка загрузки фото', 'error');
+  } 
+},
     exportMyICS() { window.open('/api/slots/export', '_blank'); }
   }
 };
