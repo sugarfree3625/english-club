@@ -105,23 +105,49 @@ async function ensureTutorChat(userId) {
   app.post('/api/reset-password', async (req, res) => { console.log(`🔑 Сброс для ${req.body.email}`); res.json({ success: true }); });
 
   // FILES
-app.post('/api/nimg', auth, upNw.single('img'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Нет файла' });
-  try {
-    const name = `nw-${Date.now()}${path.extname(req.file.originalname)}`;
-    const { error } = await supabase.storage.from('uploads').upload(name, req.file.buffer, {
-      contentType: req.file.mimetype,
-      upsert: true
-    });
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({
-      success: true,
-      url: supabase.storage.from('uploads').getPublicUrl(name).data.publicUrl
-    });
-  } catch(e) {
-    res.status(500).json({ error: e.message });
-  }
-});
+  app.post('/api/nimg', auth, upNw.single('img'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'Нет файла' });
+    try {
+      const name = `nw-${Date.now()}${path.extname(req.file.originalname)}`;
+      const { error } = await supabase.storage.from('uploads').upload(name, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: true
+      });
+      if (error) return res.status(500).json({ error: error.message });
+      res.json({
+        success: true,
+        url: supabase.storage.from('uploads').getPublicUrl(name).data.publicUrl
+      });
+    } catch(e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Загрузка файлов для чата
+  app.post('/api/chat-upload', auth, upNw.single('file'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'Нет файла' });
+    try {
+      const ext = path.extname(req.file.originalname) || '.bin';
+      const isAudio = req.file.mimetype.startsWith('audio/');
+      const isImage = req.file.mimetype.startsWith('image/');
+      const prefix = isAudio ? 'voice-' : isImage ? 'chat-img-' : 'doc-';
+      const name = `${prefix}${Date.now()}${ext}`;
+      const { error } = await supabase.storage.from('uploads').upload(name, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: true
+      });
+      if (error) return res.status(500).json({ error: error.message });
+      res.json({
+        success: true,
+        url: supabase.storage.from('uploads').getPublicUrl(name).data.publicUrl,
+        type: isAudio ? 'audio' : isImage ? 'image' : 'file',
+        name: req.file.originalname,
+        size: req.file.size
+      });
+    } catch(e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
 
   // POSTS
   app.get('/api/posts', auth, async (req, res) => { const page = parseInt(req.query.page) || 0; const limit = 20; const { data } = await supabase.from('posts').select('*, users!author_id(username, avatar_url), categories(name)').order('pinned', { ascending: false }).order('ts', { ascending: false }).range(page*limit, (page+1)*limit-1); res.json(data?.map(p => ({ ...p, an: p.users?.username, aa: p.users?.avatar_url, category: p.categories?.name })) || []); });
