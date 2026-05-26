@@ -36,8 +36,8 @@
       </div>
     </header>
 
-    <!-- Приветственное окно (возвращающимся) -->
-    <WelcomeModal v-if="showWelcome" :user="user" @close="showWelcome = false" />
+    <!-- Приветственное окно -->
+    <WelcomeModal v-if="showWelcome" :user="user" :isNew="isNewUser" @close="showWelcome = false; localStorage.setItem('welcome_dismissed', Date.now().toString())" />
 
     <router-view v-slot="{ Component }">
       <transition name="page-fade" mode="out-in">
@@ -89,13 +89,13 @@ export default {
   data() { 
     return { 
       user: null, settings: {}, isDark: false, menuOpen: false, 
-      showLogin: false, showReg: false, showWelcome: false,
+      showLogin: false, showReg: false, showWelcome: false, isNewUser: false,
       loginEmail: '', loginPassword: '', regUsername: '', regEmail: '', regPassword: '', regLevel: 'B1',
       toasts: [], toastId: 0,
       showGlobalSearch: false, globalSearchQuery: '', globalResults: { posts: [], sessions: [] },
       showOnboarding: false, currentOnboardingStep: 0,
       onboardingSteps: [
-        { icon: '👋', title: 'Добро пожаловать в English Club!', text: 'Разговорный клуб для практики английского языка.' },
+        { icon: '🗣️', title: 'English Club', text: 'Погрузись в языковую среду. Живое общение, достижения и прогресс каждый день.' },
         { icon: '📅', title: 'Записывайся на встречи', text: 'Выбирай удобное время и присоединяйся к видеозвонкам.' },
         { icon: '💬', title: 'Общайся в чатах', text: 'Личные сообщения, групповые чаты и голосовые сообщения.' },
         { icon: '🏆', title: 'Получай достижения', text: 'За активность ты получаешь достижения и повышаешь уровень.' },
@@ -111,10 +111,10 @@ export default {
     handleGlobalKeydown(e) { if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();this.showGlobalSearch=true;this.$nextTick(()=>this.$refs.globalSearchInput?.focus());} if(e.key==='Escape'){this.showGlobalSearch=false;this.menuOpen=false;} },
     nextOnboardingStep() { if(this.currentOnboardingStep<this.onboardingSteps.length-1){this.currentOnboardingStep++;}else{this.showOnboarding=false;localStorage.setItem('onboarding_done','true');} },
     checkOnboarding() { if(!localStorage.getItem('onboarding_done')&&this.user){setTimeout(()=>{this.showOnboarding=true;},1000);} },
-    checkWelcome() { if(this.user&&!localStorage.getItem('welcome_dismissed')){setTimeout(()=>{this.showWelcome=true;},800);} },
+    checkWelcome() { if(this.user){ this.isNewUser=!localStorage.getItem('onboarding_done'); setTimeout(()=>{this.showWelcome=true;},800); } },
     async login() { try{const r=await axios.post('/api/login',{email:this.loginEmail,password:this.loginPassword});if(r.data.success){this.user=r.data.user;this.showLogin=false;this.loginEmail='';this.loginPassword='';this.addToast('Добро пожаловать! 👋','success');this.$router.push('/dashboard');this.checkOnboarding();this.checkWelcome();}}catch(e){this.addToast(e.response?.data?.error||'Ошибка входа','error');} },
     async register() { try{const r=await axios.post('/api/reg',{username:this.regUsername,email:this.regEmail,password:this.regPassword,level:this.regLevel});if(r.data.success){this.showReg=false;this.showLogin=true;this.addToast('Регистрация успешна! ✨','success');}}catch(e){this.addToast(e.response?.data?.error||'Ошибка регистрации','error');} },
-    async logout() { if(!confirm('Выйти из аккаунта?'))return; try{await axios.post('/api/out');this.addToast('До встречи! 👋','info');}catch(e){} this.user=null;this.menuOpen=false;this.$router.push('/'); }
+    async logout() { if(!confirm('Выйти из аккаунта?'))return; try{await axios.post('/api/out');this.addToast('До встречи! 👋','info'); localStorage.removeItem('welcome_dismissed'); }catch(e){} this.user=null;this.menuOpen=false;this.$router.push('/'); }
   },
   async created() {
     try{const r=await axios.get('/api/me');if(r.data.ok){this.user=r.data.user;this.checkOnboarding();this.checkWelcome();}}catch(e){}
