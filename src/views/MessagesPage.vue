@@ -106,8 +106,9 @@ export default {
   async mounted() {
     if (!this.user?.id) return; this.currentUserId = this.user.id; await this.loadDialogs();
     if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
-    this.socket = io('https://english-club-v1.onrender.com', { transports: ['websocket', 'polling'] });
-    this.socket.on('connect', () => this.socket.emit('join', { uid: this.currentUserId, uname: this.user.username, role: this.user.role }));
+    this.socket = io('https://english-club-v1.onrender.com', { transports: ['websocket', 'polling'], path: '/socket.io' });
+    window.socket = this.socket;
+    this.socket.on('connect', () => { console.log('🔌 Сокет подключён, ID:', this.socket.id); this.socket.emit('join', { uid: this.currentUserId, uname: this.user.username, role: this.user.role }); });
     this.socket.on('unread', ({ count }) => { this.unreadCount = count; });
     this.socket.on('dm', (msg) => { if (typeof msg.files === 'string') { try { msg.files = JSON.parse(msg.files); } catch(e) { msg.files = null; } } if (msg.from === this.currentUserId) { this.loadDialogs(); return; } if (this.activeChat === msg.from) { if (!this.messages.find(m => m.id === msg.id)) { this.messages.push(msg); this.filterMessages(); this.$nextTick(() => this.scrollToBottom()); } } if (document.hidden && msg.from !== this.currentUserId) this.sendBrowserNotification(msg); this.loadDialogs(); });
     this.searchUsers = useDebounce(this.searchUsers, 300);
