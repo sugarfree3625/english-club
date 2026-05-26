@@ -54,6 +54,7 @@
       <div class="modal-overlay" v-if="showBindParent" @click.self="showBindParent = false"><div class="modal" style="max-width:400px"><h3>Привязать родителя</h3><input class="input" v-model="parentSearch" @input="searchParents"><div v-for="p in parentResults" :key="p.id" class="student-card" @click="doBindParent(p.id)"><strong>{{ p.username }}</strong></div><button class="btn btn-o w-100 mt-2" @click="showBindParent = false">Закрыть</button></div></div>
       <div class="modal-overlay" v-if="showFeedback" @click.self="showFeedback = false"><div class="modal" style="max-width:400px"><h3>Фидбек</h3><select class="input" v-model="fbRating"><option v-for="n in 5" :key="n" :value="n">{{ '⭐'.repeat(n) }}</option></select><input class="input" v-model="fbTopic" placeholder="Тема"><textarea class="input note-area" v-model="fbGood" rows="2" placeholder="Хорошо"></textarea><textarea class="input note-area" v-model="fbImprove" rows="2" placeholder="Улучшить"></textarea><button class="btn btn-p w-100" @click="doAddFeedback">Отправить</button><button class="btn btn-o w-100 mt-2" @click="showFeedback = false">Закрыть</button></div></div>
       <ConfettiExplosion :active="showConfetti" />
+      <AchievementUnlock v-if="newAchievement" :achievement="newAchievement" />
     </div>
   </div>
 </template>
@@ -66,10 +67,11 @@ import ProfileTabInfo from '../components/profile/ProfileTabInfo.vue';
 import ProfileTabAchievements from '../components/profile/ProfileTabAchievements.vue';
 import ProfileTabSchedule from '../components/profile/ProfileTabSchedule.vue';
 import ProfileTabStudents from '../components/profile/ProfileTabStudents.vue';
+import AchievementUnlock from '../components/AchievementUnlock.vue';
 
 export default {
   name: 'ProfilePage',
-  components: { AppAvatar, ConfettiExplosion, ProfileTabInfo, ProfileTabAchievements, ProfileTabSchedule, ProfileTabStudents },
+  components: { AppAvatar, ConfettiExplosion, ProfileTabInfo, ProfileTabAchievements, ProfileTabSchedule, ProfileTabStudents, AchievementUnlock },
   props: ['user'],
   inject: ['addToast'],
   data() {
@@ -79,7 +81,9 @@ export default {
       myHomework: [], myStudents: [], allStudents: [], viewingStudent: null,
       mySlots: [], showBindParent: false, bindStudentId: null, parentSearch: '', parentResults: [],
       showFeedback: false, fbStudentId: null, fbRating: 3, fbTopic: '', fbGood: '', fbImprove: '',
-      hwStudent: '', hwTitle: '', hwDesc: '', hwDueDate: ''
+      hwStudent: '', hwTitle: '', hwDesc: '', hwDueDate: '',
+      newAchievement: null,
+      prevEarnedCodes: []
     };
   },
   computed: {
@@ -112,7 +116,20 @@ export default {
   },
   methods: {
     switchTab(btn) { this.tab = btn.tab; if (btn.load) this[btn.load](); },
-    async loadAchievements() { try { const r = await axios.get('/api/achievements'); this.allAchievements = (r.data || []).map(a => ({ ...a, progressPercent: a.progress_percent || (a.earned ? 100 : 0) })); this.earnedCount = this.allAchievements.filter(a => a.earned).length; } catch(e) {} },
+    async loadAchievements() { 
+      try { 
+        const r = await axios.get('/api/achievements'); 
+        const prevCodes = this.allAchievements.filter(a => a.earned).map(a => a.code);
+        this.allAchievements = (r.data || []).map(a => ({ ...a, progressPercent: a.progress_percent || (a.earned ? 100 : 0) })); 
+        this.earnedCount = this.allAchievements.filter(a => a.earned).length;
+        const newCodes = this.allAchievements.filter(a => a.earned).map(a => a.code);
+        const unlocked = newCodes.find(c => !prevCodes.includes(c));
+        if (unlocked) {
+          const ach = this.allAchievements.find(a => a.code === unlocked);
+          if (ach) { this.newAchievement = ach; this.showConfetti = true; }
+        }
+      } catch(e) {} 
+    },
     async loadMyHomework() { try { this.myHomework = (await axios.get('/api/homework/my')).data || []; } catch(e) {} },
     async loadMyStudents() { try { this.myStudents = (await axios.get('/api/parent/students')).data || []; } catch(e) {} },
     async loadAllStudents() { try { this.allStudents = ((await axios.get('/api/users')).data || []).filter(u => u.role !== 'admin'); } catch(e) {} },
