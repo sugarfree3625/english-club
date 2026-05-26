@@ -129,122 +129,48 @@ export default {
     weekDays() { return ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС']; },
     currentMonthName() { return new Date(this.currentYear, this.currentMonth).toLocaleDateString('ru', { month: 'long' }); },
     monthDays() {
-      const days = [];
-      const firstDay = new Date(this.currentYear, this.currentMonth, 1);
-      const lastDay = new Date(this.currentYear, this.currentMonth + 1, 0);
-      const startDay = firstDay.getDay() || 7;
-      for (let i = 1; i < startDay; i++) {
-        const d = new Date(this.currentYear, this.currentMonth, 1 - (startDay - i));
-        days.push({ day: d.getDate(), date: d.toISOString().split('T')[0], isOtherMonth: true, isToday: false });
-      }
-      for (let i = 1; i <= lastDay.getDate(); i++) {
-        const d = new Date(this.currentYear, this.currentMonth, i);
-        days.push({ day: i, date: d.toISOString().split('T')[0], isOtherMonth: false, isToday: d.toDateString() === new Date().toDateString() });
-      }
+      const days = []; const firstDay = new Date(this.currentYear, this.currentMonth, 1); const lastDay = new Date(this.currentYear, this.currentMonth + 1, 0); const startDay = firstDay.getDay() || 7;
+      for (let i = 1; i < startDay; i++) { const d = new Date(this.currentYear, this.currentMonth, 1 - (startDay - i)); days.push({ day: d.getDate(), date: d.toISOString().split('T')[0], isOtherMonth: true, isToday: false }); }
+      for (let i = 1; i <= lastDay.getDate(); i++) { const d = new Date(this.currentYear, this.currentMonth, i); days.push({ day: i, date: d.toISOString().split('T')[0], isOtherMonth: false, isToday: d.toDateString() === new Date().toDateString() }); }
       return days;
     },
     weekDaysList() {
-      const today = new Date();
-      const monday = new Date(today);
-      monday.setDate(today.getDate() - (today.getDay() || 7) + 1 + this.currentWeek * 7);
-      return Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(monday); d.setDate(monday.getDate() + i);
-        return { date: d.toISOString().split('T')[0], name: ['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'][i], dateStr: d.toLocaleDateString('ru', { day: 'numeric', month: 'short' }), isToday: d.toDateString() === today.toDateString(), dayIndex: i };
-      });
+      const today = new Date(); const monday = new Date(today); monday.setDate(today.getDate() - (today.getDay() || 7) + 1 + this.currentWeek * 7);
+      return Array.from({ length: 7 }, (_, i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return { date: d.toISOString().split('T')[0], name: ['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'][i], dateStr: d.toLocaleDateString('ru', { day: 'numeric', month: 'short' }), isToday: d.toDateString() === today.toDateString(), dayIndex: i }; });
     },
     weekLabel() { return this.weekDaysList.length ? `${this.weekDaysList[0].dateStr} — ${this.weekDaysList[6].dateStr}` : ''; },
-    weekSlots() {
-      const weekStart = this.weekDaysList[0]?.date;
-      const weekEnd = this.weekDaysList[6]?.date;
-      if (!weekStart || !weekEnd) return [];
-      return this.slots.filter(s => { const sd = new Date(s.start_time).toISOString().split('T')[0]; return sd >= weekStart && sd <= weekEnd; }).sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
-    },
+    weekSlots() { const ws = this.weekDaysList[0]?.date, we = this.weekDaysList[6]?.date; if (!ws || !we) return []; return this.slots.filter(s => { const sd = new Date(s.start_time).toISOString().split('T')[0]; return sd >= ws && sd <= we; }).sort((a, b) => new Date(a.start_time) - new Date(b.start_time)); },
     pastSlots() { return this.slots.filter(s => new Date(s.start_time) < new Date()); },
   },
-  async mounted() {
-    await Promise.all([this.loadSlots(), this.loadStudents()]);
-    document.addEventListener('mousemove', this.onDragMove);
-    document.addEventListener('mouseup', this.onDragEnd);
-  },
-  beforeUnmount() {
-    document.removeEventListener('mousemove', this.onDragMove);
-    document.removeEventListener('mouseup', this.onDragEnd);
-  },
+  async mounted() { await Promise.all([this.loadSlots(), this.loadStudents()]); document.addEventListener('mousemove', this.onDragMove); document.addEventListener('mouseup', this.onDragEnd); },
+  beforeUnmount() { document.removeEventListener('mousemove', this.onDragMove); document.removeEventListener('mouseup', this.onDragEnd); },
   methods: {
     async loadSlots() { try { const r = await axios.get('/api/slots'); this.slots = r.data || []; } catch(e) {} },
     async loadStudents() { try { const r = await axios.get('/api/users'); this.allStudents = (r.data || []).filter(u => u.role !== 'admin' && u.role !== 'parent'); } catch(e) {} },
     getSlotsForDate(date) { return this.slots.filter(s => new Date(s.start_time).toISOString().split('T')[0] === date); },
-    getDaySlots(date) { return this.slots.filter(s => new Date(s.start_time).toISOString().split('T')[0] === date); },
     getSlotColor(t) { if (t === 'online') return 'slot-online'; if (t === 'offline') return 'slot-offline'; if (t === 'group-online') return 'slot-group-online'; if (t === 'group-offline') return 'slot-group-offline'; return 'slot-online'; },
     getTypeEmoji(t) { if (t === 'online') return '🟢'; if (t === 'offline') return '🔵'; if (t === 'group-online') return '🟠'; if (t === 'group-offline') return '🔴'; return '🟢'; },
     getSlotStyle(slot) {
-      const sd = new Date(slot.start_time);
-      const ed = new Date(slot.end_time);
-      if (ed < sd) return { display: 'none' };
-      const dayIndex = this.weekDaysList.findIndex(d => d.date === sd.toISOString().split('T')[0]);
-      if (dayIndex === -1) return { display: 'none' };
-      const startHour = 8, totalMinutes = 14 * 60;
-      const slotStart = (sd.getHours() - startHour) * 60 + sd.getMinutes();
-      const slotEnd = (ed.getHours() - startHour) * 60 + ed.getMinutes();
-      const duration = Math.max(slotEnd - slotStart, 30);
-      return {
-        top: (slotStart / totalMinutes * 100) + '%',
-        height: (duration / totalMinutes * 100) + '%',
-        left: `calc(70px + ${dayIndex} * (100% - 70px) / 7 + 2px)`,
-        width: `calc((100% - 70px) / 7 - 4px)`,
-        minHeight: '20px',
-      };
+      const sd = new Date(slot.start_time), ed = new Date(slot.end_time); if (ed < sd) return { display: 'none' };
+      const dayIndex = this.weekDaysList.findIndex(d => d.date === sd.toISOString().split('T')[0]); if (dayIndex === -1) return { display: 'none' };
+      const startHour = 8, totalMinutes = 14 * 60; const slotStart = (sd.getHours() - startHour) * 60 + sd.getMinutes(); const slotEnd = (ed.getHours() - startHour) * 60 + ed.getMinutes(); const duration = Math.max(slotEnd - slotStart, 30);
+      return { top: (slotStart / totalMinutes * 100) + '%', height: (duration / totalMinutes * 100) + '%', left: `calc(70px + ${dayIndex} * (100% - 70px) / 7 + 2px)`, width: `calc((100% - 70px) / 7 - 4px)`, minHeight: '20px' };
     },
     formatDate(ts) { return ts ? new Date(ts).toLocaleDateString('ru', { day: 'numeric', month: 'short' }) : ''; },
     formatTime(ts) { return ts ? new Date(ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : ''; },
     startDrag(e, slot) { if (!this.isTutor) return; e.preventDefault(); this.dragging = slot; this.dragStartX = e.clientX; this.dragStartY = e.clientY; this.dragSlotOriginal = { ...slot, start_time: slot.start_time, end_time: slot.end_time }; },
     startResize(e, slot) { if (!this.isTutor) return; e.preventDefault(); this.resizing = slot; this.dragStartY = e.clientY; this.dragSlotOriginal = { ...slot, start_time: slot.start_time, end_time: slot.end_time }; },
     onDragMove(e) {
-      if (!this.dragging && !this.resizing) return;
-      const grid = this.$refs.weekGrid;
-      if (!grid) return;
-      const rect = grid.getBoundingClientRect();
-      const totalMinutes = 14 * 60;
-      const gridHeight = rect.height - 44;
-      const minutesPerPixel = totalMinutes / gridHeight;
-      const dayWidth = (rect.width - 70) / 7;
-      
-      if (this.dragging) {
-        const dy = e.clientY - this.dragStartY;
-        const dx = e.clientX - this.dragStartX;
-        const deltaMinutes = Math.round(dy * minutesPerPixel / 30) * 30;
-        const deltaDays = Math.round(dx / dayWidth);
-        const originalStart = new Date(this.dragSlotOriginal.start_time);
-        const duration = Math.max((new Date(this.dragSlotOriginal.end_time) - originalStart) / 60000, 30);
-        let newStart = new Date(originalStart.getTime() + deltaMinutes * 60000);
-        newStart.setDate(newStart.getDate() + deltaDays);
-        const newStartMin = (newStart.getHours() - 8) * 60 + newStart.getMinutes();
-        if (newStartMin < 0) newStart.setHours(8, 0, 0, 0);
-        if (newStartMin + duration > totalMinutes) { newStart.setHours(8, 0, 0, 0); newStart.setMinutes(totalMinutes - duration); }
-        this.dragging.start_time = newStart.toISOString();
-        this.dragging.end_time = new Date(newStart.getTime() + duration * 60000).toISOString();
-      }
-      
-      if (this.resizing) {
-        const dy = e.clientY - this.dragStartY;
-        const deltaMinutes = Math.round(dy * minutesPerPixel / 30) * 30;
-        const originalEnd = new Date(this.dragSlotOriginal.end_time);
-        let newEnd = new Date(originalEnd.getTime() + deltaMinutes * 60000);
-        const minEnd = new Date(this.dragSlotOriginal.start_time).getTime() + 30 * 60000;
-        if (newEnd.getTime() < minEnd) newEnd.setTime(minEnd);
-        const newEndMin = (newEnd.getHours() - 8) * 60 + newEnd.getMinutes();
-        if (newEndMin > totalMinutes) { newEnd.setHours(8, 0, 0, 0); newEnd.setMinutes(totalMinutes); }
-        this.resizing.end_time = newEnd.toISOString();
-      }
+      if (!this.dragging && !this.resizing) return; const grid = this.$refs.weekGrid; if (!grid) return; const rect = grid.getBoundingClientRect(); const totalMinutes = 14 * 60; const gridHeight = rect.height - 44; const minutesPerPixel = totalMinutes / gridHeight; const dayWidth = (rect.width - 70) / 7;
+      if (this.dragging) { const dy = e.clientY - this.dragStartY; const dx = e.clientX - this.dragStartX; const deltaMinutes = Math.round(dy * minutesPerPixel / 30) * 30; const deltaDays = Math.round(dx / dayWidth); const originalStart = new Date(this.dragSlotOriginal.start_time); const duration = Math.max((new Date(this.dragSlotOriginal.end_time) - originalStart) / 60000, 30); let newStart = new Date(originalStart.getTime() + deltaMinutes * 60000); newStart.setDate(newStart.getDate() + deltaDays); const newStartMin = (newStart.getHours() - 8) * 60 + newStart.getMinutes(); if (newStartMin < 0) newStart.setHours(8, 0, 0, 0); if (newStartMin + duration > totalMinutes) { newStart.setHours(8, 0, 0, 0); newStart.setMinutes(totalMinutes - duration); } this.dragging.start_time = newStart.toISOString(); this.dragging.end_time = new Date(newStart.getTime() + duration * 60000).toISOString(); }
+      if (this.resizing) { const dy = e.clientY - this.dragStartY; const deltaMinutes = Math.round(dy * minutesPerPixel / 30) * 30; const originalEnd = new Date(this.dragSlotOriginal.end_time); let newEnd = new Date(originalEnd.getTime() + deltaMinutes * 60000); const minEnd = new Date(this.dragSlotOriginal.start_time).getTime() + 30 * 60000; if (newEnd.getTime() < minEnd) newEnd.setTime(minEnd); const newEndMin = (newEnd.getHours() - 8) * 60 + newEnd.getMinutes(); if (newEndMin > totalMinutes) { newEnd.setHours(8, 0, 0, 0); newEnd.setMinutes(totalMinutes); } this.resizing.end_time = newEnd.toISOString(); }
     },
     async onDragEnd() {
-      const slot = this.dragging || this.resizing;
-      if (!slot) return;
-      const st = new Date(slot.start_time), et = new Date(slot.end_time);
-      if (et <= st) slot.end_time = new Date(st.getTime() + 30 * 60000).toISOString();
+      const slot = this.dragging || this.resizing; if (!slot) return;
+      const st = new Date(slot.start_time), et = new Date(slot.end_time); if (et <= st) slot.end_time = new Date(st.getTime() + 30 * 60000).toISOString();
       try {
-        await axios.put(`/api/slots/${slot.id}`, { start_time: slot.start_time, end_time: slot.end_time, lesson_type: slot.lesson_type, title: slot.title, student_id: slot.student_id, notes: slot.notes, group_students: slot.group_students });
-        this.addToast(this.dragging ? 'Перемещено! 📅' : 'Длительность изменена! ⏱️', 'success');
+        if (this.dragging) { await axios.put(`/api/slots/${slot.id}/move`, { start_time: slot.start_time, end_time: slot.end_time }); this.addToast('Перемещено! 📅', 'success'); }
+        else { await axios.put(`/api/slots/${slot.id}`, { start_time: slot.start_time, end_time: slot.end_time, lesson_type: slot.lesson_type, title: slot.title, student_id: slot.student_id, notes: slot.notes, group_students: slot.group_students }); this.addToast('Длительность изменена! ⏱️', 'success'); }
       } catch(e) { this.addToast(e.response?.data?.error || 'Ошибка', 'error'); }
       this.dragging = null; this.resizing = null; this.dragSlotOriginal = null; this.loadSlots();
     },
@@ -260,15 +186,9 @@ export default {
     closeModal() { this.showAddSlot = false; this.editingSlot = null; this.slotForm.group_students = []; },
     async saveSlot() {
       try {
-        const st = `${this.slotForm.date}T${this.slotForm.time}:00`;
-        const et = new Date(new Date(st).getTime() + (this.slotForm.duration || 30) * 60000).toISOString();
-        const data = { ...this.slotForm, start_time: st, end_time: et };
-        if (!this.isGroupType) data.group_students = [];
-        if (this.isGroupType) data.student_id = null;
-        if (this.editingSlot) { await axios.put(`/api/slots/${this.editingSlot.id}`, data); }
-        else { await axios.post('/api/slots', data); }
-        this.closeModal(); this.addToast('Сохранено! 🎉', 'success');
-        setTimeout(() => this.loadSlots(), 500);
+        const st = `${this.slotForm.date}T${this.slotForm.time}:00`; const et = new Date(new Date(st).getTime() + (this.slotForm.duration || 30) * 60000).toISOString(); const data = { ...this.slotForm, start_time: st, end_time: et }; if (!this.isGroupType) data.group_students = []; if (this.isGroupType) data.student_id = null;
+        if (this.editingSlot) { await axios.put(`/api/slots/${this.editingSlot.id}`, data); } else { await axios.post('/api/slots', data); }
+        this.closeModal(); this.addToast('Сохранено! 🎉', 'success'); setTimeout(() => this.loadSlots(), 500);
       } catch(e) { this.addToast(e.response?.data?.error || 'Ошибка', 'error'); }
     },
     async deleteSlot(id) { if (confirm('Удалить занятие?')) { await axios.delete(`/api/slots/${id}`); this.closeModal(); this.loadSlots(); } },
