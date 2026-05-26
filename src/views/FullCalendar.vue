@@ -31,9 +31,9 @@
         <div class="week-header-cell" v-for="day in weekDaysList" :key="day.date" :class="{ today: day.isToday }">{{ day.name }}<br>{{ day.dateStr }}</div>
         <template v-for="hour in hours" :key="hour">
           <div class="week-time-cell">{{ hour }}:00</div>
-          <div class="week-bg-cell" v-for="day in weekDaysList" :key="'bg'+day.date+hour+':00'" :class="{ today: day.isToday }"></div>
+          <div class="week-bg-cell" v-for="day in weekDaysList" :key="'bg'+day.date+hour+':00'" :class="{ today: day.isToday }" @click="openSlot(day.date, hour, 0)"></div>
           <div class="week-time-cell week-time-half">:30</div>
-          <div class="week-bg-cell week-bg-half" v-for="day in weekDaysList" :key="'bg'+day.date+hour+':30'" :class="{ today: day.isToday }"></div>
+          <div class="week-bg-cell week-bg-half" v-for="day in weekDaysList" :key="'bg'+day.date+hour+':30'" :class="{ today: day.isToday }" @click="openSlot(day.date, hour, 30)"></div>
         </template>
         <div class="slots-layer">
           <div v-for="slot in weekSlots" :key="slot.id" class="slot-block" :class="getSlotColor(slot.lesson_type)" :style="getSlotStyle(slot)" @mousedown="startDrag($event, slot)" @click.stop="editSlot(slot)">
@@ -106,21 +106,11 @@ export default {
   inject: ['addToast'],
   data() {
     return {
-      viewMode: 'week',
-      currentMonth: new Date().getMonth(),
-      currentYear: new Date().getFullYear(),
-      currentWeek: 0,
-      hours: Array.from({ length: 14 }, (_, i) => i + 8),
-      slots: [],
-      allStudents: [],
-      showAddSlot: false,
-      editingSlot: null,
+      viewMode: 'week', currentMonth: new Date().getMonth(), currentYear: new Date().getFullYear(), currentWeek: 0,
+      hours: Array.from({ length: 14 }, (_, i) => i + 8), slots: [], allStudents: [],
+      showAddSlot: false, editingSlot: null,
       slotForm: { student_id: '', lesson_type: 'online', title: '', date: '', time: '', duration: 30, notes: '', group_students: [] },
-      dragging: null,
-      resizing: null,
-      dragStartX: 0,
-      dragStartY: 0,
-      dragSlotOriginal: null,
+      dragging: null, resizing: null, dragStartX: 0, dragStartY: 0, dragSlotOriginal: null,
     };
   },
   computed: {
@@ -181,6 +171,7 @@ export default {
     prevMonth() { this.currentMonth === 0 ? (this.currentMonth = 11, this.currentYear--) : this.currentMonth--; },
     nextMonth() { this.currentMonth === 11 ? (this.currentMonth = 0, this.currentYear++) : this.currentMonth++; },
     openDay(date) { this.slotForm.date = date; this.slotForm.group_students = []; this.showAddSlot = true; },
+    openSlot(date, hour, minutes = 0) { if (!this.isTutor) return; this.slotForm = { student_id: '', lesson_type: 'online', title: '', date, time: `${String(hour).padStart(2,'0')}:${String(minutes).padStart(2,'0')}`, duration: 30, notes: '', group_students: [] }; this.editingSlot = null; this.showAddSlot = true; },
     openAddSlot() { this.editingSlot = null; this.slotForm = { student_id: '', lesson_type: 'online', title: '', date: '', time: '', duration: 30, notes: '', group_students: [] }; this.showAddSlot = true; },
     editSlot(slot) { this.editingSlot = slot; const sd = new Date(slot.start_time); this.slotForm = { student_id: slot.student_id || '', lesson_type: slot.lesson_type || 'online', title: slot.title || '', date: sd.toISOString().split('T')[0], time: sd.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }), duration: Math.round((new Date(slot.end_time) - sd) / 60000) || 30, notes: slot.notes || '', group_students: slot.group_students || [] }; this.showAddSlot = true; },
     closeModal() { this.showAddSlot = false; this.editingSlot = null; this.slotForm.group_students = []; },
@@ -223,8 +214,9 @@ export default {
 .week-header-cell.today { background: rgba(99,102,241,0.08); }
 .week-time-cell { background: var(--bg); font-weight: 600; text-align: center; padding: 8px; border-bottom: 1px solid var(--b); font-size: 0.75rem; }
 .week-time-half { font-size: 0.65rem; color: var(--t2); }
-.week-bg-cell { min-height: 50px; border-bottom: 1px solid var(--b); border-right: 1px solid var(--b); }
+.week-bg-cell { min-height: 50px; border-bottom: 1px solid var(--b); border-right: 1px solid var(--b); cursor: pointer; }
 .week-bg-half { border-bottom: 1px dashed rgba(0,0,0,0.05); }
+.week-bg-cell:hover { background: rgba(99,102,241,0.03); }
 .week-bg-cell.today { background: rgba(99,102,241,0.02); }
 body.dark .week-bg-half { border-bottom: 1px dashed rgba(255,255,255,0.05); }
 .slots-layer { position: absolute; top: 44px; left: 0; right: 0; bottom: 0; pointer-events: none; }
