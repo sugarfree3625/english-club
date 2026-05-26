@@ -10,14 +10,14 @@
         <input v-model="searchQuery" @input="searchUsers" placeholder="Поиск ученика..." class="search-input">
         <div v-if="searchResults.length" class="search-results">
           <div v-for="(u, idx) in searchResults" :key="u.id" class="search-item fade-in-up" :style="{ animationDelay: `${idx * 0.04}s` }" @click="startChat(u)">
-            <img :src="u.avatar_url || 'https://ui-avatars.com/api/?name=' + u.username" class="dialog-avatar" @error="$event.target.src='https://ui-avatars.com/api/?name=' + u.username">
+            <AppAvatar :src="u.avatar_url" :name="u.username" :size="48" class="dialog-avatar" />
             <div><strong>{{ u.username }}</strong><small>{{ u.level }}</small></div>
           </div>
         </div>
       </div>
       <div class="dialog-list">
         <div v-for="(d, idx) in dialogs" :key="d.partner_id || d.id" class="dialog-item fade-in-up" :class="{ active: activeChat === (d.partner_id || d.id) }" :style="{ animationDelay: `${idx * 0.03}s` }" @click="openChat(d)">
-          <img :src="d.avatar_url || 'https://ui-avatars.com/api/?name=' + (d.username || 'U')" class="dialog-avatar" @error="$event.target.src='https://ui-avatars.com/api/?name=' + (d.username || 'U')">
+          <AppAvatar :src="d.avatar_url" :name="d.username || 'U'" :size="48" class="dialog-avatar" />
           <div class="dialog-info"><strong>{{ d.username }}</strong><small>{{ (d.message || d.last_msg || '').substring(0, 35) }}</small></div>
         </div>
         <p v-if="!dialogs.length" class="empty-text">Нет диалогов</p>
@@ -31,7 +31,7 @@
     <div class="chat-main" v-if="activeChat" :class="{ 'mobile-show': !showSidebar }">
       <div class="chat-header">
         <div style="display:flex;align-items:center;gap:12px">
-          <img :src="partnerAvatar || 'https://ui-avatars.com/api/?name=' + activeChatName" class="chat-avatar tilt-avatar" @error="$event.target.src='https://ui-avatars.com/api/?name=' + activeChatName">
+          <AppAvatar :src="partnerAvatar" :name="activeChatName" :size="40" class="chat-avatar tilt-avatar" />
           <div><strong>{{ activeChatName }}</strong><small :class="{ online: isPartnerOnline }">{{ isPartnerOnline ? '🟢 Онлайн' : '⚫ Оффлайн' }}</small></div>
         </div>
         <div style="display:flex;gap:6px">
@@ -89,11 +89,10 @@
         <input type="file" ref="fileInput" @change="handleFiles" hidden multiple accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.zip">
         <button class="btn btn-o btn-sm voice-btn interactive-btn" :class="{ recording }" @mousedown="startRecord" @mouseup="stopRecord" @mouseleave="stopRecord" @touchstart.prevent="startRecord" @touchend.prevent="stopRecord">🎤</button>
         <span v-if="recording" class="recording-time">{{ recordingTime }}с</span>
-        <!-- Превью прикреплённых файлов -->
         <div v-if="pendingFiles.length" class="file-preview-bar">
           <div v-for="(f, i) in pendingFiles" :key="i" class="file-preview-item">
             <img v-if="f.type?.startsWith('image/')" :src="f.preview" class="file-preview-img">
-            <span v-else>{{ getFileIcon(getFileType(f)) }} {{ f.name }}</span>
+            <span v-else>{{ fileIcon(f) }} {{ f.name }}</span>
             <button @click="pendingFiles.splice(i, 1)" class="file-preview-remove">✕</button>
           </div>
         </div>
@@ -110,15 +109,17 @@
 
 <script>
 import axios from 'axios';
-import { io } from 'socket.io-client';
+import { useFiles } from '../composables/useFiles.js';
+import { useSocket } from '../composables/useSocket.js';
 import { useDebounce } from '../composables/useDebounce.js';
 import { translateWord } from '../composables/useTranslator.js';
+import AppAvatar from '../components/AppAvatar.vue';
 
-const SUPABASE_STORAGE_URL = 'https://qmoxemhstzfxirpskext.supabase.co/storage/v1/object/public/uploads/';
-const SOCKET_URL = 'https://english-club-v1.onrender.com';
+const { uploadFile, getFileType, getFileIcon, proxifyUrl } = useFiles();
 
 export default {
   name: 'MessagesPage',
+  components: { AppAvatar },
   props: ['user'],
   inject: ['addToast'],
   data() {
@@ -133,41 +134,31 @@ export default {
       emojis: ['😀','😂','🤣','😍','🥰','😘','😎','🤩','😇','🤔','😴','🥳','❤️','🔥','🎉','⭐','✅','💯','🙏','💪','🚀','🌈']
     };
   },
-  computed: {
-    isDark() { return document.body.classList.contains('dark'); }
-  },
+  computed: { isDark() { return document.body.classList.contains('dark'); } },
   async mounted() {
     if (!this.user?.id) return;
     this.currentUserId = this.user.id;
     await this.loadDialogs();
     if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
-    this.initSocket();
+    this.socket = useSocket(this.currentUserId, this.user.username, this.user.role);
+    this.socket.on('unread', ({ count }) => { this.unreadCount = count; });
+    this.socket.on('dm', (msg) => this.handleIncomingMessage(msg));
     this.searchUsers = useDebounce(this.searchUsers, 300);
     document.addEventListener('click', (e) => {
       if (!e.target.closest('.translate-popup') && !e.target.closest('.msg-actions')) this.showTranslate = false;
     });
   },
-  beforeUnmount() { this.socket?.disconnect(); this.socket = null; },
+  beforeUnmount() { this.socket?.disconnect(); },
   methods: {
-    initSocket() {
-      this.socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
-      this.socket.on('connect', () => {
-        this.socket.emit('join', { uid: this.currentUserId, uname: this.user.username, role: this.user.role });
-      });
-      this.socket.on('disconnect', (reason) => console.log('🔴 [SOCKET] Отключён:', reason));
-      this.socket.on('connect_error', (e) => console.log('❌ [SOCKET] Ошибка:', e.message));
-      this.socket.on('unread', ({ count }) => { this.unreadCount = count; });
-      this.socket.on('dm', (msg) => this.handleIncomingMessage(msg));
-    },
+    proxifyUrl,
+    fileIcon: getFileIcon,
 
     handleIncomingMessage(msg) {
       if (typeof msg.files === 'string') { try { msg.files = JSON.parse(msg.files); } catch(e) { msg.files = null; } }
       if (msg.from === this.currentUserId) { this.loadDialogs(); return; }
       if (this.activeChat === msg.from) {
         if (!this.messages.find(m => m.id === msg.id)) {
-          this.messages.push(msg);
-          this.filterMessages();
-          this.$nextTick(() => this.scrollToBottom());
+          this.messages.push(msg); this.filterMessages(); this.$nextTick(() => this.scrollToBottom());
         }
       }
       if (document.hidden && msg.from !== this.currentUserId) this.sendBrowserNotification(msg);
@@ -180,30 +171,21 @@ export default {
       const replyTo = text.startsWith('↩') ? text.split('\n')[0] : null;
       const cleanText = replyTo ? text.split('\n').slice(1).join('\n').trim() : text;
       if (cleanText) {
-        const m = { id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: cleanText, ts: new Date().toISOString() };
-        this.messages.push(m);
+        this.messages.push({ id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: cleanText, ts: new Date().toISOString() });
         this.filterMessages();
         this.socket.emit('dm', { to: this.activeChat, msg: cleanText, replyTo });
       }
       for (const file of this.pendingFiles) {
-        const form = new FormData();
-        form.append('img', file);
-        try {
-          const r = await axios.post('/api/nimg', form);
-          if (r.data?.url) {
-            const type = this.getFileType(file);
-            const msgText = type === 'audio' ? `🎵 ${file.name}` : `${this.getFileIcon(type)} ${file.name}`;
-            const fm = { id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: msgText, files: [{ url: r.data.url, type, name: file.name }], ts: new Date().toISOString() };
-            this.messages.push(fm);
-            this.filterMessages();
-            this.socket.emit('dm', { to: this.activeChat, msg: msgText, files: [{ url: r.data.url, type, name: file.name }] });
-          }
-        } catch(e) {}
+        const url = await uploadFile(file);
+        if (url) {
+          const type = getFileType(file);
+          const msgText = type === 'audio' ? `🎵 ${file.name}` : `${getFileIcon(type)} ${file.name}`;
+          this.messages.push({ id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: msgText, files: [{ url, type, name: file.name }], ts: new Date().toISOString() });
+          this.filterMessages();
+          this.socket.emit('dm', { to: this.activeChat, msg: msgText, files: [{ url, type, name: file.name }] });
+        }
       }
-      this.playSendSound();
-      this.msgText = '';
-      this.pendingFiles = [];
-      this.$nextTick(() => this.scrollToBottom());
+      this.playSendSound(); this.msgText = ''; this.pendingFiles = []; this.$nextTick(() => this.scrollToBottom());
     },
 
     handleFiles(e) {
@@ -216,171 +198,63 @@ export default {
       e.target.value = '';
     },
 
-    getFileType(file) {
-      if (!file) return 'file';
-      if (file.type) {
-        if (file.type.startsWith('image/')) return 'image';
-        if (file.type.startsWith('audio/')) return 'audio';
-        if (file.type.startsWith('video/')) return 'video';
-      }
-      const ext = (file.name || '').split('.').pop()?.toLowerCase();
-      if (['mp3','wav','ogg','aac','m4a','flac','webm'].includes(ext)) return 'audio';
-      if (['mp4','webm','mov','avi'].includes(ext)) return 'video';
-      if (['jpg','jpeg','png','gif','webp','svg','bmp'].includes(ext)) return 'image';
-      return 'file';
-    },
-
-    getFileIcon(type) {
-      return { image: '🖼️', audio: '🎵', video: '🎬' }[type] || '📎';
-    },
-
-    proxifyUrl(url) {
-      if (!url) return '';
-      return url.replace(SUPABASE_STORAGE_URL, '/api/file/');
-    },
-
-    parseFiles(m) {
-      if (!m.files) return m;
-      if (typeof m.files === 'string') { try { m.files = JSON.parse(m.files); } catch(e) { m.files = null; } }
-      return m;
-    },
-
     toggleAudio(e, url) {
       const btn = e.target;
       const existing = document.querySelector('audio.voice-audio');
       if (existing) { existing.pause(); existing.remove(); }
       if (btn.dataset.playing === 'true') { btn.dataset.playing = 'false'; btn.textContent = '▶️'; return; }
-      const audio = new Audio(url);
-      audio.classList.add('voice-audio');
-      audio.preload = 'auto';
-      btn.dataset.playing = 'true';
-      btn.textContent = '⏳';
+      const audio = new Audio(url); audio.classList.add('voice-audio'); audio.preload = 'auto';
+      btn.dataset.playing = 'true'; btn.textContent = '⏳';
       audio.oncanplaythrough = () => {
-        audio.play().then(() => { btn.textContent = '⏸️'; })
-          .catch(e => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; });
+        audio.play().then(() => { btn.textContent = '⏸️'; }).catch(() => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; });
       };
       audio.onended = () => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; audio.remove(); };
       audio.onerror = () => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; audio.remove(); };
-      document.body.appendChild(audio);
-      audio.load();
+      document.body.appendChild(audio); audio.load();
     },
 
     async startRecord() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        this.recording = true;
-        this.recordingTime = 0;
+        this.recording = true; this.recordingTime = 0;
         this.recordingTimer = setInterval(() => this.recordingTime++, 1000);
-        this.mediaRecorder = new MediaRecorder(stream);
-        this.chunks = [];
+        this.mediaRecorder = new MediaRecorder(stream); this.chunks = [];
         this.mediaRecorder.ondataavailable = e => this.chunks.push(e.data);
         this.mediaRecorder.onstop = async () => {
           clearInterval(this.recordingTimer);
           const blob = new Blob(this.chunks, { type: 'audio/webm' });
-          const form = new FormData();
-          form.append('img', blob, 'voice.webm');
+          const form = new FormData(); form.append('img', blob, 'voice.webm');
           try {
             const r = await axios.post('/api/nimg', form);
             if (r.data?.url) {
-              const vm = { id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }], ts: new Date().toISOString() };
-              this.messages.push(vm);
+              this.messages.push({ id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }], ts: new Date().toISOString() });
               this.filterMessages();
               this.socket.emit('dm', { to: this.activeChat, msg: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }] });
             }
           } catch(e) {}
           stream.getTracks().forEach(t => t.stop());
-          this.recording = false;
-          this.recordingTime = 0;
+          this.recording = false; this.recordingTime = 0;
           this.$nextTick(() => this.scrollToBottom());
         };
         this.mediaRecorder.start();
-      } catch(e) {
-        this.recording = false;
-        this.addToast('Нет доступа к микрофону 🎤', 'error');
-      }
+      } catch(e) { this.recording = false; this.addToast('Нет доступа к микрофону 🎤', 'error'); }
     },
-
     stopRecord() { if (this.mediaRecorder?.state === 'recording') this.mediaRecorder.stop(); },
-
-    async loadDialogs() {
-      if (!this.currentUserId) return;
-      try { const r = await axios.get('/api/dialogs'); this.dialogs = Array.isArray(r.data) ? r.data : []; } catch(e) {}
-    },
-
-    async startChat(u) {
-      Object.assign(this, { activeChat: u.id, activeChatName: u.username, partnerAvatar: u.avatar_url, searchQuery: '', searchResults: [], showSidebar: false });
-      await this.loadMessages(u.id);
-      this.loadDialogs();
-    },
-
-    async openChat(d) {
-      const pid = d.partner_id || d.id;
-      Object.assign(this, { activeChat: pid, activeChatName: d.username, partnerAvatar: d.avatar_url, showSidebar: false });
-      await this.loadMessages(pid);
-    },
-
-    async loadMessages(userId) {
-      try {
-        const r = await axios.get(`/api/messages/${userId}`);
-        this.messages = (r.data || []).map(m => this.parseFiles(m));
-        this.filterMessages();
-        this.$nextTick(() => this.scrollToBottom());
-      } catch(e) {}
-    },
-
-    async searchUsers() {
-      if (this.searchQuery.length < 2) { this.searchResults = []; return; }
-      try {
-        const r = await axios.get(`/api/users?q=${this.searchQuery}`);
-        this.searchResults = (r.data || []).filter(u => u.id !== this.currentUserId);
-      } catch(e) {}
-    },
-
+    async loadDialogs() { if (!this.currentUserId) return; try { const r = await axios.get('/api/dialogs'); this.dialogs = Array.isArray(r.data) ? r.data : []; } catch(e) {} },
+    async startChat(u) { Object.assign(this, { activeChat: u.id, activeChatName: u.username, partnerAvatar: u.avatar_url, searchQuery: '', searchResults: [], showSidebar: false }); await this.loadMessages(u.id); this.loadDialogs(); },
+    async openChat(d) { const pid = d.partner_id || d.id; Object.assign(this, { activeChat: pid, activeChatName: d.username, partnerAvatar: d.avatar_url, showSidebar: false }); await this.loadMessages(pid); },
+    async loadMessages(userId) { try { const r = await axios.get(`/api/messages/${userId}`); this.messages = (r.data || []).map(m => { if (m.files && typeof m.files === 'string') try { m.files = JSON.parse(m.files); } catch(e) { m.files = null; } return m; }); this.filterMessages(); this.$nextTick(() => this.scrollToBottom()); } catch(e) {} },
+    async searchUsers() { if (this.searchQuery.length < 2) { this.searchResults = []; return; } try { const r = await axios.get(`/api/users?q=${this.searchQuery}`); this.searchResults = (r.data || []).filter(u => u.id !== this.currentUserId); } catch(e) {} },
     filterMessages() { const q = this.msgSearchQuery.toLowerCase(); this.filteredMessages = q ? this.messages.filter(m => m.message?.toLowerCase().includes(q)) : this.messages; },
     formatTime(ts) { return ts ? new Date(ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : ''; },
     linkify(text) { return text ? text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:#818cf8;text-decoration:underline">$1</a>') : ''; },
     scrollToBottom() { const el = this.$refs.msgContainer; if (el) el.scrollTop = el.scrollHeight; },
-
-    playSendSound() {
-      if (!this.soundEnabled) return;
-      try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator(); const gain = ctx.createGain();
-        osc.connect(gain); gain.connect(ctx.destination);
-        osc.frequency.value = 1200; osc.type = 'sine';
-        gain.gain.setValueAtTime(0.08, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
-        osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.1);
-      } catch(e) {}
-    },
-
-    replyTo(msg) {
-      this.msgText = `↩ ${msg.fn || ''}: ${(msg.msg || msg.message || '').substring(0, 50)}\n`;
-      this.$nextTick(() => this.$el.querySelector('textarea')?.focus());
-    },
-
-    async deleteMsg(id) {
-      if (!confirm('Удалить?')) return;
-      try { await axios.delete(`/api/msg/${id}`); this.messages = this.messages.filter(m => m.id !== id); this.filterMessages(); this.addToast('Удалено 🗑', 'success'); } catch(e) {}
-    },
-
-    sendBrowserNotification(msg) {
-      if (!('Notification' in window) || Notification.permission !== 'granted') return;
-      try { new Notification(`💬 ${msg.fn || 'Новое сообщение'}`, { body: (msg.msg || msg.message || '📎 Файл').substring(0, 100), icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🗣️</text></svg>', tag: 'engclub' }); } catch(e) {}
-    },
-
-    async translateMsg(m) {
-      if (!m.message) return;
-      const word = m.message.split(' ').find(w => /^[a-zA-Z]+$/.test(w));
-      if (!word) { this.addToast('Нет английских слов', 'info'); return; }
-      this.selectedWord = word; this.showTranslate = true; this.translating = true;
-      try { this.translatedText = await translateWord(word); } catch(e) { this.translatedText = 'Ошибка'; }
-      finally { this.translating = false; }
-    },
-
-    async copyTranslation() {
-      try { await navigator.clipboard.writeText(this.translatedText); this.addToast('Перевод скопирован 📋', 'success'); } catch(e) {}
-    }
+    playSendSound() { if (!this.soundEnabled) return; try { const ctx = new (window.AudioContext || window.webkitAudioContext)(); const o = ctx.createOscillator(); const g = ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.frequency.value = 1200; o.type = 'sine'; g.gain.setValueAtTime(0.08, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1); o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.1); } catch(e) {} },
+    replyTo(msg) { this.msgText = `↩ ${msg.fn || ''}: ${(msg.msg || msg.message || '').substring(0, 50)}\n`; this.$nextTick(() => this.$el.querySelector('textarea')?.focus()); },
+    async deleteMsg(id) { if (!confirm('Удалить?')) return; try { await axios.delete(`/api/msg/${id}`); this.messages = this.messages.filter(m => m.id !== id); this.filterMessages(); this.addToast('Удалено 🗑', 'success'); } catch(e) {} },
+    sendBrowserNotification(msg) { if (!('Notification' in window) || Notification.permission !== 'granted') return; try { new Notification(`💬 ${msg.fn || 'Новое сообщение'}`, { body: (msg.msg || msg.message || '📎 Файл').substring(0, 100), icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🗣️</text></svg>', tag: 'engclub' }); } catch(e) {} },
+    async translateMsg(m) { if (!m.message) return; const word = m.message.split(' ').find(w => /^[a-zA-Z]+$/.test(w)); if (!word) { this.addToast('Нет английских слов', 'info'); return; } this.selectedWord = word; this.showTranslate = true; this.translating = true; try { this.translatedText = await translateWord(word); } catch(e) { this.translatedText = 'Ошибка'; } finally { this.translating = false; } },
+    async copyTranslation() { try { await navigator.clipboard.writeText(this.translatedText); this.addToast('Перевод скопирован 📋', 'success'); } catch(e) {} }
   }
 };
 </script>
