@@ -14,7 +14,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
   transports: ['websocket', 'polling'],
-  path: '/socket.io'  // ← ДОБАВЛЕНО
+  path: '/socket.io'
 });
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
@@ -36,7 +36,7 @@ const upNw = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// Отдача socket.io клиента — ДОБАВЛЕНО
+// Отдача socket.io клиента
 app.get('/socket.io/socket.io.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'node_modules', 'socket.io', 'client-dist', 'socket.io.js'));
 });
@@ -44,7 +44,7 @@ app.get('/socket.io/socket.io.js', (req, res) => {
 app.use(express.static('dist'));
 app.use(session({ secret: 'sp-club-2026', resave: false, saveUninitialized: false, cookie: { maxAge: 30 * 24 * 3600000, sameSite: 'lax', secure: false } }));
 
-
+// CORS заголовки
 app.use((req, res, next) => {
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
   res.header('Access-Control-Allow-Origin', '*');
@@ -157,6 +157,26 @@ async function ensureTutorChat(userId) {
         name: req.file.originalname,
         size: req.file.size
       });
+    } catch(e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Прокси для файлов (обход CORS и сетевых проблем)
+  app.get('/api/file/:filename', auth, async (req, res) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('uploads')
+        .download(req.params.filename);
+      
+      if (error) return res.status(404).json({ error: 'Файл не найден' });
+      
+      const blob = await data.blob();
+      const buffer = Buffer.from(await blob.arrayBuffer());
+      
+      res.setHeader('Content-Type', blob.type);
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
+      res.send(buffer);
     } catch(e) {
       res.status(500).json({ error: e.message });
     }
