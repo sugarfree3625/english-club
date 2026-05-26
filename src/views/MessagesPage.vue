@@ -46,14 +46,14 @@
             <div v-if="m.message" class="msg-text" v-html="linkify(m.message)"></div>
             <div v-if="m.files && m.files.length" class="msg-files">
               <div v-for="(f, i) in m.files" :key="i" class="msg-file">
-                <img v-if="f.type === 'image'" :src="f.url" class="msg-img" @click="lightbox = f.url" @error="$event.target.style.display='none'">
+                <img v-if="f.type === 'image'" :src="f.proxiedUrl || f.url" class="msg-img" @click="lightbox = f.proxiedUrl || f.url" @error="$event.target.style.display='none'">
                 <div v-else-if="f.type === 'audio'" class="voice-msg">
-                  <button @click="toggleAudio($event, f.url)" class="voice-play-btn interactive-btn">▶️</button>
+                  <button @click="toggleAudio($event, f.proxiedUrl || f.url)" class="voice-play-btn interactive-btn">▶️</button>
                   <div class="voice-wave"><div class="voice-wave-bar" v-for="n in 12" :key="n" :style="{ height: Math.random() * 16 + 4 + 'px' }"></div></div>
                   <span class="voice-label">🎤 Голосовое</span>
                 </div>
-                <video v-else-if="f.type === 'video'" :src="f.url" controls class="msg-video"></video>
-                <a v-else :href="f.url" target="_blank" class="file-link" :download="f.name || 'file'">📎 {{ f.name || 'Файл' }}</a>
+                <video v-else-if="f.type === 'video'" :src="f.proxiedUrl || f.url" controls class="msg-video"></video>
+                <a v-else :href="f.proxiedUrl || f.url" target="_blank" class="file-link" :download="f.name || 'file'">📎 {{ f.name || 'Файл' }}</a>
               </div>
             </div>
             <small class="msg-time">{{ formatTime(m.ts) }}</small>
@@ -110,50 +110,71 @@ export default {
     window.socket = this.socket;
     this.socket.on('connect', () => { console.log('🔌 Сокет подключён, ID:', this.socket.id); this.socket.emit('join', { uid: this.currentUserId, uname: this.user.username, role: this.user.role }); });
     this.socket.on('unread', ({ count }) => { this.unreadCount = count; });
-    this.socket.on('dm', (msg) => { if (typeof msg.files === 'string') { try { msg.files = JSON.parse(msg.files); } catch(e) { msg.files = null; } } if (msg.from === this.currentUserId) { this.loadDialogs(); return; } if (this.activeChat === msg.from) { if (!this.messages.find(m => m.id === msg.id)) { this.messages.push(msg); this.filterMessages(); this.$nextTick(() => this.scrollToBottom()); } } if (document.hidden && msg.from !== this.currentUserId) this.sendBrowserNotification(msg); this.loadDialogs(); });
+    this.socket.on('dm', (msg) => { 
+      if (typeof msg.files === 'string') { try { msg.files = JSON.parse(msg.files); } catch(e) { msg.files = null; } } 
+      msg = this.parseFiles(msg);
+      if (msg.from === this.currentUserId) { this.loadDialogs(); return; } 
+      if (this.activeChat === msg.from) { 
+        if (!this.messages.find(m => m.id === msg.id)) { 
+          this.messages.push(msg); 
+          this.filterMessages(); 
+          this.$nextTick(() => this.scrollToBottom()); 
+        } 
+      } 
+      if (document.hidden && msg.from !== this.currentUserId) this.sendBrowserNotification(msg); 
+      this.loadDialogs(); 
+    });
     this.searchUsers = useDebounce(this.searchUsers, 300);
     document.addEventListener('click', (e) => { if (!e.target.closest('.translate-popup') && !e.target.closest('.msg-actions')) this.showTranslate = false; });
   },
   beforeUnmount() { if (this.socket) { this.socket.disconnect(); this.socket = null; } },
   methods: {
     playSendSound() { if (!this.soundEnabled) return; try { const ctx = new (window.AudioContext || window.webkitAudioContext)(); const osc = ctx.createOscillator(); const gain = ctx.createGain(); osc.connect(gain); gain.connect(ctx.destination); osc.frequency.value = 1200; osc.type = 'sine'; gain.gain.setValueAtTime(0.08, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1); osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.1); } catch(e) {} },
+    
     toggleAudio(e, url) { 
-  const btn = e.target; 
-  const existing = document.querySelector('audio.voice-audio'); 
-  if (existing) { 
-    existing.pause(); 
-    existing.remove(); 
-  } 
-  if (btn.dataset.playing === 'true') { 
-    btn.dataset.playing = 'false'; 
-    btn.textContent = '▶️'; 
-    return; 
-  } 
-  const audio = new Audio(url); 
-  audio.classList.add('voice-audio'); 
-  audio.preload = 'auto';
-  
-  audio.oncanplay = () => {
-    audio.play().catch(e => console.log('Play error:', e));
-    btn.dataset.playing = 'true'; 
-    btn.textContent = '⏸️';
-  };
-  
-  audio.onended = () => { 
-    btn.dataset.playing = 'false'; 
-    btn.textContent = '▶️'; 
-    audio.remove(); 
-  };
-  
-  audio.onerror = () => {
-    btn.dataset.playing = 'false';
-    btn.textContent = '▶️';
-    audio.remove();
-  };
-  
-  document.body.appendChild(audio); 
-  audio.load();
-},
+      const btn = e.target; 
+      const existing = document.querySelector('audio.voice-audio'); 
+      if (existing) { 
+        existing.pause(); 
+        existing.remove(); 
+      } 
+      if (btn.dataset.playing === 'true') { 
+        btn.dataset.playing = 'false'; 
+        btn.textContent = '▶️'; 
+        return; 
+      } 
+      const audio = new Audio(url); 
+      audio.classList.add('voice-audio'); 
+      audio.preload = 'auto';
+      audio.crossOrigin = 'anonymous';
+      
+      audio.oncanplaythrough = () => {
+        audio.play().then(() => {
+          btn.dataset.playing = 'true'; 
+          btn.textContent = '⏸️';
+        }).catch(e => {
+          console.log('Play prevented:', e);
+          btn.dataset.playing = 'false'; 
+          btn.textContent = '▶️';
+        });
+      };
+      
+      audio.onended = () => { 
+        btn.dataset.playing = 'false'; 
+        btn.textContent = '▶️'; 
+        audio.remove(); 
+      };
+      
+      audio.onerror = () => {
+        btn.dataset.playing = 'false';
+        btn.textContent = '▶️';
+        audio.remove();
+      };
+      
+      document.body.appendChild(audio); 
+      audio.load();
+    },
+    
     async translateMsg(m) { if (!m.message) return; const word = m.message.split(' ').find(w => /^[a-zA-Z]+$/.test(w)); if (!word) { this.addToast('Нет английских слов', 'info'); return; } this.selectedWord = word; this.showTranslate = true; this.translating = true; this.translatedText = ''; try { this.translatedText = await translateWord(word); } catch(e) { this.translatedText = 'Ошибка'; } finally { this.translating = false; } },
     async copyTranslation() { try { await navigator.clipboard.writeText(this.translatedText); this.addToast('Перевод скопирован 📋', 'success'); } catch(e) {} },
     formatTime(ts) { if (!ts) return ''; return new Date(ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }); },
@@ -165,9 +186,27 @@ export default {
     async searchUsers() { if (this.searchQuery.length < 2) { this.searchResults = []; return; } try { const r = await axios.get(`/api/users?q=${this.searchQuery}`); this.searchResults = (r.data || []).filter(u => u.id !== this.currentUserId); } catch(e) {} },
     async startChat(u) { this.activeChat = u.id; this.activeChatName = u.username; this.partnerAvatar = u.avatar_url; this.searchQuery = ''; this.searchResults = []; this.showSidebar = false; try { const r = await axios.get(`/api/messages/${u.id}`); this.messages = (r.data || []).map(m => this.parseFiles(m)); this.filterMessages(); this.$nextTick(() => this.scrollToBottom()); } catch(e) {} this.loadDialogs(); },
     async openChat(d) { const pid = d.partner_id || d.id; this.activeChat = pid; this.activeChatName = d.username; this.partnerAvatar = d.avatar_url; this.showSidebar = false; try { const r = await axios.get(`/api/messages/${pid}`); this.messages = (r.data || []).map(m => this.parseFiles(m)); this.filterMessages(); this.$nextTick(() => this.scrollToBottom()); } catch(e) {} },
-    parseFiles(m) { if (!m.files) return m; if (typeof m.files === 'string') { try { m.files = JSON.parse(m.files); } catch(e) { m.files = null; } } return m; },
-    replyTo(msg) { this.msgText = `↩ ${msg.fn || ''}: ${(msg.msg || '').substring(0, 50)}\n`; this.$nextTick(() => { const ta = this.$el.querySelector('textarea'); if (ta) ta.focus(); }); },
+    
+    parseFiles(m) { 
+      if (!m.files) return m; 
+      if (typeof m.files === 'string') { 
+        try { m.files = JSON.parse(m.files); } catch(e) { m.files = null; } 
+      }
+      if (m.files && Array.isArray(m.files)) {
+        m.files = m.files.map(f => ({
+          ...f,
+          proxiedUrl: f.url ? f.url.replace(
+            'https://qmoxemhstzfxirpskext.supabase.co/storage/v1/object/public/uploads/',
+            '/api/file/'
+          ) : null
+        }));
+      }
+      return m; 
+    },
+    
+    replyTo(msg) { this.msgText = `↩ ${msg.fn || ''}: ${(msg.message || msg.msg || '').substring(0, 50)}\n`; this.$nextTick(() => { const ta = this.$el.querySelector('textarea'); if (ta) ta.focus(); }); },
     async deleteMsg(id) { if (confirm('Удалить?')) { try { await axios.delete(`/api/msg/${id}`); this.messages = this.messages.filter(m => m.id !== id); this.filterMessages(); this.addToast('Удалено 🗑', 'success'); } catch(e) {} } },
+    
     async sendMsg() {
       const text = this.msgText.trim();
       if ((!text && !this.pendingFiles.length) || !this.activeChat || !this.socket?.connected) return;
@@ -175,7 +214,6 @@ export default {
       const replyTo = text.startsWith('↩') ? text.split('\n')[0] : null;
       const cleanText = replyTo ? text.split('\n').slice(1).join('\n').trim() : text;
       
-      // Загружаем файлы через новый эндпоинт
       const uploadedFiles = [];
       for (const file of this.pendingFiles) {
         const form = new FormData();
@@ -208,7 +246,7 @@ export default {
         ts: new Date().toISOString()
       };
       
-      this.messages.push(localMsg);
+      this.messages.push(this.parseFiles(localMsg));
       this.filterMessages();
       
       this.socket.emit('dm', {
@@ -223,7 +261,9 @@ export default {
       this.pendingFiles = [];
       this.$nextTick(() => this.scrollToBottom());
     },
+    
     handleFiles(e) { if (e.target.files?.length) { for (const file of e.target.files) { if (file.type.startsWith('image/')) file.preview = URL.createObjectURL(file); this.pendingFiles.push(file); } } e.target.value = ''; },
+    
     async startRecord() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -250,7 +290,7 @@ export default {
                 files: [{ url: r.data.url, type: 'audio', name: 'Голосовое сообщение' }],
                 ts: new Date().toISOString()
               };
-              this.messages.push(voiceMsg);
+              this.messages.push(this.parseFiles(voiceMsg));
               this.filterMessages();
               this.socket.emit('dm', {
                 to: this.activeChat,
