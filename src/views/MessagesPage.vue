@@ -117,7 +117,43 @@ export default {
   beforeUnmount() { if (this.socket) { this.socket.disconnect(); this.socket = null; } },
   methods: {
     playSendSound() { if (!this.soundEnabled) return; try { const ctx = new (window.AudioContext || window.webkitAudioContext)(); const osc = ctx.createOscillator(); const gain = ctx.createGain(); osc.connect(gain); gain.connect(ctx.destination); osc.frequency.value = 1200; osc.type = 'sine'; gain.gain.setValueAtTime(0.08, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1); osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.1); } catch(e) {} },
-    toggleAudio(e, url) { const btn = e.target; const existing = document.querySelector('audio.voice-audio'); if (existing) { existing.pause(); existing.remove(); } if (btn.dataset.playing === 'true') { btn.dataset.playing = 'false'; btn.textContent = '▶️'; return; } const audio = new Audio(url); audio.classList.add('voice-audio'); audio.onended = () => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; audio.remove(); }; audio.play(); btn.dataset.playing = 'true'; btn.textContent = '⏸️'; document.body.appendChild(audio); },
+    toggleAudio(e, url) { 
+  const btn = e.target; 
+  const existing = document.querySelector('audio.voice-audio'); 
+  if (existing) { 
+    existing.pause(); 
+    existing.remove(); 
+  } 
+  if (btn.dataset.playing === 'true') { 
+    btn.dataset.playing = 'false'; 
+    btn.textContent = '▶️'; 
+    return; 
+  } 
+  const audio = new Audio(url); 
+  audio.classList.add('voice-audio'); 
+  audio.preload = 'auto';
+  
+  audio.oncanplay = () => {
+    audio.play().catch(e => console.log('Play error:', e));
+    btn.dataset.playing = 'true'; 
+    btn.textContent = '⏸️';
+  };
+  
+  audio.onended = () => { 
+    btn.dataset.playing = 'false'; 
+    btn.textContent = '▶️'; 
+    audio.remove(); 
+  };
+  
+  audio.onerror = () => {
+    btn.dataset.playing = 'false';
+    btn.textContent = '▶️';
+    audio.remove();
+  };
+  
+  document.body.appendChild(audio); 
+  audio.load();
+},
     async translateMsg(m) { if (!m.message) return; const word = m.message.split(' ').find(w => /^[a-zA-Z]+$/.test(w)); if (!word) { this.addToast('Нет английских слов', 'info'); return; } this.selectedWord = word; this.showTranslate = true; this.translating = true; this.translatedText = ''; try { this.translatedText = await translateWord(word); } catch(e) { this.translatedText = 'Ошибка'; } finally { this.translating = false; } },
     async copyTranslation() { try { await navigator.clipboard.writeText(this.translatedText); this.addToast('Перевод скопирован 📋', 'success'); } catch(e) {} },
     formatTime(ts) { if (!ts) return ''; return new Date(ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }); },
