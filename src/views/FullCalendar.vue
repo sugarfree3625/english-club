@@ -173,7 +173,9 @@ export default {
     openDay(date) { this.slotForm.date = date; this.slotForm.group_students = []; this.showAddSlot = true; },
     openSlot(date, hour, minutes = 0) { if (!this.isTutor) return; this.slotForm = { student_id: '', lesson_type: 'online', title: '', date, time: `${String(hour).padStart(2,'0')}:${String(minutes).padStart(2,'0')}`, duration: 30, notes: '', group_students: [] }; this.editingSlot = null; this.showAddSlot = true; },
     openAddSlot() { this.editingSlot = null; this.slotForm = { student_id: '', lesson_type: 'online', title: '', date: '', time: '', duration: 30, notes: '', group_students: [] }; this.showAddSlot = true; },
-    editSlot(slot) { this.editingSlot = slot; const sd = new Date(slot.start_time); this.slotForm = { student_id: slot.student_id || '', lesson_type: slot.lesson_type || 'online', title: slot.title || '', date: sd.toISOString().split('T')[0], time: sd.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }), duration: Math.round((new Date(slot.end_time) - sd) / 60000) || 30, notes: slot.notes || '', group_students: slot.group_students || [] }; this.showAddSlot = true; },
+    editSlot(slot) { 
+  if (this.dragging || this.resizing) return;
+  this.editingSlot = slot; const sd = new Date(slot.start_time); this.slotForm = { student_id: slot.student_id || '', lesson_type: slot.lesson_type || 'online', title: slot.title || '', date: sd.toISOString().split('T')[0], time: sd.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }), duration: Math.round((new Date(slot.end_time) - sd) / 60000) || 30, notes: slot.notes || '', group_students: slot.group_students || [] }; this.showAddSlot = true; },
     closeModal() { this.showAddSlot = false; this.editingSlot = null; this.slotForm.group_students = []; },
     async saveSlot() {
       try {
