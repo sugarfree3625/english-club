@@ -337,7 +337,16 @@ export default {
       } catch(e) {}
     },
 
-    searchUsers() {},
+    async searchUsers() {
+  console.log('🔍 [SEARCH] Запрос:', this.searchQuery);
+  if (this.searchQuery.length < 2) { this.searchResults = []; return; }
+  try {
+    const r = await axios.get(`/api/users?q=${this.searchQuery}`);
+    console.log('🔍 [SEARCH] Результаты:', r.data?.length);
+    this.searchResults = (r.data || []).filter(u => u.id !== this.currentUserId);
+    console.log('🔍 [SEARCH] После фильтра:', this.searchResults.length);
+  } catch(e) { console.log('❌ [SEARCH] Ошибка:', e); }
+},
     filterMessages() { const q = this.msgSearchQuery.toLowerCase(); this.filteredMessages = q ? this.messages.filter(m => m.message?.toLowerCase().includes(q)) : this.messages; },
     formatTime(ts) { return ts ? new Date(ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : ''; },
     linkify(text) { return text ? text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:#818cf8;text-decoration:underline">$1</a>') : ''; },
