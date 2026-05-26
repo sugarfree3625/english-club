@@ -342,7 +342,16 @@ async function ensureTutorChat(userId) {
       const msg = { id: Date.now(), from: s.uid, fn: s.uname, msg: d.msg || '', files, reply_to: d.replyTo || null, ts: new Date().toISOString() };
       io.to(`u:${d.to}`).emit('dm', msg);
       s.emit('dm', msg);
-      await supabase.from('msg').insert({ sender_id: s.uid, receiver_id: d.to, message: d.msg || '', files: files ? JSON.stringify(files) : null, read: false, reply_to: d.replyTo || null });
+      const { data, error } = await supabase.from('msg').insert({ 
+  sender_id: s.uid, receiver_id: d.to, message: d.msg || '', 
+  files: files ? JSON.stringify(files) : null, read: false, reply_to: d.replyTo || null 
+}).select();
+
+if (error) {
+  console.log('❌ [DB] Ошибка вставки:', JSON.stringify(error));
+} else {
+  console.log('✅ [DB] Сохранено, id:', data?.[0]?.id);
+}
       await updateRating(s.uid, 2);
       if (!onlineUsers.has(d.to)) notifyUser(d.to, `💬 ${s.uname}: ${(d.msg || '📎 Файл').substring(0, 50)}`);
     });
