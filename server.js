@@ -17,7 +17,7 @@ const io = new Server(server, {
 });
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-console.log('📊 Supabase инициализирован');
+console.log('📊 [SERVER] Supabase инициализирован');
 
 const TG_TOKEN = process.env.TG_TOKEN || '';
 const TG_BOT = 'English_Language_Class_Bot';
@@ -30,7 +30,6 @@ function sanitizeHtml(str) {
     .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
 }
 
-// ✅ ИСПРАВЛЕНО: memoryStorage вместо diskStorage
 const upNw = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -92,48 +91,72 @@ async function ensureTutorChat(userId) {
 
 (async () => {
   const { data: admin } = await supabase.from('users').select('id').eq('role', 'admin').single();
-  if (!admin) { const hash = await bcrypt.hash('changeme123', 10); await supabase.from('users').insert({ username: 'Admin', email: 'admin@club.com', password: hash, role: 'admin', level: 'C1', rating: 9999 }); console.log('✅ Админ создан'); }
+  if (!admin) { const hash = await bcrypt.hash('changeme123', 10); await supabase.from('users').insert({ username: 'Admin', email: 'admin@club.com', password: hash, role: 'admin', level: 'C1', rating: 9999 }); console.log('✅ [SERVER] Админ создан'); }
   const { data: settings } = await supabase.from('settings').select('key').eq('key', 'hero_title').single();
   if (!settings) { await supabase.from('settings').insert([{ key: 'hero_title', value: 'Speak English Freely' }, { key: 'hero_subtitle', value: 'Разговорный клуб' }, { key: 'primary_color', value: '#6366f1' }, { key: 'club_name', value: 'English Club' }]); }
 
   // AUTH
   app.post('/api/reg', async (req, res) => { const { username, email, password, level } = req.body; const { data: exists } = await supabase.from('users').select('id').eq('email', email).single(); if (exists) return res.status(400).json({ error: 'Email занят' }); const hash = await bcrypt.hash(password, 10); const { data: newUser } = await supabase.from('users').insert({ username, email, password: hash, level: level || 'B1' }).select('id').single(); if (newUser) ensureTutorChat(newUser.id); res.json({ success: true }); });
   app.post('/api/login', async (req, res) => { const { data: u } = await supabase.from('users').select('*').eq('email', req.body.email).single(); if (!u || !(await bcrypt.compare(req.body.password, u.password))) return res.status(400).json({ error: 'Неверно' }); req.session.userId = u.id; req.session.role = u.role; ensureTutorChat(u.id); res.json({ success: true, user: { id: u.id, username: u.username, role: u.role, level: u.level, rating: u.rating, avatar_url: u.avatar_url, bio: u.bio } }); });
-  // Прокси файлов Supabase через Signed URL
-app.get('/api/file/:filename', async (req, res) => {
-  try {
-    const { data, error } = await supabase.storage
-      .from('uploads')
-      .createSignedUrl(req.params.filename, 3600);
-    
-    if (error || !data?.signedUrl) {
-      return res.status(404).json({ error: 'Файл не найден' });
-    }
-    
-    res.redirect(data.signedUrl);
-  } catch(e) {
-    res.status(500).json({ error: e.message });
-  }
-});
   app.get('/api/me', async (req, res) => { if (!req.session.userId) return res.json({ ok: false }); const { data: u } = await supabase.from('users').select('id,username,role,level,rating,avatar_url,bio').eq('id', req.session.userId).single(); res.json({ ok: true, user: u }); });
   app.put('/api/me', auth, async (req, res) => { const u = {}; if (req.body.avatar_url) u.avatar_url = req.body.avatar_url; if (req.body.bio !== undefined) u.bio = req.body.bio; if (req.body.level) u.level = req.body.level; await supabase.from('users').update(u).eq('id', req.session.userId); res.json({ success: true }); });
   app.post('/api/out', (req, res) => { req.session.destroy(); res.json({ success: true }); });
-  app.post('/api/reset-password', async (req, res) => { console.log(`🔑 Сброс для ${req.body.email}`); res.json({ success: true }); });
+  app.post('/api/reset-password', async (req, res) => { console.log(`🔑 [SERVER] Сброс для ${req.body.email}`); res.json({ success: true }); });
 
-  // ✅ ИСПРАВЛЕНО: загрузка через buffer, без сохранения на диск
+  // FILES — загрузка через buffer
   app.post('/api/nimg', auth, upNw.single('img'), async (req, res) => {
+    console.log('📤 [UPLOAD] Получен файл:', req.file?.originalname, 'размер:', req.file?.size);
     if (!req.file) return res.status(400).json({ error: 'Нет файла' });
     try {
       const name = `nw-${Date.now()}${path.extname(req.file.originalname)}`;
+      console.log('📤 [UPLOAD] Загрузка в Supabase:', name);
       const { error } = await supabase.storage.from('uploads').upload(name, req.file.buffer, {
         contentType: req.file.mimetype, upsert: true
       });
-      if (error) return res.status(500).json({ error: error.message });
-      res.json({
-        success: true,
-        url: supabase.storage.from('uploads').getPublicUrl(name).data.publicUrl
-      });
-    } catch(e) { res.status(500).json({ error: e.message }); }
+      if (error) {
+        console.log('❌ [UPLOAD] Ошибка Supabase:', error.message);
+        return res.status(500).json({ error: error.message });
+      }
+      const publicUrl = supabase.storage.from('uploads').getPublicUrl(name).data.publicUrl;
+      console.log('✅ [UPLOAD] Успех, URL:', publicUrl);
+      res.json({ success: true, url: publicUrl });
+    } catch(e) {
+      console.log('💥 [UPLOAD] Крах:', e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // FILE PROXY — Signed URL
+  app.get('/api/file/:filename', async (req, res) => {
+    console.log('📁 [PROXY] Запрошен файл:', req.params.filename);
+    try {
+      const { data, error } = await supabase.storage
+        .from('uploads')
+        .createSignedUrl(req.params.filename, 3600);
+      
+      if (error) {
+        console.log('❌ [PROXY] Ошибка Signed URL:', error.message);
+        return res.status(404).json({ error: 'Файл не найден' });
+      }
+      if (!data?.signedUrl) {
+        console.log('❌ [PROXY] signedUrl пустой');
+        return res.status(404).json({ error: 'URL не создан' });
+      }
+      
+      console.log('✅ [PROXY] Редирект на Signed URL');
+      res.redirect(data.signedUrl);
+    } catch(e) {
+      console.log('💥 [PROXY] Крах:', e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Логирование API запросов
+  app.use('/api', (req, res, next) => {
+    if (!req.path.startsWith('/file/')) {
+      console.log(`📡 [API] ${req.method} ${req.path}`);
+    }
+    next();
   });
 
   // POSTS
@@ -342,9 +365,27 @@ app.get('/api/file/:filename', async (req, res) => {
   // SOCKET.IO
   const onlineUsers = new Map();
   io.on('connection', s => {
-    s.on('join', d => { s.uid = d.uid; s.uname = d.uname; s.join(`u:${d.uid}`); onlineUsers.set(d.uid, true); supabase.from('msg').select('*', { count: 'exact', head: true }).eq('receiver_id', d.uid).eq('read', false).then(({ count }) => { s.emit('unread', { count: count || 0 }); }); });
-    s.on('disconnect', () => { if (s.uid) onlineUsers.delete(s.uid); });
-    s.on('dm', async d => { if (!s.uid) return; const files = d.files || null; const msg = { id: Date.now(), from: s.uid, fn: s.uname, msg: d.msg || '', files, reply_to: d.replyTo || null, ts: new Date().toISOString() }; io.to(`u:${d.to}`).emit('dm', msg); s.emit('dm', msg); await supabase.from('msg').insert({ sender_id: s.uid, receiver_id: d.to, message: d.msg || '', files: files ? JSON.stringify(files) : null, read: false, reply_to: d.replyTo || null }); await updateRating(s.uid, 2); if (!onlineUsers.has(d.to)) notifyUser(d.to, `💬 ${s.uname}: ${(d.msg||'📎 Файл').substring(0, 50)}`, { sender: s.uname }); });
+    console.log('🔌 [SOCKET] Новое подключение');
+    s.on('join', d => { 
+      console.log('👤 [SOCKET] join:', d.uid, d.uname);
+      s.uid = d.uid; s.uname = d.uname; s.join(`u:${d.uid}`); onlineUsers.set(d.uid, true); 
+      supabase.from('msg').select('*', { count: 'exact', head: true }).eq('receiver_id', d.uid).eq('read', false).then(({ count }) => { s.emit('unread', { count: count || 0 }); }); 
+    });
+    s.on('disconnect', () => { 
+      console.log('🔌 [SOCKET] Отключение:', s.uid);
+      if (s.uid) onlineUsers.delete(s.uid); 
+    });
+    s.on('dm', async d => { 
+      console.log('💬 [SOCKET] dm от', s.uid, '→', d.to, ':', (d.msg || '').substring(0, 30));
+      if (!s.uid) return; 
+      const files = d.files || null; 
+      const msg = { id: Date.now(), from: s.uid, fn: s.uname, msg: d.msg || '', files, reply_to: d.replyTo || null, ts: new Date().toISOString() }; 
+      io.to(`u:${d.to}`).emit('dm', msg); 
+      s.emit('dm', msg); 
+      await supabase.from('msg').insert({ sender_id: s.uid, receiver_id: d.to, message: d.msg || '', files: files ? JSON.stringify(files) : null, read: false, reply_to: d.replyTo || null }); 
+      await updateRating(s.uid, 2); 
+      if (!onlineUsers.has(d.to)) notifyUser(d.to, `💬 ${s.uname}: ${(d.msg||'📎 Файл').substring(0, 50)}`, { sender: s.uname }); 
+    });
     s.on('joinGroup', gid => { s.join(`group:${gid}`); });
     s.on('groupMsg', async d => { if (!s.uid) return; const msg = { id: Date.now(), from: s.uid, fn: s.uname, msg: d.msg || '', ts: new Date().toISOString() }; io.to(`group:${d.groupId}`).emit('groupMsg', msg); await supabase.from('group_messages').insert({ group_id: d.groupId, sender_id: s.uid, message: d.msg || '' }); await updateRating(s.uid, 3); });
   });
@@ -352,7 +393,7 @@ app.get('/api/file/:filename', async (req, res) => {
   setInterval(async () => { try { const { data: files } = await supabase.storage.from('uploads').list(); if (files) { const now = new Date(); for (const f of files) { if ((now - new Date(f.created_at)) / 86400000 > 180) await supabase.storage.from('uploads').remove([f.name]); } } } catch(e) {} }, 86400000);
 
   app.get('*', (req, res) => { if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io')) return res.status(404).json({ error: 'Not found' }); res.sendFile(path.join(__dirname, 'dist', 'index.html')); });
-  server.listen(process.env.PORT || 3000, () => { console.log('🚀 Сервер запущен'); });
+  server.listen(process.env.PORT || 3000, () => { console.log('🚀 [SERVER] Сервер запущен на порту', process.env.PORT || 3000); });
   setInterval(async () => { try { const now = new Date(); const inOneHour = new Date(now.getTime() + 3600000); const { data: sessions } = await supabase.from('sessions').select('*, users!host_id(username)').gte('date', now.toISOString()).lte('date', inOneHour.toISOString()); if (sessions) for (const s of sessions) { notifyUser(s.host_id, `🔔 Через час: "${s.title}"`); const { data: bookings } = await supabase.from('bookings').select('user_id').eq('session_id', s.id).eq('status', 'active'); if (bookings) for (const b of bookings) { if (b.user_id !== s.host_id) notifyUser(b.user_id, `🔔 Через час: "${s.title}"`); } } } catch(e) {} }, 1800000);
 
   // TELEGRAM BOT
@@ -373,6 +414,6 @@ app.get('/api/file/:filename', async (req, res) => {
           else if (text === '/help' || text === '❓ Помощь') { await sendMsg(chatId, '<b>Команды:</b>\n📅 Расписание\n📝 Задания\n📊 Статистика\n👤 Профиль\n📊 Фидбеки\n📚 Слова\n🏆 Топ'); }
           else if (text.startsWith('/')) { await sendMsg(chatId, '❓ /help', mainKeyboard); }
         } } catch(e) {} }, 2000);
-    console.log('🤖 Telegram бот запущен');
+    console.log('🤖 [SERVER] Telegram бот запущен');
   }
 })();
