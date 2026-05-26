@@ -99,6 +99,22 @@ async function ensureTutorChat(userId) {
   // AUTH
   app.post('/api/reg', async (req, res) => { const { username, email, password, level } = req.body; const { data: exists } = await supabase.from('users').select('id').eq('email', email).single(); if (exists) return res.status(400).json({ error: 'Email занят' }); const hash = await bcrypt.hash(password, 10); const { data: newUser } = await supabase.from('users').insert({ username, email, password: hash, level: level || 'B1' }).select('id').single(); if (newUser) ensureTutorChat(newUser.id); res.json({ success: true }); });
   app.post('/api/login', async (req, res) => { const { data: u } = await supabase.from('users').select('*').eq('email', req.body.email).single(); if (!u || !(await bcrypt.compare(req.body.password, u.password))) return res.status(400).json({ error: 'Неверно' }); req.session.userId = u.id; req.session.role = u.role; ensureTutorChat(u.id); res.json({ success: true, user: { id: u.id, username: u.username, role: u.role, level: u.level, rating: u.rating, avatar_url: u.avatar_url, bio: u.bio } }); });
+  // Прокси файлов Supabase через Signed URL
+app.get('/api/file/:filename', async (req, res) => {
+  try {
+    const { data, error } = await supabase.storage
+      .from('uploads')
+      .createSignedUrl(req.params.filename, 3600);
+    
+    if (error || !data?.signedUrl) {
+      return res.status(404).json({ error: 'Файл не найден' });
+    }
+    
+    res.redirect(data.signedUrl);
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
   app.get('/api/me', async (req, res) => { if (!req.session.userId) return res.json({ ok: false }); const { data: u } = await supabase.from('users').select('id,username,role,level,rating,avatar_url,bio').eq('id', req.session.userId).single(); res.json({ ok: true, user: u }); });
   app.put('/api/me', auth, async (req, res) => { const u = {}; if (req.body.avatar_url) u.avatar_url = req.body.avatar_url; if (req.body.bio !== undefined) u.bio = req.body.bio; if (req.body.level) u.level = req.body.level; await supabase.from('users').update(u).eq('id', req.session.userId); res.json({ success: true }); });
   app.post('/api/out', (req, res) => { req.session.destroy(); res.json({ success: true }); });
