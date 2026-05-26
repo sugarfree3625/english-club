@@ -50,14 +50,14 @@
             <div v-if="m.message" class="msg-text" v-html="linkify(m.message)"></div>
             <div v-if="m.files && m.files.length" class="msg-files">
               <div v-for="(f, i) in m.files" :key="i" class="msg-file">
-                <img v-if="f.type === 'image'" :src="f.url" class="msg-img" @click="lightbox = f.url">
+                <img v-if="f.type === 'image'" :src="proxifyUrl(f.url)" class="msg-img" @click="lightbox = proxifyUrl(f.url)" @error="$event.target.style.display='none'">
                 <div v-else-if="f.type === 'audio'" class="voice-msg">
-                  <button @click="toggleAudio($event, f.url)" class="voice-play-btn interactive-btn">▶️</button>
+                  <button @click="toggleAudio($event, proxifyUrl(f.url))" class="voice-play-btn interactive-btn">▶️</button>
                   <div class="voice-wave"><div class="voice-wave-bar" v-for="n in 12" :key="n" :style="{ height: Math.random() * 16 + 4 + 'px' }"></div></div>
                   <span class="voice-label">🎤 Голосовое</span>
                 </div>
-                <video v-else-if="f.type === 'video'" :src="f.url" controls class="msg-video"></video>
-                <a v-else :href="f.url" target="_blank" class="file-link" :download="f.name || 'file'">📎 {{ f.name || 'Файл' }}</a>
+                <video v-else-if="f.type === 'video'" :src="proxifyUrl(f.url)" controls class="msg-video"></video>
+                <a v-else :href="proxifyUrl(f.url)" target="_blank" class="file-link" :download="f.name || 'file'">📎 {{ f.name || 'Файл' }}</a>
               </div>
             </div>
             <small class="msg-time">{{ formatTime(m.ts) }}</small>
@@ -127,6 +127,13 @@ export default {
     async translateMsg(m) { if (!m.message) return; const word = m.message.split(' ').find(w => /^[a-zA-Z]+$/.test(w)); if (!word) { this.addToast('Нет английских слов', 'info'); return; } this.selectedWord = word; this.showTranslate = true; this.translating = true; this.translatedText = ''; try { this.translatedText = await translateWord(word); } catch(e) { this.translatedText = 'Ошибка'; } finally { this.translating = false; } },
     async copyTranslation() { try { await navigator.clipboard.writeText(this.translatedText); this.addToast('Перевод скопирован 📋', 'success'); } catch(e) {} },
     formatTime(ts) { if (!ts) return ''; return new Date(ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }); },
+    proxifyUrl(url) {
+      if (!url) return '';
+      return url.replace(
+        'https://qmoxemhstzfxirpskext.supabase.co/storage/v1/object/public/uploads/',
+        '/api/file/'
+      );
+    },
     sendBrowserNotification(msg) { if ('Notification' in window && Notification.permission === 'granted') { try { new Notification(`💬 ${msg.fn || 'Новое сообщение'}`, { body: (msg.msg || '📎 Файл').substring(0, 100), icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🗣️</text></svg>', tag: 'engclub' }); } catch(e) {} } },
     linkify(text) { if (!text) return ''; return text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:#818cf8;text-decoration:underline">$1</a>'); },
     filterMessages() { const q = this.msgSearchQuery.toLowerCase(); this.filteredMessages = q ? this.messages.filter(m => m.message?.toLowerCase().includes(q)) : this.messages; },
