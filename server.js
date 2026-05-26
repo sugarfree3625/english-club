@@ -30,17 +30,13 @@ function sanitizeHtml(str) {
     .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
 }
 
-const nwStorage = multer.diskStorage({
-  destination: (r, f, cb) => { const d = 'uploads/tmp'; if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); cb(null, d); },
-  filename: (r, f, cb) => cb(null, `nw-${Date.now()}${path.extname(f.originalname)}`)
-});
-const upNw = multer({ storage: nwStorage, limits: { fileSize: 10 * 1024 * 1024 } });
+const upNw = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(express.static('dist'));
 app.use(session({ secret: 'sp-club-2026', resave: false, saveUninitialized: false, cookie: { maxAge: 30 * 24 * 3600000, sameSite: 'lax', secure: false } }));
-['uploads/tmp'].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
+
 
 function auth(req, res, next) { req.session.userId ? next() : res.status(401).json({ error: 'Войдите' }); }
 
@@ -109,10 +105,23 @@ async function ensureTutorChat(userId) {
   app.post('/api/reset-password', async (req, res) => { console.log(`🔑 Сброс для ${req.body.email}`); res.json({ success: true }); });
 
   // FILES
-  app.post('/api/nimg', auth, upNw.single('img'), async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: 'Нет файла' });
-    try { const buf = fs.readFileSync(req.file.path); const name = `nw-${Date.now()}${path.extname(req.file.originalname)}`; const { error } = await supabase.storage.from('uploads').upload(name, buf, { contentType: req.file.mimetype, upsert: true }); fs.unlinkSync(req.file.path); if (error) return res.status(500).json({ error: error.message }); res.json({ success: true, url: supabase.storage.from('uploads').getPublicUrl(name).data.publicUrl }); } catch(e) { res.status(500).json({ error: e.message }); }
-  });
+app.post('/api/nimg', auth, upNw.single('img'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Нет файла' });
+  try {
+    const name = `nw-${Date.now()}${path.extname(req.file.originalname)}`;
+    const { error } = await supabase.storage.from('uploads').upload(name, req.file.buffer, {
+      contentType: req.file.mimetype,
+      upsert: true
+    });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({
+      success: true,
+      url: supabase.storage.from('uploads').getPublicUrl(name).data.publicUrl
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
   // POSTS
   app.get('/api/posts', auth, async (req, res) => { const page = parseInt(req.query.page) || 0; const limit = 20; const { data } = await supabase.from('posts').select('*, users!author_id(username, avatar_url), categories(name)').order('pinned', { ascending: false }).order('ts', { ascending: false }).range(page*limit, (page+1)*limit-1); res.json(data?.map(p => ({ ...p, an: p.users?.username, aa: p.users?.avatar_url, category: p.categories?.name })) || []); });
