@@ -13,7 +13,8 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
-  transports: ['websocket', 'polling']
+  transports: ['websocket', 'polling'],
+  path: '/socket.io'  // ← ДОБАВЛЕНО
 });
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
@@ -34,6 +35,12 @@ const upNw = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
+
+// Отдача socket.io клиента — ДОБАВЛЕНО
+app.get('/socket.io/socket.io.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'node_modules', 'socket.io', 'client-dist', 'socket.io.js'));
+});
+
 app.use(express.static('dist'));
 app.use(session({ secret: 'sp-club-2026', resave: false, saveUninitialized: false, cookie: { maxAge: 30 * 24 * 3600000, sameSite: 'lax', secure: false } }));
 
