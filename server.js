@@ -30,7 +30,7 @@ function sanitizeHtml(str) {
     .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
 }
 
-const upNw = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const upNw = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
@@ -121,8 +121,8 @@ async function ensureTutorChat(userId) {
       console.log('✅ [UPLOAD] Успех, URL:', publicUrl);
       res.json({ success: true, url: publicUrl });
     } catch(e) {
-      console.log('💥 [UPLOAD] Крах:', e.message);
-      res.status(500).json({ error: e.message });
+      console.log('💥 [UPLOAD] Крах:', e.message, '| статус:', e.statusCode, '| ошибка:', e.error);
+      res.status(500).json({ error: e.message || 'Ошибка загрузки' });
     }
   });
 
