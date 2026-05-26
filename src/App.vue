@@ -35,12 +35,18 @@
         </div>
       </div>
     </header>
+
+    <!-- Приветственное окно (возвращающимся) -->
+    <WelcomeModal v-if="showWelcome" :user="user" @close="showWelcome = false" />
+
     <router-view v-slot="{ Component }">
       <transition name="page-fade" mode="out-in">
         <component :is="Component" :user="user" :settings="settings" @update-user="user = $event" />
       </transition>
     </router-view>
     <ScrollToTop />
+
+    <!-- Глобальный поиск -->
     <div class="modal-overlay" v-if="showGlobalSearch" @click.self="showGlobalSearch = false">
       <div class="global-search-modal">
         <div class="global-search-header"><i class="fas fa-search"></i><input ref="globalSearchInput" v-model="globalSearchQuery" @input="globalSearch" placeholder="Поиск по сайту... (Esc для закрытия)" class="global-search-input" @keydown.esc="showGlobalSearch = false"><span class="search-shortcut-badge">ESC</span></div>
@@ -51,15 +57,23 @@
         <div v-else-if="globalSearchQuery.length >= 2" class="search-empty">Ничего не найдено</div>
       </div>
     </div>
+
+    <!-- Онбординг (новые пользователи) -->
     <div class="onboarding-overlay" v-if="showOnboarding">
       <div class="onboarding-card"><div class="onboarding-icon">{{ onboardingSteps[currentOnboardingStep].icon }}</div><h2>{{ onboardingSteps[currentOnboardingStep].title }}</h2><p>{{ onboardingSteps[currentOnboardingStep].text }}</p><div class="onboarding-steps"><div v-for="(step, i) in onboardingSteps" :key="i" class="onboarding-step-dot" :class="{ active: i === currentOnboardingStep }"></div></div><div class="onboarding-actions"><button v-if="currentOnboardingStep > 0" class="btn btn-o btn-sm" @click="currentOnboardingStep--">← Назад</button><button class="btn btn-p btn-sm" @click="nextOnboardingStep">{{ currentOnboardingStep < onboardingSteps.length - 1 ? 'Далее →' : 'Понятно! 🎉' }}</button></div><button class="onboarding-skip" @click="showOnboarding = false">Пропустить</button></div>
     </div>
+
+    <!-- Тосты -->
     <div class="toast-container">
       <transition-group name="toast-list">
         <div v-for="toast in toasts" :key="toast.id" class="toast" :class="toast.type" @click="removeToast(toast.id)"><span class="toast-icon">{{ toast.type === 'error' ? '❌' : toast.type === 'success' ? '✅' : 'ℹ️' }}</span><span class="toast-msg">{{ toast.message }}</span></div>
       </transition-group>
     </div>
+
+    <!-- Логин -->
     <div class="modal-overlay" v-if="showLogin" @click.self="showLogin = false"><div class="modal"><h3>👋 Войти</h3><input class="input" v-model="loginEmail" placeholder="Email"><input class="input" v-model="loginPassword" placeholder="Пароль" type="password"><button class="btn btn-p w-100 ripple" @click="login">Войти</button><p style="margin-top:14px;text-align:center;font-size:0.85rem;color:var(--t2)">Нет аккаунта? <a href="#" @click.prevent="showLogin=false;showReg=true" style="color:var(--p);font-weight:600">Регистрация</a></p><button class="btn btn-o w-100 mt-2" @click="showLogin=false">Закрыть</button></div></div>
+
+    <!-- Регистрация -->
     <div class="modal-overlay" v-if="showReg" @click.self="showReg = false"><div class="modal"><h3>✨ Регистрация</h3><input class="input" v-model="regUsername" placeholder="Имя"><input class="input" v-model="regEmail" placeholder="Email"><input class="input" v-model="regPassword" placeholder="Пароль" type="password"><select class="input" v-model="regLevel"><option value="A1">🟢 Beginner</option><option value="B1" selected>🔵 Intermediate</option><option value="C1">🟣 Advanced</option></select><button class="btn btn-p w-100 ripple" @click="register">Зарегистрироваться</button><p style="margin-top:14px;text-align:center;font-size:0.85rem;color:var(--t2)">Есть аккаунт? <a href="#" @click.prevent="showReg=false;showLogin=true" style="color:var(--p);font-weight:600">Войти</a></p><button class="btn btn-o w-100 mt-2" @click="showReg=false">Закрыть</button></div></div>
   </div>
 </template>
@@ -67,14 +81,15 @@
 <script>
 import axios from 'axios';
 import ScrollToTop from './components/ScrollToTop.vue';
+import WelcomeModal from './components/WelcomeModal.vue';
 
 export default {
   name: 'App',
-  components: { ScrollToTop },
+  components: { ScrollToTop, WelcomeModal },
   data() { 
     return { 
       user: null, settings: {}, isDark: false, menuOpen: false, 
-      showLogin: false, showReg: false, 
+      showLogin: false, showReg: false, showWelcome: false,
       loginEmail: '', loginPassword: '', regUsername: '', regEmail: '', regPassword: '', regLevel: 'B1',
       toasts: [], toastId: 0,
       showGlobalSearch: false, globalSearchQuery: '', globalResults: { posts: [], sessions: [] },
@@ -96,12 +111,13 @@ export default {
     handleGlobalKeydown(e) { if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();this.showGlobalSearch=true;this.$nextTick(()=>this.$refs.globalSearchInput?.focus());} if(e.key==='Escape'){this.showGlobalSearch=false;this.menuOpen=false;} },
     nextOnboardingStep() { if(this.currentOnboardingStep<this.onboardingSteps.length-1){this.currentOnboardingStep++;}else{this.showOnboarding=false;localStorage.setItem('onboarding_done','true');} },
     checkOnboarding() { if(!localStorage.getItem('onboarding_done')&&this.user){setTimeout(()=>{this.showOnboarding=true;},1000);} },
-    async login() { try{const r=await axios.post('/api/login',{email:this.loginEmail,password:this.loginPassword});if(r.data.success){this.user=r.data.user;this.showLogin=false;this.loginEmail='';this.loginPassword='';this.addToast('Добро пожаловать! 👋','success');this.$router.push('/dashboard');this.checkOnboarding();}}catch(e){this.addToast(e.response?.data?.error||'Ошибка входа','error');} },
+    checkWelcome() { if(this.user&&!localStorage.getItem('welcome_dismissed')){setTimeout(()=>{this.showWelcome=true;},800);} },
+    async login() { try{const r=await axios.post('/api/login',{email:this.loginEmail,password:this.loginPassword});if(r.data.success){this.user=r.data.user;this.showLogin=false;this.loginEmail='';this.loginPassword='';this.addToast('Добро пожаловать! 👋','success');this.$router.push('/dashboard');this.checkOnboarding();this.checkWelcome();}}catch(e){this.addToast(e.response?.data?.error||'Ошибка входа','error');} },
     async register() { try{const r=await axios.post('/api/reg',{username:this.regUsername,email:this.regEmail,password:this.regPassword,level:this.regLevel});if(r.data.success){this.showReg=false;this.showLogin=true;this.addToast('Регистрация успешна! ✨','success');}}catch(e){this.addToast(e.response?.data?.error||'Ошибка регистрации','error');} },
     async logout() { if(!confirm('Выйти из аккаунта?'))return; try{await axios.post('/api/out');this.addToast('До встречи! 👋','info');}catch(e){} this.user=null;this.menuOpen=false;this.$router.push('/'); }
   },
   async created() {
-    try{const r=await axios.get('/api/me');if(r.data.ok){this.user=r.data.user;this.checkOnboarding();}}catch(e){}
+    try{const r=await axios.get('/api/me');if(r.data.ok){this.user=r.data.user;this.checkOnboarding();this.checkWelcome();}}catch(e){}
     try{const s=await axios.get('/api/settings');this.settings=s.data;}catch(e){}
     const saved=localStorage.getItem('theme');
     if(saved==='dark'){this.isDark=true;document.body.classList.add('dark');}
