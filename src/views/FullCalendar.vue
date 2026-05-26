@@ -31,21 +31,19 @@
         <div class="week-header-cell" v-for="day in weekDaysList" :key="day.date" :class="{ today: day.isToday }">{{ day.name }}<br>{{ day.dateStr }}</div>
         <template v-for="hour in hours" :key="hour">
           <div class="week-time-cell">{{ hour }}:00</div>
-          <div class="week-day-column" v-for="day in weekDaysList" :key="day.date + hour + ':00'" :class="{ today: day.isToday }">
-            <div class="week-bg-cell"></div>
-            <div class="week-bg-cell week-bg-half"></div>
-          </div>
+          <div class="week-bg-cell" v-for="day in weekDaysList" :key="'bg'+day.date+hour+':00'" :class="{ today: day.isToday }"></div>
+          <div class="week-time-cell week-time-half">:30</div>
+          <div class="week-bg-cell week-bg-half" v-for="day in weekDaysList" :key="'bg'+day.date+hour+':30'" :class="{ today: day.isToday }"></div>
         </template>
-        <template v-for="(day, dayIdx) in weekDaysList" :key="'col-' + day.date">
-          <div class="day-slots-column" :style="{ gridColumn: dayIdx + 2, gridRow: '1 / -1' }">
-            <div v-for="slot in getDaySlots(day.date)" :key="slot.id" class="slot-block" :class="getSlotColor(slot.lesson_type)" :style="getSlotStyle(slot)" @mousedown="startDrag($event, slot)" @click.stop="editSlot(slot)">
-              <div class="slot-time-label">{{ formatTime(slot.start_time) }} - {{ formatTime(slot.end_time) }}</div>
-              <div class="slot-block-title">{{ slot.title }}</div>
-              <div class="slot-block-student">{{ slot.users?.username || (slot.group_students?.length ? '👥 Группа' : '—') }}</div>
-              <div class="resize-handle" @mousedown.stop="startResize($event, slot)"></div>
-            </div>
+        <div class="slots-layer">
+          <div v-for="slot in weekSlots" :key="slot.id" class="slot-block" :class="getSlotColor(slot.lesson_type)" :style="getSlotStyle(slot)" @mousedown="startDrag($event, slot)" @click.stop="editSlot(slot)">
+            <div class="slot-time-label">{{ formatTime(slot.start_time) }} - {{ formatTime(slot.end_time) }}</div>
+            <div class="slot-block-title">{{ slot.title }}</div>
+            <div class="slot-block-student">{{ slot.users?.username || (slot.group_students?.length ? '👥 Группа' : '—') }}</div>
+            <a v-if="slot.meeting_link" :href="slot.meeting_link" target="_blank" class="slot-join-btn" @click.stop title="Подключиться">📹</a>
+            <div class="resize-handle" @mousedown.stop="startResize($event, slot)"></div>
           </div>
-        </template>
+        </div>
       </div>
     </div>
 
@@ -93,6 +91,7 @@
           <button v-if="editingSlot" class="btn btn-o btn-sm" style="color:#ef4444" @click="deleteSlot(editingSlot.id)">🗑</button>
           <button class="btn btn-o btn-sm" @click="closeModal">Отмена</button>
         </div>
+        <a v-if="editingSlot?.meeting_link" :href="editingSlot.meeting_link" target="_blank" class="btn btn-p btn-sm w-100 mt-2">📹 Подключиться</a>
       </div>
     </div>
   </div>
@@ -154,6 +153,12 @@ export default {
       });
     },
     weekLabel() { return this.weekDaysList.length ? `${this.weekDaysList[0].dateStr} — ${this.weekDaysList[6].dateStr}` : ''; },
+    weekSlots() {
+      const weekStart = this.weekDaysList[0]?.date;
+      const weekEnd = this.weekDaysList[6]?.date;
+      if (!weekStart || !weekEnd) return [];
+      return this.slots.filter(s => { const sd = new Date(s.start_time).toISOString().split('T')[0]; return sd >= weekStart && sd <= weekEnd; }).sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+    },
     pastSlots() { return this.slots.filter(s => new Date(s.start_time) < new Date()); },
   },
   async mounted() {
@@ -175,14 +180,20 @@ export default {
     getSlotStyle(slot) {
       const sd = new Date(slot.start_time);
       const ed = new Date(slot.end_time);
-      if (ed < sd) [slot.start_time, slot.end_time] = [slot.end_time, slot.start_time];
+      if (ed < sd) return { display: 'none' };
+      const dayIndex = this.weekDaysList.findIndex(d => d.date === sd.toISOString().split('T')[0]);
+      if (dayIndex === -1) return { display: 'none' };
       const startHour = 8, totalMinutes = 14 * 60;
       const slotStart = (sd.getHours() - startHour) * 60 + sd.getMinutes();
       const slotEnd = (ed.getHours() - startHour) * 60 + ed.getMinutes();
       const duration = Math.max(slotEnd - slotStart, 30);
-      const clampedStart = Math.max(0, Math.min(slotStart, totalMinutes - 30));
-      const clampedDuration = Math.min(duration, totalMinutes - clampedStart);
-      return { top: (clampedStart / totalMinutes * 100) + '%', height: (clampedDuration / totalMinutes * 100) + '%', minHeight: '20px' };
+      return {
+        top: (slotStart / totalMinutes * 100) + '%',
+        height: (duration / totalMinutes * 100) + '%',
+        left: `calc(70px + ${dayIndex} * (100% - 70px) / 7 + 2px)`,
+        width: `calc((100% - 70px) / 7 - 4px)`,
+        minHeight: '20px',
+      };
     },
     formatDate(ts) { return ts ? new Date(ts).toLocaleDateString('ru', { day: 'numeric', month: 'short' }) : ''; },
     formatTime(ts) { return ts ? new Date(ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : ''; },
@@ -292,18 +303,19 @@ export default {
 .week-header-cell.today { background: rgba(99,102,241,0.08); }
 .week-time-cell { background: var(--bg); font-weight: 600; text-align: center; padding: 8px; border-bottom: 1px solid var(--b); font-size: 0.75rem; }
 .week-time-half { font-size: 0.65rem; color: var(--t2); }
-.week-day-column { position: relative; border-right: 1px solid var(--b); }
-.week-bg-cell { min-height: 50px; border-bottom: 1px solid var(--b); }
+.week-bg-cell { min-height: 50px; border-bottom: 1px solid var(--b); border-right: 1px solid var(--b); }
 .week-bg-half { border-bottom: 1px dashed rgba(0,0,0,0.05); }
 .week-bg-cell.today { background: rgba(99,102,241,0.02); }
 body.dark .week-bg-half { border-bottom: 1px dashed rgba(255,255,255,0.05); }
-.day-slots-column { position: relative; margin-top: 44px; pointer-events: none; }
-.day-slots-column .slot-block { position: absolute; left: 2px; right: 2px; padding: 6px 8px; border-radius: 6px; color: #fff; font-size: 0.75rem; cursor: grab; pointer-events: auto; overflow: hidden; transition: box-shadow 0.2s; }
+.slots-layer { position: absolute; top: 44px; left: 0; right: 0; bottom: 0; pointer-events: none; }
+.slot-block { position: absolute; padding: 6px 8px; border-radius: 6px; color: #fff; font-size: 0.75rem; cursor: grab; pointer-events: auto; overflow: hidden; transition: box-shadow 0.2s; }
 .slot-block:active { cursor: grabbing; }
 .slot-block:hover { box-shadow: 0 0 0 2px rgba(255,255,255,0.5); z-index: 10; }
 .slot-time-label { font-size: 0.65rem; opacity: 0.9; margin-bottom: 2px; }
 .slot-block-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .slot-block-student { font-size: 0.65rem; opacity: 0.8; }
+.slot-join-btn { position: absolute; top: 4px; right: 4px; font-size: 0.8rem; text-decoration: none; opacity: 0.7; }
+.slot-join-btn:hover { opacity: 1; }
 .resize-handle { position: absolute; bottom: 0; left: 0; right: 0; height: 8px; cursor: ns-resize; background: transparent; }
 .resize-handle:hover { background: rgba(255,255,255,0.3); }
 .history-section { margin-top: 32px; }
@@ -325,4 +337,6 @@ body.dark .week-bg-half { border-bottom: 1px dashed rgba(255,255,255,0.05); }
 .btn-p { background: linear-gradient(135deg, var(--p), var(--p2)); color: #fff; }
 .btn-o { border: 2px solid var(--b); color: var(--t); background: transparent; }
 .btn-sm { padding: 7px 16px; font-size: 0.8rem; }
+.mt-2 { margin-top: 12px; }
+.w-100 { width: 100%; }
 </style>
