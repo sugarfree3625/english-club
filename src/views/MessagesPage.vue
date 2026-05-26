@@ -46,7 +46,7 @@
             <div v-if="m.message" class="msg-text" v-html="linkify(m.message)"></div>
             <div v-if="m.files && m.files.length" class="msg-files">
               <div v-for="(f, i) in m.files" :key="i" class="msg-file">
-                <img v-if="f.type === 'image'" :src="f.url" class="msg-img" @click="lightbox = f.url">
+                <img v-if="f.type === 'image'" :src="f.url" class="msg-img" @click="lightbox = f.url" @error="$event.target.style.display='none'">
                 <div v-else-if="f.type === 'audio'" class="voice-msg">
                   <button @click="toggleAudio($event, f.url)" class="voice-play-btn interactive-btn">▶️</button>
                   <div class="voice-wave"><div class="voice-wave-bar" v-for="n in 12" :key="n" :style="{ height: Math.random() * 16 + 4 + 'px' }"></div></div>
