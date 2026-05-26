@@ -215,146 +215,107 @@ async function ensureTutorChat(userId) {
   });
 
   // ========== НОВЫЙ КАЛЕНДАРЬ (SLOTS) ==========
-app.get('/api/slots', auth, async (req, res) => {
-  try {
-    const uid = req.session.userId;
-    let query = supabase.from('schedule_slots').select('*, users!student_id(username, avatar_url, level)');
-    if (req.session.role === 'admin' || req.session.role === 'host') {
-      query = query.eq('tutor_id', parseInt(uid));
-    } else if (req.session.role === 'parent') {
-      const { data: links } = await supabase.from('student_parents').select('student_id').eq('parent_id', uid);
-      const ids = (links || []).map(l => l.student_id);
-      if (ids.length > 0) query = query.in('student_id', ids);
-      else return res.json([]);
-    } else {
-      query = query.eq('student_id', uid);
-    }
-    const { data, error } = await query.order('start_time', { ascending: true });
-    if (error) return res.json([]);
-    res.json(data || []);
-  } catch(e) { res.json([]); }
-});
-
-app.post('/api/slots', auth, async (req, res) => {
-  if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' });
-  const { student_id, start_time, end_time, lesson_type, title, notes, meeting_link, group_students } = req.body;
-  
-  const { data: overlapping } = await supabase.from('schedule_slots').select('id').eq('tutor_id', req.session.userId).lt('start_time', end_time).gt('end_time', start_time);
-  if (overlapping?.length) return res.status(409).json({ error: 'Пересечение с другим занятием' });
-  
-  const slot = { tutor_id: req.session.userId, student_id: lesson_type?.startsWith('group') ? null : student_id, start_time, end_time, lesson_type: lesson_type || 'online', title: title || 'Занятие', notes, meeting_link: meeting_link || ((lesson_type === 'online' || lesson_type === 'group-online') ? `https://meet.jit.si/english-club-${Date.now()}` : null), group_students: group_students || [] };
-  await supabase.from('schedule_slots').insert(slot);
-  
-  if (student_id && !lesson_type?.startsWith('group')) {
-    notifyUser(student_id, `📅 ${title || 'Занятие'}`, { lesson: { title: title || 'Занятие', time: new Date(start_time).toLocaleString('ru'), type: lesson_type === 'online' ? '🟢 Онлайн' : '🔵 Очно' } });
-  }
-  if (group_students?.length) {
-    for (const gs of group_students) notifyUser(gs, `📅 Групповое: ${title || 'Занятие'}`);
-  }
-  res.json({ success: true });
-});
-
-app.put('/api/slots/:id', auth, async (req, res) => {
-  if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' });
-  const { student_id, start_time, end_time, lesson_type, title, notes, status, group_students } = req.body;
-  
-  if (start_time && end_time) {
-    const { data: overlapping } = await supabase.from('schedule_slots').select('id').eq('tutor_id', req.session.userId).neq('id', parseInt(req.params.id)).lt('start_time', end_time).gt('end_time', start_time);
-    if (overlapping?.length) return res.status(409).json({ error: 'Пересечение с другим занятием' });
-  }
-  
-  const updates = {};
-  if (student_id !== undefined) updates.student_id = lesson_type?.startsWith('group') ? null : student_id;
-  if (start_time) updates.start_time = start_time;
-  if (end_time) updates.end_time = end_time;
-  if (lesson_type) updates.lesson_type = lesson_type;
-  if (title) updates.title = title;
-  if (notes !== undefined) updates.notes = notes;
-  if (status) updates.status = status;
-  if (group_students !== undefined) updates.group_students = group_students;
-  
-  await supabase.from('schedule_slots').update(updates).eq('id', req.params.id);
-  res.json({ success: true });
-});
-
-// НОВЫЙ МАРШРУТ: перемещение слота с автосдвигом пересекающихся
-app.put('/api/slots/:id/move', auth, async (req, res) => {
-  if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' });
-  
-  const slotId = parseInt(req.params.id);
-  const { start_time, end_time } = req.body;
-  
-  if (!start_time || !end_time) return res.status(400).json({ error: 'Нужны start_time и end_time' });
-  
-  const newStart = new Date(start_time);
-  const newEnd = new Date(end_time);
-  const duration = newEnd - newStart;
-  
-  // Получаем текущий слот
-  const { data: currentSlot } = await supabase.from('schedule_slots').select('*').eq('id', slotId).single();
-  if (!currentSlot) return res.status(404).json({ error: 'Слот не найден' });
-  
-  // Находим все слоты, которые пересекаются с новым временем (кроме перемещаемого)
-  const { data: conflicts } = await supabase.from('schedule_slots')
-    .select('*')
-    .eq('tutor_id', req.session.userId)
-    .neq('id', slotId)
-    .lt('start_time', end_time)
-    .gt('end_time', start_time)
-    .order('start_time', { ascending: true });
-  
-  // Обновляем перемещаемый слот
-  await supabase.from('schedule_slots').update({ start_time, end_time }).eq('id', slotId);
-  
-  // Сдвигаем конфликтующие слоты вниз
-  if (conflicts?.length) {
-    let shiftEnd = newEnd;
-    for (const conflict of conflicts) {
-      const conflictDuration = new Date(conflict.end_time) - new Date(conflict.start_time);
-      const newConflictStart = new Date(shiftEnd.getTime());
-      const newConflictEnd = new Date(newConflictStart.getTime() + conflictDuration);
-      
-      await supabase.from('schedule_slots').update({
-        start_time: newConflictStart.toISOString(),
-        end_time: newConflictEnd.toISOString()
-      }).eq('id', conflict.id);
-      
-      shiftEnd = newConflictEnd;
-    }
-  }
-  
-  res.json({ success: true });
-});
-
-app.delete('/api/slots/:id', auth, async (req, res) => {
-  if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' });
-  await supabase.from('schedule_slots').delete().eq('id', req.params.id);
-  res.json({ success: true });
-});
-
-app.get('/api/slots/export', auth, async (req, res) => {
-  const uid = req.session.userId;
-  let query = supabase.from('schedule_slots').select('*');
-  if (req.session.role === 'admin' || req.session.role === 'host') query = query.eq('tutor_id', uid);
-  else if (req.session.role === 'parent') {
-    const { data: links } = await supabase.from('student_parents').select('student_id').eq('parent_id', uid);
-    const ids = (links || []).map(l => l.student_id);
-    if (ids.length) query = query.in('student_id', ids); else return res.json([]);
-  }
-  else query = query.eq('student_id', uid);
-  
-  const { data: slots } = await query;
-  let ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n';
-  slots?.forEach(s => {
-    const st = new Date(s.start_time).toISOString().replace(/[-:]/g,'').substring(0,15)+'Z';
-    const en = new Date(s.end_time || new Date(s.start_time).getTime()+3600000).toISOString().replace(/[-:]/g,'').substring(0,15)+'Z';
-    ics += `BEGIN:VEVENT\nDTSTART:${st}\nDTEND:${en}\nSUMMARY:${s.title || 'Занятие'}\nDESCRIPTION:${s.notes||''} ${s.meeting_link||''}\nLOCATION:${s.meeting_link||'Очно'}\nEND:VEVENT\n`;
+  app.get('/api/slots', auth, async (req, res) => {
+    try {
+      const uid = req.session.userId;
+      let query = supabase.from('schedule_slots').select('*, users!student_id(username, avatar_url, level)');
+      if (req.session.role === 'admin' || req.session.role === 'host') query = query.eq('tutor_id', parseInt(uid));
+      else if (req.session.role === 'parent') {
+        const { data: links } = await supabase.from('student_parents').select('student_id').eq('parent_id', uid);
+        const ids = (links || []).map(l => l.student_id);
+        if (ids.length > 0) query = query.in('student_id', ids);
+        else return res.json([]);
+      } else query = query.eq('student_id', uid);
+      const { data, error } = await query.order('start_time', { ascending: true });
+      if (error) return res.json([]);
+      res.json(data || []);
+    } catch(e) { res.json([]); }
   });
-  ics += 'END:VCALENDAR';
-  res.setHeader('Content-Type','text/calendar; charset=utf-8');
-  res.setHeader('Content-Disposition','attachment; filename="schedule.ics"');
-  res.send(ics);
-});
+
+  app.post('/api/slots', auth, async (req, res) => {
+    if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' });
+    const { student_id, start_time, end_time, lesson_type, title, notes, meeting_link, group_students } = req.body;
+    let st = new Date(start_time), et = new Date(end_time);
+    if (et <= st) et = new Date(st.getTime() + 30 * 60000);
+    const { data: overlapping } = await supabase.from('schedule_slots').select('id').eq('tutor_id', req.session.userId).lt('start_time', et.toISOString()).gt('end_time', st.toISOString());
+    if (overlapping?.length) return res.status(409).json({ error: 'Пересечение с другим занятием' });
+    const slot = { tutor_id: req.session.userId, student_id: lesson_type?.startsWith('group') ? null : student_id, start_time: st.toISOString(), end_time: et.toISOString(), lesson_type: lesson_type || 'online', title: title || 'Занятие', notes, meeting_link: meeting_link || ((lesson_type === 'online' || lesson_type === 'group-online') ? `https://meet.jit.si/english-club-${Date.now()}` : null), group_students: group_students || [] };
+    await supabase.from('schedule_slots').insert(slot);
+    if (student_id && !lesson_type?.startsWith('group')) notifyUser(student_id, `📅 ${title || 'Занятие'}`, { lesson: { title: title || 'Занятие', time: st.toLocaleString('ru'), type: lesson_type === 'online' ? '🟢 Онлайн' : '🔵 Очно' } });
+    if (group_students?.length) for (const gs of group_students) notifyUser(gs, `📅 Групповое: ${title || 'Занятие'}`);
+    res.json({ success: true });
+  });
+
+  app.put('/api/slots/:id', auth, async (req, res) => {
+    if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' });
+    const { student_id, start_time, end_time, lesson_type, title, notes, status, group_students } = req.body;
+    let st = start_time ? new Date(start_time) : null, et = end_time ? new Date(end_time) : null;
+    if (st && et && et <= st) et = new Date(st.getTime() + 30 * 60000);
+    if (st && et) {
+      const { data: overlapping } = await supabase.from('schedule_slots').select('id').eq('tutor_id', req.session.userId).neq('id', parseInt(req.params.id)).lt('start_time', et.toISOString()).gt('end_time', st.toISOString());
+      if (overlapping?.length) return res.status(409).json({ error: 'Пересечение с другим занятием' });
+    }
+    const updates = {};
+    if (student_id !== undefined) updates.student_id = lesson_type?.startsWith('group') ? null : student_id;
+    if (st) updates.start_time = st.toISOString();
+    if (et) updates.end_time = et.toISOString();
+    if (lesson_type) updates.lesson_type = lesson_type;
+    if (title) updates.title = title;
+    if (notes !== undefined) updates.notes = notes;
+    if (status) updates.status = status;
+    if (group_students !== undefined) updates.group_students = group_students;
+    await supabase.from('schedule_slots').update(updates).eq('id', req.params.id);
+    res.json({ success: true });
+  });
+
+  app.put('/api/slots/:id/move', auth, async (req, res) => {
+    if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' });
+    const slotId = parseInt(req.params.id);
+    const { start_time, end_time } = req.body;
+    if (!start_time || !end_time) return res.status(400).json({ error: 'Нужны start_time и end_time' });
+    let newStart = new Date(start_time), newEnd = new Date(end_time);
+    if (newEnd <= newStart) newEnd = new Date(newStart.getTime() + 30 * 60000);
+    const { data: currentSlot } = await supabase.from('schedule_slots').select('*').eq('id', slotId).single();
+    if (!currentSlot) return res.status(404).json({ error: 'Слот не найден' });
+    const { data: conflicts } = await supabase.from('schedule_slots').select('*').eq('tutor_id', req.session.userId).neq('id', slotId).lt('start_time', newEnd.toISOString()).gt('end_time', newStart.toISOString()).order('start_time', { ascending: true });
+    await supabase.from('schedule_slots').update({ start_time: newStart.toISOString(), end_time: newEnd.toISOString() }).eq('id', slotId);
+    if (conflicts?.length) {
+      let shiftEnd = newEnd;
+      for (const conflict of conflicts) {
+        const conflictDuration = new Date(conflict.end_time) - new Date(conflict.start_time);
+        const newConflictStart = new Date(shiftEnd.getTime());
+        const newConflictEnd = new Date(newConflictStart.getTime() + conflictDuration);
+        await supabase.from('schedule_slots').update({ start_time: newConflictStart.toISOString(), end_time: newConflictEnd.toISOString() }).eq('id', conflict.id);
+        shiftEnd = newConflictEnd;
+      }
+    }
+    res.json({ success: true });
+  });
+
+  app.delete('/api/slots/:id', auth, async (req, res) => {
+    if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' });
+    await supabase.from('schedule_slots').delete().eq('id', req.params.id);
+    res.json({ success: true });
+  });
+
+  app.get('/api/slots/export', auth, async (req, res) => {
+    const uid = req.session.userId;
+    let query = supabase.from('schedule_slots').select('*');
+    if (req.session.role === 'admin' || req.session.role === 'host') query = query.eq('tutor_id', uid);
+    else if (req.session.role === 'parent') { const { data: links } = await supabase.from('student_parents').select('student_id').eq('parent_id', uid); const ids = (links || []).map(l => l.student_id); if (ids.length) query = query.in('student_id', ids); else return res.json([]); }
+    else query = query.eq('student_id', uid);
+    const { data: slots } = await query;
+    let ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n';
+    slots?.forEach(s => {
+      const st = new Date(s.start_time).toISOString().replace(/[-:]/g,'').substring(0,15)+'Z';
+      const en = new Date(s.end_time || new Date(s.start_time).getTime()+3600000).toISOString().replace(/[-:]/g,'').substring(0,15)+'Z';
+      ics += `BEGIN:VEVENT\nDTSTART:${st}\nDTEND:${en}\nSUMMARY:${s.title || 'Занятие'}\nDESCRIPTION:${s.notes||''} ${s.meeting_link||''}\nLOCATION:${s.meeting_link||'Очно'}\nEND:VEVENT\n`;
+    });
+    ics += 'END:VCALENDAR';
+    res.setHeader('Content-Type','text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition','attachment; filename="schedule.ics"');
+    res.send(ics);
+  });
 
   // SOCKET.IO
   const onlineUsers = new Map();
