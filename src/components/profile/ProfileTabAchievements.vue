@@ -1,18 +1,40 @@
 <template>
-  <div class="card fade-in">
-    <h3>🏆 Достижения</h3>
-    <div class="achieve-stats">
-      <div class="achieve-stat"><span class="achieve-stat-value">{{ earned }}</span><span class="achieve-stat-label">Получено</span></div>
-      <div class="achieve-stat"><span class="achieve-stat-value">{{ total }}</span><span class="achieve-stat-label">Всего</span></div>
-      <div class="achieve-stat"><span class="achieve-stat-value">{{ percent }}%</span><span class="achieve-stat-label">Выполнено</span></div>
+  <div class="card achievements-card fade-in">
+    <h3>🏆 Трофеи</h3>
+    <div class="trophy-stats">
+      <div class="trophy-stat">
+        <span class="trophy-icon">💎</span>
+        <span class="trophy-count">{{ platinumCount }}</span>
+        <span class="trophy-label">Платина</span>
+      </div>
+      <div class="trophy-stat">
+        <span class="trophy-icon">🥇</span>
+        <span class="trophy-count">{{ goldCount }}</span>
+        <span class="trophy-label">Золото</span>
+      </div>
+      <div class="trophy-stat">
+        <span class="trophy-icon">🥈</span>
+        <span class="trophy-count">{{ silverCount }}</span>
+        <span class="trophy-label">Серебро</span>
+      </div>
+      <div class="trophy-stat">
+        <span class="trophy-icon">🥉</span>
+        <span class="trophy-count">{{ bronzeCount }}</span>
+        <span class="trophy-label">Бронза</span>
+      </div>
     </div>
-    <div class="achievements-grid">
-      <div v-for="a in achievements" :key="a.code" class="achieve-badge-card" :class="{ earned: a.earned }">
-        <div class="achieve-rarity" :class="a.rarity">{{ rarityLabel(a.rarity) }}</div>
-        <span class="achieve-icon">{{ a.icon }}</span>
-        <div class="achieve-name">{{ a.name }}</div>
-        <div class="achieve-progress-mini" v-if="!a.earned">
-          <div class="achieve-progress-mini-fill" :style="{ width: a.progressPercent + '%' }"></div>
+    <div class="trophy-grid">
+      <div v-for="a in achievements" :key="a.code" 
+           class="trophy-card" 
+           :class="{ earned: a.earned, locked: !a.earned }">
+        <div class="trophy-img">
+          <span class="trophy-emoji">{{ a.icon }}</span>
+          <div v-if="!a.earned" class="trophy-lock">🔒</div>
+        </div>
+        <div class="trophy-name">{{ a.name }}</div>
+        <div class="trophy-points" v-if="a.points">+{{ a.points }} XP</div>
+        <div class="trophy-progress" v-if="!a.earned">
+          <div class="trophy-progress-fill" :style="{ width: a.progressPercent + '%' }"></div>
         </div>
       </div>
     </div>
@@ -23,33 +45,42 @@
 export default {
   name: 'ProfileTabAchievements',
   props: ['achievements', 'earned', 'total', 'percent'],
-  methods: {
-    rarityLabel(r) {
-      return { bronze: '🥉', silver: '🥈', gold: '🥇', platinum: '💎' }[r] || '';
+  computed: {
+    platinumCount() {
+      return this.achievements.filter(a => a.earned && a.rarity === 'platinum').length;
+    },
+    goldCount() {
+      return this.achievements.filter(a => a.earned && a.rarity === 'gold').length;
+    },
+    silverCount() {
+      return this.achievements.filter(a => a.earned && a.rarity === 'silver').length;
+    },
+    bronzeCount() {
+      return this.achievements.filter(a => a.earned && a.rarity === 'bronze').length;
     }
   }
 };
 </script>
 
 <style scoped>
-.card { background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); border-radius: 22px; padding: 28px; margin-bottom: 18px; color: #cbd5e1; }
+.card { background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); border-radius: 22px; margin-bottom: 18px; color: #cbd5e1; padding: 24px; }
 .card h3 { font-weight: 700; margin-bottom: 18px; color: #fff; }
-.achieve-stats { display: flex; gap: 20px; margin-bottom: 20px; }
-.achieve-stat { text-align: center; flex: 1; }
-.achieve-stat-value { display: block; font-size: 2rem; font-weight: 800; background: linear-gradient(135deg, #6366f1, #2dd4bf); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.achieve-stat-label { font-size: 0.8rem; color: #94a3b8; }
-.achievements-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 16px; }
-.achieve-badge-card { background: rgba(255,255,255,0.03); border-radius: 20px; padding: 20px 14px; text-align: center; cursor: pointer; border: 2px solid rgba(255,255,255,0.06); transition: all 0.3s; }
-.achieve-badge-card.earned { border-color: rgba(16,185,129,0.5); }
-.achieve-icon { font-size: 2.5rem; display: block; }
-.achieve-name { font-size: 0.75rem; font-weight: 600; margin-top: 4px; color: #cbd5e1; }
-.achieve-progress-mini { height: 4px; background: rgba(255,255,255,0.05); border-radius: 2px; margin-top: 10px; overflow: hidden; }
-.achieve-progress-mini-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #2dd4bf); border-radius: 2px; max-width: 100%; }
-.achieve-rarity { font-size: 0.7rem; margin-bottom: 4px; }
-.achieve-rarity.bronze { color: #cd7f32; }
-.achieve-rarity.silver { color: #c0c0c0; }
-.achieve-rarity.gold { color: #ffd700; }
-.achieve-rarity.platinum { color: #e5e4e2; }
+.trophy-stats { display: flex; gap: 8px; margin-bottom: 20px; }
+.trophy-stat { flex: 1; text-align: center; background: rgba(255,255,255,0.03); padding: 10px 6px; border-radius: 12px; }
+.trophy-icon { font-size: 1.3rem; display: block; }
+.trophy-count { font-size: 1.1rem; font-weight: 800; color: #fff; }
+.trophy-label { font-size: 0.65rem; color: #94a3b8; }
+.trophy-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.trophy-card { background: rgba(255,255,255,0.03); border: 2px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 14px; text-align: center; }
+.trophy-card.earned { border-color: rgba(16,185,129,0.4); }
+.trophy-card.locked { opacity: 0.5; }
+.trophy-img { position: relative; display: inline-block; }
+.trophy-emoji { font-size: 2rem; display: block; }
+.trophy-lock { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1rem; }
+.trophy-name { font-size: 0.75rem; font-weight: 600; color: #fff; margin-top: 6px; }
+.trophy-points { font-size: 0.65rem; color: #f59e0b; margin-top: 4px; }
+.trophy-progress { height: 3px; background: rgba(255,255,255,0.05); border-radius: 2px; margin-top: 6px; }
+.trophy-progress-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #2dd4bf); border-radius: 2px; }
 .fade-in { animation: fadeIn 0.35s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 </style>
