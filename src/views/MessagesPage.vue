@@ -123,7 +123,7 @@ export default {
     sendBrowserNotification(msg) { if ('Notification' in window && Notification.permission === 'granted') { try { new Notification(`💬 ${msg.fn || 'Новое сообщение'}`, { body: (msg.msg || '📎 Файл').substring(0, 100), icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🗣️</text></svg>', tag: 'engclub' }); } catch(e) {} } },
     linkify(text) { if (!text) return ''; return text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:#818cf8;text-decoration:underline">$1</a>'); },
     filterMessages() { const q = this.msgSearchQuery.toLowerCase(); this.filteredMessages = q ? this.messages.filter(m => m.message?.toLowerCase().includes(q)) : this.messages; },
-    getFileType(file) { if (file.type.startsWith('image/')) return 'image'; if (file.type.startsWith('audio/')) return 'audio'; if (file.type.startsWith('video/')) return 'video'; const ext = (file.name || '').split('.').pop()?.toLowerCase(); if (['mp3','wav','ogg','aac','m4a','flac','webm'].includes(ext)) return 'audio'; if (['mp4','webm','mov','avi'].includes(ext)) return 'video'; if (['jpg','jpeg','png','gif','webp','svg','bmp'].includes(ext)) return 'image'; return 'file'; },
+    getFileType(file) { if (!file) return 'file'; if (file.type) { if (file.type.startsWith('image/')) return 'image'; if (file.type.startsWith('audio/')) return 'audio'; if (file.type.startsWith('video/')) return 'video'; } const name = file.name || ''; const ext = name.split('.').pop()?.toLowerCase(); if (['mp3','wav','ogg','aac','m4a','flac','webm'].includes(ext)) return 'audio'; if (['mp4','webm','mov','avi'].includes(ext)) return 'video'; if (['jpg','jpeg','png','gif','webp','svg','bmp'].includes(ext)) return 'image'; return 'file'; },
     async loadDialogs() { if (!this.currentUserId) return; try { const r = await axios.get('/api/dialogs'); this.dialogs = Array.isArray(r.data) ? r.data : []; } catch(e) {} },
     async searchUsers() { if (this.searchQuery.length < 2) { this.searchResults = []; return; } try { const r = await axios.get(`/api/users?q=${this.searchQuery}`); this.searchResults = (r.data || []).filter(u => u.id !== this.currentUserId); } catch(e) {} },
     async startChat(u) { this.activeChat = u.id; this.activeChatName = u.username; this.partnerAvatar = u.avatar_url; this.searchQuery = ''; this.searchResults = []; this.showSidebar = false; try { const r = await axios.get(`/api/messages/${u.id}`); this.messages = (r.data || []).map(m => this.parseFiles(m)); this.filterMessages(); this.$nextTick(() => this.scrollToBottom()); } catch(e) {} this.loadDialogs(); },
@@ -131,9 +131,110 @@ export default {
     parseFiles(m) { if (!m.files) return m; if (typeof m.files === 'string') { try { m.files = JSON.parse(m.files); } catch(e) { m.files = null; } } return m; },
     replyTo(msg) { this.msgText = `↩ ${msg.fn || ''}: ${(msg.msg || '').substring(0, 50)}\n`; this.$nextTick(() => { const ta = this.$el.querySelector('textarea'); if (ta) ta.focus(); }); },
     async deleteMsg(id) { if (confirm('Удалить?')) { try { await axios.delete(`/api/msg/${id}`); this.messages = this.messages.filter(m => m.id !== id); this.filterMessages(); this.addToast('Удалено 🗑', 'success'); } catch(e) {} } },
-    async sendMsg() { const text = this.msgText.trim(); if ((!text && !this.pendingFiles.length) || !this.activeChat || !this.socket?.connected) return; const replyTo = text.startsWith('↩') ? text.split('\n')[0] : null; const cleanText = replyTo ? text.split('\n').slice(1).join('\n').trim() : text; if (cleanText) { const m = { id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: cleanText, ts: new Date().toISOString() }; this.messages.push(m); this.filterMessages(); this.socket.emit('dm', { to: this.activeChat, msg: cleanText, replyTo }); } for (const file of this.pendingFiles) { const form = new FormData(); form.append('img', file); try { const r = await axios.post('/api/nimg', form); if (r.data?.url) { const type = this.getFileType(file); const icon = type === 'image' ? '🖼️' : type === 'audio' ? '🎤' : type === 'video' ? '🎬' : '📎'; const msgText = type === 'audio' ? '🎤 Голосовое' : icon + ' ' + file.name; const fm = { id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: msgText, files: [{ url: r.data.url, type, name: file.name }], ts: new Date().toISOString() }; this.messages.push(fm); this.filterMessages(); this.socket.emit('dm', { to: this.activeChat, msg: msgText, files: [{ url: r.data.url, type, name: file.name }] }); } } catch(e) {} } this.playSendSound(); this.msgText = ''; this.pendingFiles = []; this.$nextTick(() => this.scrollToBottom()); },
+    async sendMsg() {
+      const text = this.msgText.trim();
+      if ((!text && !this.pendingFiles.length) || !this.activeChat || !this.socket?.connected) return;
+      
+      const replyTo = text.startsWith('↩') ? text.split('\n')[0] : null;
+      const cleanText = replyTo ? text.split('\n').slice(1).join('\n').trim() : text;
+      
+      // Загружаем файлы через новый эндпоинт
+      const uploadedFiles = [];
+      for (const file of this.pendingFiles) {
+        const form = new FormData();
+        form.append('file', file);
+        try {
+          const r = await axios.post('/api/chat-upload', form);
+          if (r.data?.url) {
+            uploadedFiles.push({
+              url: r.data.url,
+              type: r.data.type || this.getFileType(file),
+              name: file.name || 'Файл'
+            });
+          }
+        } catch(e) {
+          this.addToast('Ошибка загрузки файла', 'error');
+        }
+      }
+      
+      const msgText = cleanText || (uploadedFiles.length ? 
+        (uploadedFiles[0].type === 'audio' ? '🎤 Голосовое' : '📎 ' + uploadedFiles[0].name) : '');
+      
+      const localMsg = {
+        id: Date.now(),
+        from: this.currentUserId,
+        sender_id: this.currentUserId,
+        fn: this.user.username,
+        message: msgText,
+        files: uploadedFiles.length ? uploadedFiles : null,
+        reply_to: replyTo,
+        ts: new Date().toISOString()
+      };
+      
+      this.messages.push(localMsg);
+      this.filterMessages();
+      
+      this.socket.emit('dm', {
+        to: this.activeChat,
+        msg: msgText,
+        files: uploadedFiles.length ? uploadedFiles : null,
+        replyTo: replyTo
+      });
+      
+      this.playSendSound();
+      this.msgText = '';
+      this.pendingFiles = [];
+      this.$nextTick(() => this.scrollToBottom());
+    },
     handleFiles(e) { if (e.target.files?.length) { for (const file of e.target.files) { if (file.type.startsWith('image/')) file.preview = URL.createObjectURL(file); this.pendingFiles.push(file); } } e.target.value = ''; },
-    async startRecord() { try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); this.recording = true; this.recordingTime = 0; this.recordingTimer = setInterval(() => this.recordingTime++, 1000); this.mediaRecorder = new MediaRecorder(stream); this.chunks = []; this.mediaRecorder.ondataavailable = e => this.chunks.push(e.data); this.mediaRecorder.onstop = async () => { clearInterval(this.recordingTimer); const blob = new Blob(this.chunks, { type: 'audio/webm' }); const form = new FormData(); form.append('img', blob, 'voice.webm'); try { const r = await axios.post('/api/nimg', form); if (r.data?.url) { const vm = { id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }], ts: new Date().toISOString() }; this.messages.push(vm); this.filterMessages(); this.socket.emit('dm', { to: this.activeChat, msg: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }] }); } } catch(e) {} stream.getTracks().forEach(t => t.stop()); this.recording = false; this.recordingTime = 0; this.$nextTick(() => this.scrollToBottom()); }; this.mediaRecorder.start(); } catch(e) { this.recording = false; this.addToast('Нет доступа к микрофону 🎤', 'error'); } },
+    async startRecord() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        this.recording = true;
+        this.recordingTime = 0;
+        this.recordingTimer = setInterval(() => this.recordingTime++, 1000);
+        this.mediaRecorder = new MediaRecorder(stream);
+        this.chunks = [];
+        this.mediaRecorder.ondataavailable = e => this.chunks.push(e.data);
+        this.mediaRecorder.onstop = async () => {
+          clearInterval(this.recordingTimer);
+          const blob = new Blob(this.chunks, { type: 'audio/webm' });
+          const form = new FormData();
+          form.append('file', blob, 'voice-message.webm');
+          try {
+            const r = await axios.post('/api/chat-upload', form);
+            if (r.data?.url) {
+              const voiceMsg = {
+                id: Date.now(),
+                from: this.currentUserId,
+                sender_id: this.currentUserId,
+                fn: this.user.username,
+                message: '🎤 Голосовое сообщение',
+                files: [{ url: r.data.url, type: 'audio', name: 'Голосовое сообщение' }],
+                ts: new Date().toISOString()
+              };
+              this.messages.push(voiceMsg);
+              this.filterMessages();
+              this.socket.emit('dm', {
+                to: this.activeChat,
+                msg: '🎤 Голосовое сообщение',
+                files: [{ url: r.data.url, type: 'audio', name: 'Голосовое сообщение' }]
+              });
+            }
+          } catch(e) {
+            this.addToast('Ошибка загрузки голосового', 'error');
+          }
+          stream.getTracks().forEach(t => t.stop());
+          this.recording = false;
+          this.recordingTime = 0;
+          this.$nextTick(() => this.scrollToBottom());
+        };
+        this.mediaRecorder.start();
+      } catch(e) {
+        this.recording = false;
+        this.addToast('Нет доступа к микрофону 🎤', 'error');
+      }
+    },
     stopRecord() { if (this.mediaRecorder?.state === 'recording') this.mediaRecorder.stop(); },
     scrollToBottom() { const el = this.$refs.msgContainer; if (el) el.scrollTop = el.scrollHeight; }
   }
