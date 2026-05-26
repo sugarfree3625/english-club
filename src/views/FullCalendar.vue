@@ -176,12 +176,31 @@ export default {
     editSlot(slot) { this.editingSlot = slot; const sd = new Date(slot.start_time); this.slotForm = { student_id: slot.student_id || '', lesson_type: slot.lesson_type || 'online', title: slot.title || '', date: sd.toISOString().split('T')[0], time: sd.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }), duration: Math.round((new Date(slot.end_time) - sd) / 60000) || 30, notes: slot.notes || '', group_students: slot.group_students || [] }; this.showAddSlot = true; },
     closeModal() { this.showAddSlot = false; this.editingSlot = null; this.slotForm.group_students = []; },
     async saveSlot() {
-      try {
-        const st = `${this.slotForm.date}T${this.slotForm.time}:00`; const et = new Date(new Date(st).getTime() + (this.slotForm.duration || 30) * 60000).toISOString(); const data = { ...this.slotForm, start_time: st, end_time: et }; if (!this.isGroupType) data.group_students = []; if (this.isGroupType) data.student_id = null;
-        if (this.editingSlot) { await axios.put(`/api/slots/${this.editingSlot.id}`, data); } else { await axios.post('/api/slots', data); }
-        this.closeModal(); this.addToast('Сохранено! 🎉', 'success'); setTimeout(() => this.loadSlots(), 500);
-      } catch(e) { this.addToast(e.response?.data?.error || 'Ошибка', 'error'); }
-    },
+  try {
+    const st = `${this.slotForm.date}T${this.slotForm.time}:00`;
+    let et = new Date(new Date(st).getTime() + (this.slotForm.duration || 30) * 60000);
+    
+    // Гарантируем что end_time > start_time (минимум 30 минут)
+    if (et <= new Date(st)) {
+      et = new Date(new Date(st).getTime() + 30 * 60000);
+    }
+    
+    const data = { ...this.slotForm, start_time: st, end_time: et.toISOString() };
+    if (!this.isGroupType) data.group_students = [];
+    if (this.isGroupType) data.student_id = null;
+    
+    if (this.editingSlot) {
+      await axios.put(`/api/slots/${this.editingSlot.id}`, data);
+    } else {
+      await axios.post('/api/slots', data);
+    }
+    this.closeModal();
+    this.addToast('Сохранено! 🎉', 'success');
+    setTimeout(() => this.loadSlots(), 500);
+  } catch(e) {
+    this.addToast(e.response?.data?.error || 'Ошибка', 'error');
+  }
+},
     async deleteSlot(id) { if (confirm('Удалить занятие?')) { await axios.delete(`/api/slots/${id}`); this.closeModal(); this.loadSlots(); } },
     exportICS() { window.open('/api/slots/export', '_blank'); },
   }
