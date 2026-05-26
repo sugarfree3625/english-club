@@ -23,9 +23,7 @@
       </div>
       <button class="btn btn-o btn-sm w-100 interactive-btn" @click="$router.push('/profile')"><i class="fas fa-arrow-left"></i> В профиль</button>
     </div>
-
     <button class="mobile-back interactive-btn" @click="showSidebar = true; activeChat = null">← Чаты</button>
-
     <div class="chat-main" v-if="activeChat" :class="{ 'mobile-show': !showSidebar }">
       <div class="chat-header">
         <div style="display:flex;align-items:center;gap:12px">
@@ -87,7 +85,6 @@
         <button class="btn btn-p btn-sm send-btn interactive-btn" @click="sendMsg"><i class="fas fa-paper-plane"></i></button>
       </div>
     </div>
-
     <div class="chat-main empty-chat" v-else><div><i class="fas fa-comments" style="font-size:4rem;opacity:0.3"></i><p>Выберите чат</p></div></div>
     <div class="lightbox" v-if="lightbox" @click="lightbox = null"><img :src="lightbox" style="max-width:90%;max-height:90%;border-radius:16px"></div>
   </div>
@@ -228,14 +225,5 @@ export default {
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.08); } }
 @keyframes wave { 0%, 100% { height: 4px; } 50% { height: 16px; } }
-@media (max-width: 768px) {
-  .chat-sidebar { width: 100%; position: absolute; inset: 0; z-index: 10; }
-  .chat-sidebar.mobile-hidden { display: none; }
-  .chat-main { display: none; width: 100%; }
-  .chat-main.mobile-show { display: flex; }
-  .empty-chat { display: flex; }
-  .mobile-back { display: block; padding: 14px 22px; background: var(--surface); border-bottom: 1px solid var(--b); font-weight: 600; cursor: pointer; border: none; width: 100%; text-align: left; color: var(--t); font-family: inherit; }
-  .msg { max-width: 85%; }
-  .emoji-picker { width: 260px; }
-}
+@media (max-width: 768px) { .chat-sidebar { width: 100%; position: absolute; inset: 0; z-index: 10; } .chat-sidebar.mobile-hidden { display: none; } .chat-main { display: none; width: 100%; } .chat-main.mobile-show { display: flex; } .empty-chat { display: flex; } .mobile-back { display: block; padding: 14px 22px; background: var(--surface); border-bottom: 1px solid var(--b); font-weight: 600; cursor: pointer; border: none; width: 100%; text-align: left; color: var(--t); font-family: inherit; } .msg { max-width: 85%; } .emoji-picker { width: 260px; } }
 </style>
