@@ -10,14 +10,14 @@
         <input v-model="searchQuery" @input="searchUsers" placeholder="Поиск ученика..." class="search-input">
         <div v-if="searchResults.length" class="search-results">
           <div v-for="(u, idx) in searchResults" :key="u.id" class="search-item fade-in-up" :style="{ animationDelay: `${idx * 0.04}s` }" @click="startChat(u)">
-            <img :src="u.avatar_url || 'https://ui-avatars.com/api/?name=' + u.username" class="dialog-avatar">
+            <img :src="u.avatar_url || 'https://ui-avatars.com/api/?name=' + u.username" class="dialog-avatar" @error="$event.target.src='https://ui-avatars.com/api/?name=' + u.username">
             <div><strong>{{ u.username }}</strong><small>{{ u.level }}</small></div>
           </div>
         </div>
       </div>
       <div class="dialog-list">
         <div v-for="(d, idx) in dialogs" :key="d.partner_id || d.id" class="dialog-item fade-in-up" :class="{ active: activeChat === (d.partner_id || d.id) }" :style="{ animationDelay: `${idx * 0.03}s` }" @click="openChat(d)">
-          <img :src="d.avatar_url || 'https://ui-avatars.com/api/?name=' + (d.username || 'U')" class="dialog-avatar">
+          <img :src="d.avatar_url || 'https://ui-avatars.com/api/?name=' + (d.username || 'U')" class="dialog-avatar" @error="$event.target.src='https://ui-avatars.com/api/?name=' + (d.username || 'U')">
           <div class="dialog-info"><strong>{{ d.username }}</strong><small>{{ (d.message || d.last_msg || '').substring(0, 35) }}</small></div>
         </div>
         <p v-if="!dialogs.length" class="empty-text">Нет диалогов</p>
@@ -31,7 +31,7 @@
     <div class="chat-main" v-if="activeChat" :class="{ 'mobile-show': !showSidebar }">
       <div class="chat-header">
         <div style="display:flex;align-items:center;gap:12px">
-          <img :src="partnerAvatar || 'https://ui-avatars.com/api/?name=' + activeChatName" class="chat-avatar tilt-avatar">
+          <img :src="partnerAvatar || 'https://ui-avatars.com/api/?name=' + activeChatName" class="chat-avatar tilt-avatar" @error="$event.target.src='https://ui-avatars.com/api/?name=' + activeChatName">
           <div><strong>{{ activeChatName }}</strong><small :class="{ online: isPartnerOnline }">{{ isPartnerOnline ? '🟢 Онлайн' : '⚫ Оффлайн' }}</small></div>
         </div>
         <div style="display:flex;gap:6px">
@@ -56,7 +56,7 @@
                 <div v-else-if="f.type === 'audio'" class="voice-msg">
                   <button @click="toggleAudio($event, proxifyUrl(f.url))" class="voice-play-btn interactive-btn">▶️</button>
                   <div class="voice-wave"><div class="voice-wave-bar" v-for="n in 12" :key="n" :style="{ height: Math.random() * 16 + 4 + 'px' }"></div></div>
-                  <span class="voice-label">🎤 Голосовое</span>
+                  <span class="voice-label">{{ f.name || '🎤 Голосовое' }}</span>
                 </div>
                 <video v-else-if="f.type === 'video'" :src="proxifyUrl(f.url)" controls class="msg-video"></video>
                 <a v-else :href="proxifyUrl(f.url)" target="_blank" class="file-link" :download="f.name || 'file'">📎 {{ f.name || 'Файл' }}</a>
@@ -89,6 +89,14 @@
         <input type="file" ref="fileInput" @change="handleFiles" hidden multiple accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.zip">
         <button class="btn btn-o btn-sm voice-btn interactive-btn" :class="{ recording }" @mousedown="startRecord" @mouseup="stopRecord" @mouseleave="stopRecord" @touchstart.prevent="startRecord" @touchend.prevent="stopRecord">🎤</button>
         <span v-if="recording" class="recording-time">{{ recordingTime }}с</span>
+        <!-- Превью прикреплённых файлов -->
+        <div v-if="pendingFiles.length" class="file-preview-bar">
+          <div v-for="(f, i) in pendingFiles" :key="i" class="file-preview-item">
+            <img v-if="f.type?.startsWith('image/')" :src="f.preview" class="file-preview-img">
+            <span v-else>{{ getFileIcon(getFileType(f)) }} {{ f.name }}</span>
+            <button @click="pendingFiles.splice(i, 1)" class="file-preview-remove">✕</button>
+          </div>
+        </div>
         <textarea v-model="msgText" @keydown.enter.exact.prevent="sendMsg" placeholder="Сообщение..." rows="1" :disabled="recording"></textarea>
         <button class="btn btn-p btn-sm send-btn interactive-btn" @click="sendMsg"><i class="fas fa-paper-plane"></i></button>
       </div>
@@ -131,9 +139,7 @@ export default {
   async mounted() {
     if (!this.user?.id) return;
     this.currentUserId = this.user.id;
-    console.log('👤 [CHAT] Пользователь:', this.user.username, 'ID:', this.currentUserId);
     await this.loadDialogs();
-    console.log('📋 [CHAT] Диалоги:', this.dialogs.length);
     if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
     this.initSocket();
     this.searchUsers = useDebounce(this.searchUsers, 300);
@@ -144,20 +150,17 @@ export default {
   beforeUnmount() { this.socket?.disconnect(); this.socket = null; },
   methods: {
     initSocket() {
-      console.log('🔌 [CHAT] Подключаю сокет...');
       this.socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
       this.socket.on('connect', () => {
-        console.log('🟢 [SOCKET] Подключён, ID:', this.socket.id);
         this.socket.emit('join', { uid: this.currentUserId, uname: this.user.username, role: this.user.role });
       });
       this.socket.on('disconnect', (reason) => console.log('🔴 [SOCKET] Отключён:', reason));
       this.socket.on('connect_error', (e) => console.log('❌ [SOCKET] Ошибка:', e.message));
-      this.socket.on('unread', ({ count }) => { console.log('📬 [SOCKET] Непрочитанных:', count); this.unreadCount = count; });
+      this.socket.on('unread', ({ count }) => { this.unreadCount = count; });
       this.socket.on('dm', (msg) => this.handleIncomingMessage(msg));
     },
 
     handleIncomingMessage(msg) {
-      console.log('💬 [SOCKET] Входящее от:', msg.from, 'текст:', (msg.msg || msg.message || '').substring(0, 30));
       if (typeof msg.files === 'string') { try { msg.files = JSON.parse(msg.files); } catch(e) { msg.files = null; } }
       if (msg.from === this.currentUserId) { this.loadDialogs(); return; }
       if (this.activeChat === msg.from) {
@@ -173,36 +176,29 @@ export default {
 
     async sendMsg() {
       const text = this.msgText.trim();
-      console.log('📤 [SEND] Текст:', text.substring(0, 30), '| Файлов:', this.pendingFiles.length, '| Сокет:', this.socket?.connected);
-      if ((!text && !this.pendingFiles.length) || !this.activeChat || !this.socket?.connected) {
-        console.log('⛔ [SEND] Блокировано');
-        return;
-      }
+      if ((!text && !this.pendingFiles.length) || !this.activeChat || !this.socket?.connected) return;
       const replyTo = text.startsWith('↩') ? text.split('\n')[0] : null;
       const cleanText = replyTo ? text.split('\n').slice(1).join('\n').trim() : text;
       if (cleanText) {
-        console.log('📝 [SEND] Текст:', cleanText.substring(0, 30));
         const m = { id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: cleanText, ts: new Date().toISOString() };
         this.messages.push(m);
         this.filterMessages();
         this.socket.emit('dm', { to: this.activeChat, msg: cleanText, replyTo });
       }
       for (const file of this.pendingFiles) {
-        console.log('📎 [SEND] Файл:', file.name, file.type, file.size);
         const form = new FormData();
         form.append('img', file);
         try {
           const r = await axios.post('/api/nimg', form);
-          console.log('✅ [SEND] /api/nimg:', r.data?.url ? 'OK' : 'No URL');
           if (r.data?.url) {
             const type = this.getFileType(file);
-            const msgText = type === 'audio' ? '🎤 Голосовое' : `${this.getFileIcon(type)} ${file.name}`;
+            const msgText = type === 'audio' ? `🎵 ${file.name}` : `${this.getFileIcon(type)} ${file.name}`;
             const fm = { id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: msgText, files: [{ url: r.data.url, type, name: file.name }], ts: new Date().toISOString() };
             this.messages.push(fm);
             this.filterMessages();
             this.socket.emit('dm', { to: this.activeChat, msg: msgText, files: [{ url: r.data.url, type, name: file.name }] });
           }
-        } catch(e) { console.log('❌ [SEND] Ошибка:', e.message, e.response?.status); }
+        } catch(e) {}
       }
       this.playSendSound();
       this.msgText = '';
@@ -235,7 +231,7 @@ export default {
     },
 
     getFileIcon(type) {
-      return { image: '🖼️', audio: '🎤', video: '🎬' }[type] || '📎';
+      return { image: '🖼️', audio: '🎵', video: '🎬' }[type] || '📎';
     },
 
     proxifyUrl(url) {
@@ -250,7 +246,6 @@ export default {
     },
 
     toggleAudio(e, url) {
-      console.log('🔊 [AUDIO]', url?.substring(0, 60));
       const btn = e.target;
       const existing = document.querySelector('audio.voice-audio');
       if (existing) { existing.pause(); existing.remove(); }
@@ -261,8 +256,8 @@ export default {
       btn.dataset.playing = 'true';
       btn.textContent = '⏳';
       audio.oncanplaythrough = () => {
-        audio.play().then(() => { console.log('✅ [AUDIO] Играет'); btn.textContent = '⏸️'; })
-          .catch(e => { console.log('❌ [AUDIO] Ошибка:', e.message); btn.dataset.playing = 'false'; btn.textContent = '▶️'; });
+        audio.play().then(() => { btn.textContent = '⏸️'; })
+          .catch(e => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; });
       };
       audio.onended = () => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; audio.remove(); };
       audio.onerror = () => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; audio.remove(); };
@@ -271,7 +266,6 @@ export default {
     },
 
     async startRecord() {
-      console.log('🎤 [RECORD] Старт...');
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         this.recording = true;
@@ -283,19 +277,17 @@ export default {
         this.mediaRecorder.onstop = async () => {
           clearInterval(this.recordingTimer);
           const blob = new Blob(this.chunks, { type: 'audio/webm' });
-          console.log('🎤 [RECORD] Blob:', blob.size);
           const form = new FormData();
           form.append('img', blob, 'voice.webm');
           try {
             const r = await axios.post('/api/nimg', form);
-            console.log('✅ [RECORD] /api/nimg:', r.data?.url ? 'OK' : 'No URL');
             if (r.data?.url) {
               const vm = { id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }], ts: new Date().toISOString() };
               this.messages.push(vm);
               this.filterMessages();
               this.socket.emit('dm', { to: this.activeChat, msg: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }] });
             }
-          } catch(e) { console.log('❌ [RECORD] Ошибка:', e.message); }
+          } catch(e) {}
           stream.getTracks().forEach(t => t.stop());
           this.recording = false;
           this.recordingTime = 0;
@@ -303,7 +295,6 @@ export default {
         };
         this.mediaRecorder.start();
       } catch(e) {
-        console.log('❌ [RECORD] Микрофон:', e.message);
         this.recording = false;
         this.addToast('Нет доступа к микрофону 🎤', 'error');
       }
@@ -338,15 +329,13 @@ export default {
     },
 
     async searchUsers() {
-  console.log('🔍 [SEARCH] Запрос:', this.searchQuery);
-  if (this.searchQuery.length < 2) { this.searchResults = []; return; }
-  try {
-    const r = await axios.get(`/api/users?q=${this.searchQuery}`);
-    console.log('🔍 [SEARCH] Результаты:', r.data?.length);
-    this.searchResults = (r.data || []).filter(u => u.id !== this.currentUserId);
-    console.log('🔍 [SEARCH] После фильтра:', this.searchResults.length);
-  } catch(e) { console.log('❌ [SEARCH] Ошибка:', e); }
-},
+      if (this.searchQuery.length < 2) { this.searchResults = []; return; }
+      try {
+        const r = await axios.get(`/api/users?q=${this.searchQuery}`);
+        this.searchResults = (r.data || []).filter(u => u.id !== this.currentUserId);
+      } catch(e) {}
+    },
+
     filterMessages() { const q = this.msgSearchQuery.toLowerCase(); this.filteredMessages = q ? this.messages.filter(m => m.message?.toLowerCase().includes(q)) : this.messages; },
     formatTime(ts) { return ts ? new Date(ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : ''; },
     linkify(text) { return text ? text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:#818cf8;text-decoration:underline">$1</a>') : ''; },
@@ -449,11 +438,15 @@ export default {
 .file-link { color: var(--p); text-decoration: none; font-size: 0.85rem; font-weight: 500; }
 .msg.mine .file-link { color: #fff; }
 .msg-time { font-size: 0.7rem; opacity: 0.65; display: block; margin-top: 8px; }
-.chat-input { display: flex; gap: 10px; padding: 16px 22px; background: var(--surface); border-top: 1px solid var(--b); align-items: flex-end; }
+.chat-input { display: flex; gap: 10px; padding: 16px 22px; background: var(--surface); border-top: 1px solid var(--b); align-items: flex-end; flex-wrap: wrap; }
+.file-preview-bar { display: flex; gap: 6px; padding: 6px 0; width: 100%; flex-wrap: wrap; }
+.file-preview-item { display: flex; align-items: center; gap: 4px; background: var(--bg); padding: 4px 8px; border-radius: 8px; font-size: 0.75rem; }
+.file-preview-img { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; }
+.file-preview-remove { background: none; border: none; color: var(--t2); cursor: pointer; font-size: 0.65rem; padding: 2px 4px; }
 .emoji-picker { position: absolute; bottom: 55px; left: 0; background: var(--surface); border: 1px solid var(--b); border-radius: 16px; padding: 12px; width: 300px; max-height: 220px; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 5px; z-index: 200; box-shadow: var(--shadow-lg); }
 .emoji-item { cursor: pointer; font-size: 1.4rem; padding: 5px; border-radius: 8px; transition: all 0.2s; }
 .emoji-item:hover { background: rgba(99,102,241,0.08); transform: scale(1.2); }
-.chat-input textarea { flex: 1; padding: 12px 16px; border: 2px solid var(--b); border-radius: 16px; font-family: inherit; font-size: 0.9rem; resize: none; outline: none; background: var(--bg); color: var(--t); }
+.chat-input textarea { flex: 1; padding: 12px 16px; border: 2px solid var(--b); border-radius: 16px; font-family: inherit; font-size: 0.9rem; resize: none; outline: none; background: var(--bg); color: var(--t); min-width: 100px; }
 .chat-input textarea:focus { border-color: var(--p); }
 .send-btn { width: 44px; height: 44px; padding: 0 !important; justify-content: center; border-radius: 50% !important; }
 .voice-btn { width: 44px; height: 44px; padding: 0 !important; justify-content: center; border-radius: 50% !important; font-size: 1.2rem; }
