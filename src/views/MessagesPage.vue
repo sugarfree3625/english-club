@@ -23,7 +23,9 @@
       </div>
       <button class="btn btn-o btn-sm w-100 interactive-btn" @click="$router.push('/profile')"><i class="fas fa-arrow-left"></i> В профиль</button>
     </div>
+
     <button class="mobile-back interactive-btn" @click="showSidebar = true; activeChat = null">← Чаты</button>
+
     <div class="chat-main" v-if="activeChat" :class="{ 'mobile-show': !showSidebar }">
       <div class="chat-header">
         <div style="display:flex;align-items:center;gap:12px">
@@ -35,10 +37,12 @@
           <button class="btn btn-o btn-sm interactive-btn" @click="showMsgSearch = !showMsgSearch"><i class="fas fa-search"></i></button>
         </div>
       </div>
+      
       <div class="msg-search" v-if="showMsgSearch">
         <input v-model="msgSearchQuery" placeholder="Поиск в чате..." class="search-input" @input="filterMessages">
         <button class="btn btn-o btn-sm interactive-btn" @click="showMsgSearch = false; msgSearchQuery = ''">✕</button>
       </div>
+      
       <div class="chat-messages" ref="msgContainer">
         <transition-group name="msg-pop">
           <div v-for="(m, idx) in filteredMessages" :key="m.id || m.ts || idx" class="msg" :class="{ mine: m.sender_id === currentUserId || m.from === currentUserId }">
@@ -46,14 +50,14 @@
             <div v-if="m.message" class="msg-text" v-html="linkify(m.message)"></div>
             <div v-if="m.files && m.files.length" class="msg-files">
               <div v-for="(f, i) in m.files" :key="i" class="msg-file">
-                <img v-if="f.type === 'image'" :src="f.proxiedUrl || f.url" class="msg-img" @click="lightbox = f.proxiedUrl || f.url" @error="$event.target.style.display='none'">
+                <img v-if="f.type === 'image'" :src="f.url" class="msg-img" @click="lightbox = f.url">
                 <div v-else-if="f.type === 'audio'" class="voice-msg">
-                  <button @click="toggleAudio($event, f.proxiedUrl || f.url)" class="voice-play-btn interactive-btn">▶️</button>
+                  <button @click="toggleAudio($event, f.url)" class="voice-play-btn interactive-btn">▶️</button>
                   <div class="voice-wave"><div class="voice-wave-bar" v-for="n in 12" :key="n" :style="{ height: Math.random() * 16 + 4 + 'px' }"></div></div>
                   <span class="voice-label">🎤 Голосовое</span>
                 </div>
-                <video v-else-if="f.type === 'video'" :src="f.proxiedUrl || f.url" controls class="msg-video"></video>
-                <a v-else :href="f.proxiedUrl || f.url" target="_blank" class="file-link" :download="f.name || 'file'">📎 {{ f.name || 'Файл' }}</a>
+                <video v-else-if="f.type === 'video'" :src="f.url" controls class="msg-video"></video>
+                <a v-else :href="f.url" target="_blank" class="file-link" :download="f.name || 'file'">📎 {{ f.name || 'Файл' }}</a>
               </div>
             </div>
             <small class="msg-time">{{ formatTime(m.ts) }}</small>
@@ -65,6 +69,7 @@
           </div>
         </transition-group>
       </div>
+      
       <div v-if="showTranslate" class="translate-popup">
         <div class="translate-word">{{ selectedWord }}</div>
         <div class="translate-result" v-if="!translating">{{ translatedText }}</div>
@@ -74,6 +79,7 @@
           <button @click="showTranslate = false" class="btn btn-o btn-sm interactive-btn">✕</button>
         </div>
       </div>
+      
       <div class="chat-input">
         <button class="btn btn-o btn-sm emoji-btn interactive-btn" @click="showEmoji = !showEmoji">😊</button>
         <div v-if="showEmoji" class="emoji-picker"><span v-for="e in emojis" :key="e" @click="msgText += e" class="emoji-item">{{ e }}</span></div>
@@ -85,6 +91,7 @@
         <button class="btn btn-p btn-sm send-btn interactive-btn" @click="sendMsg"><i class="fas fa-paper-plane"></i></button>
       </div>
     </div>
+
     <div class="chat-main empty-chat" v-else><div><i class="fas fa-comments" style="font-size:4rem;opacity:0.3"></i><p>Выберите чат</p></div></div>
     <div class="lightbox" v-if="lightbox" @click="lightbox = null"><img :src="lightbox" style="max-width:90%;max-height:90%;border-radius:16px"></div>
   </div>
@@ -101,217 +108,39 @@ export default {
   name: 'MessagesPage',
   props: ['user'],
   inject: ['addToast'],
-  data() { return { dialogs: [], messages: [], filteredMessages: [], activeChat: null, activeChatName: '', partnerAvatar: null, currentUserId: null, msgText: '', unreadCount: 0, socket: null, lightbox: null, searchQuery: '', searchResults: [], showEmoji: false, pendingFiles: [], recording: false, mediaRecorder: null, isPartnerOnline: false, chunks: [], showSidebar: true, showMsgSearch: false, msgSearchQuery: '', showTranslate: false, selectedWord: '', translatedText: '', translating: false, recordingTime: 0, recordingTimer: null, soundEnabled: false, emojis: ['😀','😂','🤣','😍','🥰','😘','😎','🤩','😇','🤔','😴','🥳','❤️','🔥','🎉','⭐','✅','💯','🙏','💪','🚀','🌈'] }; },
+  data() { return { dialogs: [], messages: [], filteredMessages: [], activeChat: null, activeChatName: '', partnerAvatar: null, currentUserId: null, msgText: '', unreadCount: 0, socket: null, lightbox: null, searchQuery: '', searchResults: [], showEmoji: false, pendingFiles: [], recording: false, mediaRecorder: null, isPartnerOnline: false, chunks: [], showSidebar: true, showMsgSearch: false, msgSearchQuery: '', showTranslate: false, selectedWord: '', translatedText: '', translating: false, recordingTime: 0, recordingTimer: null, soundEnabled: false, emojis: ['😀','😂','🤣','😍','🥰','😘','😜','😎','🤩','😇','🤔','😴','🥳','❤️','🔥','🎉','⭐','✅','💯','🙏','💪','🚀','🌈'] }; },
   computed: { isDark() { return document.body.classList.contains('dark'); } },
   async mounted() {
     if (!this.user?.id) return; this.currentUserId = this.user.id; await this.loadDialogs();
     if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
-    this.socket = io('https://english-club-v1.onrender.com', { transports: ['websocket', 'polling'], path: '/socket.io' });
-    window.socket = this.socket;
-    this.socket.on('connect', () => { console.log('🔌 Сокет подключён, ID:', this.socket.id); this.socket.emit('join', { uid: this.currentUserId, uname: this.user.username, role: this.user.role }); });
+    this.socket = io('https://english-club-v1.onrender.com', { transports: ['websocket', 'polling'] });
+    this.socket.on('connect', () => this.socket.emit('join', { uid: this.currentUserId, uname: this.user.username, role: this.user.role }));
     this.socket.on('unread', ({ count }) => { this.unreadCount = count; });
-    this.socket.on('dm', (msg) => { 
-      if (typeof msg.files === 'string') { try { msg.files = JSON.parse(msg.files); } catch(e) { msg.files = null; } } 
-      msg = this.parseFiles(msg);
-      if (msg.from === this.currentUserId) { this.loadDialogs(); return; } 
-      if (this.activeChat === msg.from) { 
-        if (!this.messages.find(m => m.id === msg.id)) { 
-          this.messages.push(msg); 
-          this.filterMessages(); 
-          this.$nextTick(() => this.scrollToBottom()); 
-        } 
-      } 
-      if (document.hidden && msg.from !== this.currentUserId) this.sendBrowserNotification(msg); 
-      this.loadDialogs(); 
-    });
+    this.socket.on('dm', (msg) => { if (typeof msg.files === 'string') { try { msg.files = JSON.parse(msg.files); } catch(e) { msg.files = null; } } if (msg.from === this.currentUserId) { this.loadDialogs(); return; } if (this.activeChat === msg.from) { if (!this.messages.find(m => m.id === msg.id)) { this.messages.push(msg); this.filterMessages(); this.$nextTick(() => this.scrollToBottom()); } } if (document.hidden && msg.from !== this.currentUserId) this.sendBrowserNotification(msg); this.loadDialogs(); });
     this.searchUsers = useDebounce(this.searchUsers, 300);
     document.addEventListener('click', (e) => { if (!e.target.closest('.translate-popup') && !e.target.closest('.msg-actions')) this.showTranslate = false; });
   },
   beforeUnmount() { if (this.socket) { this.socket.disconnect(); this.socket = null; } },
   methods: {
     playSendSound() { if (!this.soundEnabled) return; try { const ctx = new (window.AudioContext || window.webkitAudioContext)(); const osc = ctx.createOscillator(); const gain = ctx.createGain(); osc.connect(gain); gain.connect(ctx.destination); osc.frequency.value = 1200; osc.type = 'sine'; gain.gain.setValueAtTime(0.08, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1); osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.1); } catch(e) {} },
-    
-    toggleAudio(e, url) { 
-      const btn = e.target; 
-      const existing = document.querySelector('audio.voice-audio'); 
-      if (existing) { 
-        existing.pause(); 
-        existing.remove(); 
-      } 
-      if (btn.dataset.playing === 'true') { 
-        btn.dataset.playing = 'false'; 
-        btn.textContent = '▶️'; 
-        return; 
-      } 
-      const audio = new Audio(url); 
-      audio.classList.add('voice-audio'); 
-      audio.preload = 'auto';
-      audio.crossOrigin = 'anonymous';
-      
-      audio.oncanplaythrough = () => {
-        audio.play().then(() => {
-          btn.dataset.playing = 'true'; 
-          btn.textContent = '⏸️';
-        }).catch(e => {
-          console.log('Play prevented:', e);
-          btn.dataset.playing = 'false'; 
-          btn.textContent = '▶️';
-        });
-      };
-      
-      audio.onended = () => { 
-        btn.dataset.playing = 'false'; 
-        btn.textContent = '▶️'; 
-        audio.remove(); 
-      };
-      
-      audio.onerror = () => {
-        btn.dataset.playing = 'false';
-        btn.textContent = '▶️';
-        audio.remove();
-      };
-      
-      document.body.appendChild(audio); 
-      audio.load();
-    },
-    
+    toggleAudio(e, url) { const btn = e.target; const existing = document.querySelector('audio.voice-audio'); if (existing) { existing.pause(); existing.remove(); } if (btn.dataset.playing === 'true') { btn.dataset.playing = 'false'; btn.textContent = '▶️'; return; } const audio = new Audio(url); audio.classList.add('voice-audio'); audio.onended = () => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; audio.remove(); }; audio.play(); btn.dataset.playing = 'true'; btn.textContent = '⏸️'; document.body.appendChild(audio); },
     async translateMsg(m) { if (!m.message) return; const word = m.message.split(' ').find(w => /^[a-zA-Z]+$/.test(w)); if (!word) { this.addToast('Нет английских слов', 'info'); return; } this.selectedWord = word; this.showTranslate = true; this.translating = true; this.translatedText = ''; try { this.translatedText = await translateWord(word); } catch(e) { this.translatedText = 'Ошибка'; } finally { this.translating = false; } },
     async copyTranslation() { try { await navigator.clipboard.writeText(this.translatedText); this.addToast('Перевод скопирован 📋', 'success'); } catch(e) {} },
     formatTime(ts) { if (!ts) return ''; return new Date(ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }); },
     sendBrowserNotification(msg) { if ('Notification' in window && Notification.permission === 'granted') { try { new Notification(`💬 ${msg.fn || 'Новое сообщение'}`, { body: (msg.msg || '📎 Файл').substring(0, 100), icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🗣️</text></svg>', tag: 'engclub' }); } catch(e) {} } },
     linkify(text) { if (!text) return ''; return text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:#818cf8;text-decoration:underline">$1</a>'); },
     filterMessages() { const q = this.msgSearchQuery.toLowerCase(); this.filteredMessages = q ? this.messages.filter(m => m.message?.toLowerCase().includes(q)) : this.messages; },
-    getFileType(file) { if (!file) return 'file'; if (file.type) { if (file.type.startsWith('image/')) return 'image'; if (file.type.startsWith('audio/')) return 'audio'; if (file.type.startsWith('video/')) return 'video'; } const name = file.name || ''; const ext = name.split('.').pop()?.toLowerCase(); if (['mp3','wav','ogg','aac','m4a','flac','webm'].includes(ext)) return 'audio'; if (['mp4','webm','mov','avi'].includes(ext)) return 'video'; if (['jpg','jpeg','png','gif','webp','svg','bmp'].includes(ext)) return 'image'; return 'file'; },
+    getFileType(file) { if (!file) return 'file'; if (file.type) { if (file.type.startsWith('image/')) return 'image'; if (file.type.startsWith('audio/')) return 'audio'; if (file.type.startsWith('video/')) return 'video'; } const ext = (file.name || '').split('.').pop()?.toLowerCase(); if (['mp3','wav','ogg','aac','m4a','flac','webm'].includes(ext)) return 'audio'; if (['mp4','webm','mov','avi'].includes(ext)) return 'video'; if (['jpg','jpeg','png','gif','webp','svg','bmp'].includes(ext)) return 'image'; return 'file'; },
     async loadDialogs() { if (!this.currentUserId) return; try { const r = await axios.get('/api/dialogs'); this.dialogs = Array.isArray(r.data) ? r.data : []; } catch(e) {} },
     async searchUsers() { if (this.searchQuery.length < 2) { this.searchResults = []; return; } try { const r = await axios.get(`/api/users?q=${this.searchQuery}`); this.searchResults = (r.data || []).filter(u => u.id !== this.currentUserId); } catch(e) {} },
     async startChat(u) { this.activeChat = u.id; this.activeChatName = u.username; this.partnerAvatar = u.avatar_url; this.searchQuery = ''; this.searchResults = []; this.showSidebar = false; try { const r = await axios.get(`/api/messages/${u.id}`); this.messages = (r.data || []).map(m => this.parseFiles(m)); this.filterMessages(); this.$nextTick(() => this.scrollToBottom()); } catch(e) {} this.loadDialogs(); },
     async openChat(d) { const pid = d.partner_id || d.id; this.activeChat = pid; this.activeChatName = d.username; this.partnerAvatar = d.avatar_url; this.showSidebar = false; try { const r = await axios.get(`/api/messages/${pid}`); this.messages = (r.data || []).map(m => this.parseFiles(m)); this.filterMessages(); this.$nextTick(() => this.scrollToBottom()); } catch(e) {} },
-    
-    parseFiles(m) { 
-      if (!m.files) return m; 
-      if (typeof m.files === 'string') { 
-        try { m.files = JSON.parse(m.files); } catch(e) { m.files = null; } 
-      }
-      if (m.files && Array.isArray(m.files)) {
-        m.files = m.files.map(f => ({
-          ...f,
-          proxiedUrl: f.url ? f.url.replace(
-            'https://qmoxemhstzfxirpskext.supabase.co/storage/v1/object/public/uploads/',
-            '/api/file/'
-          ) : null
-        }));
-      }
-      return m; 
-    },
-    
-    replyTo(msg) { this.msgText = `↩ ${msg.fn || ''}: ${(msg.message || msg.msg || '').substring(0, 50)}\n`; this.$nextTick(() => { const ta = this.$el.querySelector('textarea'); if (ta) ta.focus(); }); },
+    parseFiles(m) { if (!m.files) return m; if (typeof m.files === 'string') { try { m.files = JSON.parse(m.files); } catch(e) { m.files = null; } } return m; },
+    replyTo(msg) { this.msgText = `↩ ${msg.fn || ''}: ${(msg.msg || '').substring(0, 50)}\n`; this.$nextTick(() => { const ta = this.$el.querySelector('textarea'); if (ta) ta.focus(); }); },
     async deleteMsg(id) { if (confirm('Удалить?')) { try { await axios.delete(`/api/msg/${id}`); this.messages = this.messages.filter(m => m.id !== id); this.filterMessages(); this.addToast('Удалено 🗑', 'success'); } catch(e) {} } },
-    
-    async sendMsg() {
-      const text = this.msgText.trim();
-      if ((!text && !this.pendingFiles.length) || !this.activeChat || !this.socket?.connected) return;
-      
-      const replyTo = text.startsWith('↩') ? text.split('\n')[0] : null;
-      const cleanText = replyTo ? text.split('\n').slice(1).join('\n').trim() : text;
-      
-      const uploadedFiles = [];
-      for (const file of this.pendingFiles) {
-        const form = new FormData();
-        form.append('file', file);
-        try {
-          const r = await axios.post('/api/chat-upload', form);
-          if (r.data?.url) {
-            uploadedFiles.push({
-              url: r.data.url,
-              type: r.data.type || this.getFileType(file),
-              name: file.name || 'Файл'
-            });
-          }
-        } catch(e) {
-          this.addToast('Ошибка загрузки файла', 'error');
-        }
-      }
-      
-      const msgText = cleanText || (uploadedFiles.length ? 
-        (uploadedFiles[0].type === 'audio' ? '🎤 Голосовое' : '📎 ' + uploadedFiles[0].name) : '');
-      
-      const localMsg = {
-        id: Date.now(),
-        from: this.currentUserId,
-        sender_id: this.currentUserId,
-        fn: this.user.username,
-        message: msgText,
-        files: uploadedFiles.length ? uploadedFiles : null,
-        reply_to: replyTo,
-        ts: new Date().toISOString()
-      };
-      
-      this.messages.push(this.parseFiles(localMsg));
-      this.filterMessages();
-      
-      this.socket.emit('dm', {
-        to: this.activeChat,
-        msg: msgText,
-        files: uploadedFiles.length ? uploadedFiles : null,
-        replyTo: replyTo
-      });
-      
-      this.playSendSound();
-      this.msgText = '';
-      this.pendingFiles = [];
-      this.$nextTick(() => this.scrollToBottom());
-    },
-    
+    async sendMsg() { const text = this.msgText.trim(); if ((!text && !this.pendingFiles.length) || !this.activeChat || !this.socket?.connected) return; const replyTo = text.startsWith('↩') ? text.split('\n')[0] : null; const cleanText = replyTo ? text.split('\n').slice(1).join('\n').trim() : text; if (cleanText) { const m = { id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: cleanText, ts: new Date().toISOString() }; this.messages.push(m); this.filterMessages(); this.socket.emit('dm', { to: this.activeChat, msg: cleanText, replyTo }); } for (const file of this.pendingFiles) { const form = new FormData(); form.append('img', file); try { const r = await axios.post('/api/nimg', form); if (r.data?.url) { const type = this.getFileType(file); const icon = type === 'image' ? '🖼️' : type === 'audio' ? '🎤' : type === 'video' ? '🎬' : '📎'; const msgText = type === 'audio' ? '🎤 Голосовое' : icon + ' ' + file.name; const fm = { id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: msgText, files: [{ url: r.data.url, type, name: file.name }], ts: new Date().toISOString() }; this.messages.push(fm); this.filterMessages(); this.socket.emit('dm', { to: this.activeChat, msg: msgText, files: [{ url: r.data.url, type, name: file.name }] }); } } catch(e) {} } this.playSendSound(); this.msgText = ''; this.pendingFiles = []; this.$nextTick(() => this.scrollToBottom()); },
     handleFiles(e) { if (e.target.files?.length) { for (const file of e.target.files) { if (file.type.startsWith('image/')) file.preview = URL.createObjectURL(file); this.pendingFiles.push(file); } } e.target.value = ''; },
-    
-    async startRecord() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        this.recording = true;
-        this.recordingTime = 0;
-        this.recordingTimer = setInterval(() => this.recordingTime++, 1000);
-        this.mediaRecorder = new MediaRecorder(stream);
-        this.chunks = [];
-        this.mediaRecorder.ondataavailable = e => this.chunks.push(e.data);
-        this.mediaRecorder.onstop = async () => {
-          clearInterval(this.recordingTimer);
-          const blob = new Blob(this.chunks, { type: 'audio/webm' });
-          const form = new FormData();
-          form.append('file', blob, 'voice-message.webm');
-          try {
-            const r = await axios.post('/api/chat-upload', form);
-            if (r.data?.url) {
-              const voiceMsg = {
-                id: Date.now(),
-                from: this.currentUserId,
-                sender_id: this.currentUserId,
-                fn: this.user.username,
-                message: '🎤 Голосовое сообщение',
-                files: [{ url: r.data.url, type: 'audio', name: 'Голосовое сообщение' }],
-                ts: new Date().toISOString()
-              };
-              this.messages.push(this.parseFiles(voiceMsg));
-              this.filterMessages();
-              this.socket.emit('dm', {
-                to: this.activeChat,
-                msg: '🎤 Голосовое сообщение',
-                files: [{ url: r.data.url, type: 'audio', name: 'Голосовое сообщение' }]
-              });
-            }
-          } catch(e) {
-            this.addToast('Ошибка загрузки голосового', 'error');
-          }
-          stream.getTracks().forEach(t => t.stop());
-          this.recording = false;
-          this.recordingTime = 0;
-          this.$nextTick(() => this.scrollToBottom());
-        };
-        this.mediaRecorder.start();
-      } catch(e) {
-        this.recording = false;
-        this.addToast('Нет доступа к микрофону 🎤', 'error');
-      }
-    },
+    async startRecord() { try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); this.recording = true; this.recordingTime = 0; this.recordingTimer = setInterval(() => this.recordingTime++, 1000); this.mediaRecorder = new MediaRecorder(stream); this.chunks = []; this.mediaRecorder.ondataavailable = e => this.chunks.push(e.data); this.mediaRecorder.onstop = async () => { clearInterval(this.recordingTimer); const blob = new Blob(this.chunks, { type: 'audio/webm' }); const form = new FormData(); form.append('img', blob, 'voice.webm'); try { const r = await axios.post('/api/nimg', form); if (r.data?.url) { const vm = { id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }], ts: new Date().toISOString() }; this.messages.push(vm); this.filterMessages(); this.socket.emit('dm', { to: this.activeChat, msg: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }] }); } } catch(e) {} stream.getTracks().forEach(t => t.stop()); this.recording = false; this.recordingTime = 0; this.$nextTick(() => this.scrollToBottom()); }; this.mediaRecorder.start(); } catch(e) { this.recording = false; this.addToast('Нет доступа к микрофону 🎤', 'error'); } },
     stopRecord() { if (this.mediaRecorder?.state === 'recording') this.mediaRecorder.stop(); },
     scrollToBottom() { const el = this.$refs.msgContainer; if (el) el.scrollTop = el.scrollHeight; }
   }
