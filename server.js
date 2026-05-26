@@ -45,6 +45,12 @@ app.use(express.static('dist'));
 app.use(session({ secret: 'sp-club-2026', resave: false, saveUninitialized: false, cookie: { maxAge: 30 * 24 * 3600000, sameSite: 'lax', secure: false } }));
 
 
+app.use((req, res, next) => {
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.header('Access-Control-Allow-Origin', '*');
+  next();
+});
+
 function auth(req, res, next) { req.session.userId ? next() : res.status(401).json({ error: 'Войдите' }); }
 
 function sendTelegram(chatId, text, extra = {}) {
