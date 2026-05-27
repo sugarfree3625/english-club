@@ -29,7 +29,7 @@ module.exports = (app, supabase) => {
   // Фидбеки
   app.post('/api/feedback', auth, async (req, res) => { if (req.session.role !== 'admin' && req.session.role !== 'host') return res.status(403).json({ error: 'Нет прав' }); await supabase.from('feedbacks').insert({ ...req.body, created_by: req.session.userId }); res.json({ success: true }); });
 
-  // ==================== ДОСТИЖЕНИЯ (ПЕРЕРАБОТАННЫЕ) ====================
+  // ==================== ДОСТИЖЕНИЯ ====================
   app.get('/api/achievements', auth, async (req, res) => {
     try {
       const uid = req.session.userId;
@@ -57,18 +57,17 @@ module.exports = (app, supabase) => {
         account_age_days: ageDays
       };
       
-      console.log('📊 Статистика для', uid, ':', stats);
-      
       // Получаем все ачивки
       const { data: allAchievements } = await supabase.from('achievements').select('*');
       
-      // Уже полученные
+      // Уже полученные (один раз и навсегда)
       const { data: earned } = await supabase.from('user_achievements').select('achievement_id').eq('user_id', uid);
       const earnedIds = earned?.map(e => e.achievement_id) || [];
       
-      // Проверяем и выдаём новые
+      // Проверяем и выдаём НОВЫЕ (только те, которых ещё нет)
+      let newAchievements = [];
       for (const a of (allAchievements || [])) {
-        if (earnedIds.includes(a.id)) continue;
+        if (earnedIds.includes(a.id)) continue; // уже есть — пропускаем
         let ok = false;
         switch (a.condition_field) {
           case 'meetings_count': ok = stats.meetings_count >= a.condition_value; break;
@@ -80,7 +79,7 @@ module.exports = (app, supabase) => {
         if (ok) {
           await supabase.from('user_achievements').insert({ user_id: uid, achievement_id: a.id });
           earnedIds.push(a.id);
-          console.log('🏆 Выдана ачивка:', a.name, 'для', uid);
+          newAchievements.push(a);
         }
       }
       
