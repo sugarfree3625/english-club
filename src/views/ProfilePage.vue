@@ -117,19 +117,27 @@ export default {
   methods: {
     switchTab(btn) { this.tab = btn.tab; if (btn.load) this[btn.load](); },
     async loadAchievements() { 
-      try { 
-        const r = await axios.get('/api/achievements'); 
-        const prevCodes = this.allAchievements.filter(a => a.earned).map(a => a.code);
-        this.allAchievements = (r.data || []).map(a => ({ ...a, progressPercent: a.progress_percent || (a.earned ? 100 : 0) })); 
-        this.earnedCount = this.allAchievements.filter(a => a.earned).length;
-        const newCodes = this.allAchievements.filter(a => a.earned).map(a => a.code);
-        const unlocked = newCodes.find(c => !prevCodes.includes(c));
-        if (unlocked) {
-          const ach = this.allAchievements.find(a => a.code === unlocked);
-          if (ach) { this.newAchievement = ach; this.showConfetti = true; }
-        }
-      } catch(e) {} 
-    },
+  try { 
+    const r = await axios.get('/api/achievements'); 
+    const newData = (r.data || []).map(a => ({ ...a, progressPercent: a.progressPercent || a.progress_percent || (a.earned ? 100 : 0) }));
+    
+    // Находим только что полученные (были не earned, стали earned)
+    const newlyUnlocked = newData.filter(a => {
+      const old = this.allAchievements.find(o => o.code === a.code);
+      return old && !old.earned && a.earned;
+    });
+    
+    this.allAchievements = newData;
+    this.earnedCount = this.allAchievements.filter(a => a.earned).length;
+    
+    // Показываем уведомление только для первой новой ачивки
+    if (newlyUnlocked.length > 0 && !this._shownAchievements) {
+      this._shownAchievements = true;
+      this.newAchievement = newlyUnlocked[0];
+      this.showConfetti = true;
+    }
+  } catch(e) {} 
+},
     async loadMyHomework() { try { this.myHomework = (await axios.get('/api/homework/my')).data || []; } catch(e) {} },
     async loadMyStudents() { try { this.myStudents = (await axios.get('/api/parent/students')).data || []; } catch(e) {} },
     async loadAllStudents() { try { this.allStudents = ((await axios.get('/api/users')).data || []).filter(u => u.role !== 'admin'); } catch(e) {} },
