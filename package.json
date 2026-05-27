@@ -22,6 +22,8 @@
     "googleapis": "^144.0.0",
     "grapesjs": "^0.22.16",
     "ics": "^3.8.1",
+    "stripe": "^14.0.0",
+    "@tinkoff/invest-openapi-js-sdk": "^1.5.0",
     "multer": "^1.4.5-lts.1",
     "socket.io": "^4.7.5",
     "socket.io-client": "^4.7.5",
