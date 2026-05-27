@@ -27,6 +27,7 @@
                 <a @click="$router.push('/messages');menuOpen=false"><i class="fas fa-comments"></i> Сообщения</a>
                 <a @click="$router.push('/dashboard');menuOpen=false"><i class="fas fa-chart-line"></i> Главная</a>
                 <a @click="$router.push('/profile');menuOpen=false"><i class="fas fa-user"></i> Профиль</a>
+                <a @click="showPricing = true; menuOpen=false"><i class="fas fa-crown"></i> Тарифы</a>
                 <a @click="$router.push('/admin');menuOpen=false" v-if="user?.role === 'admin'"><i class="fas fa-sliders-h"></i> Управление сайтом</a>
                 <a @click="logout();menuOpen=false"><i class="fas fa-sign-out-alt"></i> Выйти</a>
               </div>
@@ -38,6 +39,9 @@
 
     <!-- Приветственное окно -->
     <WelcomeModal v-if="showWelcome" :user="user" :isNew="isNewUser" @close="showWelcome = false; localStorage.setItem('welcome_dismissed', Date.now().toString())" />
+
+    <!-- Тарифы -->
+    <PricingModal v-if="showPricing" @close="showPricing = false" />
 
     <router-view v-slot="{ Component }">
       <transition name="page-fade" mode="out-in">
@@ -82,13 +86,14 @@
 import axios from 'axios';
 import ScrollToTop from './components/ScrollToTop.vue';
 import WelcomeModal from './components/WelcomeModal.vue';
+import PricingModal from './components/PricingModal.vue';
 
 export default {
   name: 'App',
-  components: { ScrollToTop, WelcomeModal },
+  components: { ScrollToTop, WelcomeModal, PricingModal },
   data() { 
     return { 
-      user: null, settings: {}, isDark: false, menuOpen: false, 
+      user: null, settings: {}, isDark: false, menuOpen: false, showPricing: false,
       showLogin: false, showReg: false, showWelcome: false, isNewUser: false,
       loginEmail: '', loginPassword: '', regUsername: '', regEmail: '', regPassword: '', regLevel: 'B1',
       toasts: [], toastId: 0,
