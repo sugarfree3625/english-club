@@ -17,6 +17,9 @@
             <span class="profile-rating">{{ user?.rating }}🏆</span>
           </div>
           <button class="btn btn-p btn-sm w-100" @click="linkTelegram"><i class="fab fa-telegram"></i> Telegram</button>
+          <button class="btn btn-o btn-sm w-100" @click="exportPDF">
+            📊 Экспорт прогресса
+          </button>
           <nav class="sidebar-nav">
             <button v-for="btn in sidebarButtons" :key="btn.tab" class="sidebar-btn" :class="{ active: tab === btn.tab }" @click="switchTab(btn)">
               <i :class="btn.icon"></i> {{ btn.label }}
@@ -68,6 +71,7 @@ import ProfileTabAchievements from '../components/profile/ProfileTabAchievements
 import ProfileTabSchedule from '../components/profile/ProfileTabSchedule.vue';
 import ProfileTabStudents from '../components/profile/ProfileTabStudents.vue';
 import AchievementUnlock from '../components/AchievementUnlock.vue';
+import { exportProgressPDF } from '../composables/useExportPDF.js';
 
 export default {
   name: 'ProfilePage',
@@ -117,27 +121,36 @@ export default {
   methods: {
     switchTab(btn) { this.tab = btn.tab; if (btn.load) this[btn.load](); },
     async loadAchievements() { 
-  try { 
-    const r = await axios.get('/api/achievements'); 
-    const newData = (r.data || []).map(a => ({ ...a, progressPercent: a.progressPercent || a.progress_percent || (a.earned ? 100 : 0) }));
-    
-    // Находим только что полученные (были не earned, стали earned)
-    const newlyUnlocked = newData.filter(a => {
-      const old = this.allAchievements.find(o => o.code === a.code);
-      return old && !old.earned && a.earned;
-    });
-    
-    this.allAchievements = newData;
-    this.earnedCount = this.allAchievements.filter(a => a.earned).length;
-    
-    // Показываем уведомление только для первой новой ачивки
-    if (newlyUnlocked.length > 0 && !this._shownAchievements) {
-      this._shownAchievements = true;
-      this.newAchievement = newlyUnlocked[0];
-      this.showConfetti = true;
-    }
-  } catch(e) {} 
-},
+      try { 
+        const r = await axios.get('/api/achievements'); 
+        const newData = (r.data || []).map(a => ({ ...a, progressPercent: a.progressPercent || a.progress_percent || (a.earned ? 100 : 0) }));
+        const newlyUnlocked = newData.filter(a => {
+          const old = this.allAchievements.find(o => o.code === a.code);
+          return old && !old.earned && a.earned;
+        });
+        this.allAchievements = newData;
+        this.earnedCount = this.allAchievements.filter(a => a.earned).length;
+        if (newlyUnlocked.length > 0 && !this._shownAchievements) {
+          this._shownAchievements = true;
+          this.newAchievement = newlyUnlocked[0];
+          this.showConfetti = true;
+        }
+      } catch(e) {} 
+    },
+    async exportPDF() {
+      try {
+        const achRes = await axios.get('/api/achievements');
+        const stats = {
+          messages: this.allAchievements.find(a => a.condition_field === 'messages_count')?.current_value || 0,
+          meetings: this.allAchievements.find(a => a.condition_field === 'meetings_count')?.current_value || 0,
+          words: this.allAchievements.find(a => a.condition_field === 'words_count')?.current_value || 0,
+          achievements: this.allAchievements.filter(a => a.earned).length
+        };
+        exportProgressPDF(this.user, stats, achRes.data || []);
+      } catch(e) {
+        this.addToast('Ошибка экспорта', 'error');
+      }
+    },
     async loadMyHomework() { try { this.myHomework = (await axios.get('/api/homework/my')).data || []; } catch(e) {} },
     async loadMyStudents() { try { this.myStudents = (await axios.get('/api/parent/students')).data || []; } catch(e) {} },
     async loadAllStudents() { try { this.allStudents = ((await axios.get('/api/users')).data || []).filter(u => u.role !== 'admin'); } catch(e) {} },
