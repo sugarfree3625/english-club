@@ -80,4 +80,9 @@ export default {
 .student-role-badge.user, .student-role-badge.student { background: rgba(148,163,184,0.2); color: #94a3b8; }
 .student-actions { display: flex; gap: 6px; }
 .empty-text { text-align: center; color: #64748b; padding: 30px; }
-.btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 50px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border: none; font-family: inherit; transition: all 0.2s; }
+.btn-o { border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; background: rgba(255,255,255,0.05); }
+.btn-sm { padding: 7px 16px; font-size: 0.8rem; }
+.fade-in { animation: fadeIn 0.35s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+</style>
