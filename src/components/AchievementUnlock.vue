@@ -168,7 +168,64 @@ export default {
   -webkit-backdrop-filter: blur(6px);
   overflow: hidden;
 }
+/* 3D для карточки уведомления */
+.unlock-card {
+  transform-style: preserve-3d;
+  perspective: 1000px;
+  box-shadow: 
+    0 0 80px rgba(251, 191, 36, 0.3),
+    0 0 120px rgba(251, 191, 36, 0.15),
+    0 30px 60px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
 
+/* Глянцевый блик на иконке */
+.unlock-icon-wrap {
+  filter: drop-shadow(0 0 30px rgba(251, 191, 36, 0.8))
+          drop-shadow(0 0 60px rgba(251, 191, 36, 0.4))
+          drop-shadow(0 10px 20px rgba(0, 0, 0, 0.5));
+}
+
+.unlock-icon-wrap::after {
+  content: '';
+  position: absolute;
+  top: 5%;
+  left: 10%;
+  width: 35%;
+  height: 35%;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.5) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: iconBounceIn 0.6s ease infinite alternate;
+}
+
+/* 3D для кнопки */
+.unlock-btn {
+  box-shadow: 
+    0 8px 25px rgba(99, 102, 241, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform-style: preserve-3d;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.unlock-btn:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 
+    0 12px 35px rgba(99, 102, 241, 0.6),
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.unlock-btn:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+/* Объёмные конфетти */
+.confetti-piece {
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.5));
+  box-shadow: 0 0 6px currentColor;
+}
 /* ==================== КОНФЕТТИ ==================== */
 .confetti-container {
   position: absolute;
