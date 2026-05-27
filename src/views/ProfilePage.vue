@@ -44,6 +44,31 @@
           <ProfileTabStudents v-if="tab === 'children'" :students="myStudents" title="Мои дети" @view="viewStudent" />
           <ProfileTabStudents v-if="tab === 'students'" :students="allStudents" title="Ученики" :showActions="true" :isAdmin="user?.role === 'admin'" @view="viewStudent" @bind="bindParent" @homework="addHomework" @feedback="addFeedback" />
 
+          <!-- Фидбеки для родителей -->
+          <div v-if="tab === 'feedbacks'" class="card fade-in">
+            <h3>📊 Фидбеки моих детей</h3>
+            <div v-if="feedbacks.length" class="feedback-list">
+              <div v-for="f in feedbacks" :key="f.id" class="feedback-card">
+                <div class="feedback-header">
+                  <AppAvatar :src="f.student_avatar" :name="f.student_name" :size="40" />
+                  <div>
+                    <strong>{{ f.student_name }}</strong>
+                    <small>{{ formatDate(f.created_at) }}</small>
+                  </div>
+                  <div class="feedback-rating">
+                    <span v-for="i in 5" :key="i">{{ i <= f.rating ? '⭐' : '☆' }}</span>
+                  </div>
+                </div>
+                <div class="feedback-body">
+                  <div v-if="f.topic"><strong>Тема:</strong> {{ f.topic }}</div>
+                  <div v-if="f.good">👍 <strong>Хорошо:</strong> {{ f.good }}</div>
+                  <div v-if="f.improve">📝 <strong>Улучшить:</strong> {{ f.improve }}</div>
+                </div>
+              </div>
+            </div>
+            <p v-else class="empty-text">Нет фидбеков</p>
+          </div>
+
           <div v-if="tab === 'homework'" class="card fade-in"><h3>Создать задание</h3><select class="input" v-model="hwStudent"><option value="">Выберите ученика</option><option v-for="s in allStudents" :key="s.id" :value="s.id">{{ s.username }}</option></select><input class="input" v-model="hwTitle" placeholder="Название"><textarea class="input note-area" v-model="hwDesc" rows="3" placeholder="Описание"></textarea><input class="input" v-model="hwDueDate" type="date"><button class="btn btn-p btn-sm w-100" @click="createHomework">Создать</button></div>
 
           <div v-if="tab === 'history'" class="card fade-in"><h3>История встреч</h3><div class="session-item" v-for="b in pastBookings" :key="b.bid"><strong>{{ b.title }}</strong><small>{{ new Date(b.date).toLocaleString('ru') }}</small></div><p v-if="!pastBookings.length" class="empty-text">Нет истории</p></div>
@@ -84,7 +109,8 @@ export default {
       mySlots: [], showBindParent: false, bindStudentId: null, parentSearch: '', parentResults: [],
       showFeedback: false, fbStudentId: null, fbRating: 3, fbTopic: '', fbGood: '', fbImprove: '',
       hwStudent: '', hwTitle: '', hwDesc: '', hwDueDate: '',
-      newAchievement: null
+      newAchievement: null,
+      feedbacks: []
     };
   },
   computed: {
@@ -100,10 +126,11 @@ export default {
         { tab: 'info', icon: 'fas fa-user', label: 'Инфо', show: true },
         { tab: 'achievements', icon: 'fas fa-trophy', label: 'Достижения', show: true, load: 'loadAchievements' },
         { tab: 'myschedule', icon: 'fas fa-calendar-check', label: 'Расписание', show: true, load: 'loadMySlots' },
-        { tab: 'words', icon: 'fas fa-book', label: 'Словарь', show: this.isStudent },
+        { tab: 'words', icon: 'fas fa-book', label: 'Словарь', show: this.isStudent || this.isTutor },
         { tab: 'notes', icon: 'fas fa-sticky-note', label: 'Блокнот', show: this.isStudent },
         { tab: 'myhomework', icon: 'fas fa-tasks', label: 'Задания', show: this.isStudent, load: 'loadMyHomework' },
         { tab: 'children', icon: 'fas fa-child', label: 'Мои дети', show: this.isParent, load: 'loadMyStudents' },
+        { tab: 'feedbacks', icon: 'fas fa-star', label: 'Фидбеки', show: this.isParent, load: 'loadFeedbacks' },
         { tab: 'students', icon: 'fas fa-users', label: 'Ученики', show: this.isTutor, load: 'loadAllStudents' },
         { tab: 'homework', icon: 'fas fa-tasks', label: 'Задания', show: this.isTutor },
         { tab: 'history', icon: 'fas fa-history', label: 'История', show: true }
@@ -114,9 +141,12 @@ export default {
   async mounted() {
     try { const [w, n, b] = await Promise.all([axios.get('/api/words'), axios.get('/api/notes'), axios.get('/api/myb')]); this.words = w.data; this.note = n.data.note || ''; this.allBookings = b.data; } catch(e) {}
     this.loadAchievements();
+    const savedTab = localStorage.getItem('profile_tab');
+    if (savedTab) { this.tab = savedTab; localStorage.removeItem('profile_tab'); if (savedTab === 'feedbacks') this.loadFeedbacks(); if (savedTab === 'achievements') this.loadAchievements(); }
   },
   methods: {
     switchTab(btn) { this.tab = btn.tab; if (btn.load) this[btn.load](); },
+    formatDate(ts) { return ts ? new Date(ts).toLocaleDateString('ru', { day: 'numeric', month: 'short', year: 'numeric' }) : ''; },
     async loadAchievements() { 
       try { 
         const r = await axios.get('/api/achievements'); 
@@ -134,6 +164,7 @@ export default {
         }
       } catch(e) {} 
     },
+    async loadFeedbacks() { try { const r = await axios.get('/api/feedback/my'); this.feedbacks = r.data || []; } catch(e) {} },
     async exportPDF() {
       try {
         const achRes = await axios.get('/api/achievements');
@@ -217,6 +248,17 @@ h3 { color: #fff; font-family: 'Space Grotesk', sans-serif; }
 .session-item strong { color: #fff; }
 .session-item small { color: #94a3b8; }
 .empty-text { text-align: center; color: #64748b; padding: 30px; }
+
+.feedback-list { display: flex; flex-direction: column; gap: 12px; }
+.feedback-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 18px; }
+.feedback-header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.feedback-header strong { color: #fff; font-size: 0.9rem; }
+.feedback-header small { color: #94a3b8; font-size: 0.75rem; }
+.feedback-rating { margin-left: auto; font-size: 0.85rem; }
+.feedback-body { display: flex; flex-direction: column; gap: 6px; }
+.feedback-body div { font-size: 0.85rem; color: #cbd5e1; }
+.feedback-body strong { color: #94a3b8; }
+
 .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 50px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border: none; font-family: inherit; transition: all 0.2s; }
 .btn-p { background: linear-gradient(135deg, #6366f1, #2dd4bf); color: #fff; }
 .btn-o { border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; background: rgba(255,255,255,0.05); }
