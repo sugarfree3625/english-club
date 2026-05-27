@@ -9,12 +9,11 @@
       <div class="quick-actions">
         <button class="quick-action-btn" @click="$router.push('/messages')">💬 Чат</button>
         <button class="quick-action-btn" @click="$router.push('/calendar')">📅 Встречи</button>
-        <button class="quick-action-btn" @click="$router.push('/profile')">🏆 Достижения</button>
+        <button class="quick-action-btn" @click="goToAchievements">🏆 Достижения</button>
       </div>
       
       <div class="dashboard-grid">
         <div class="main-col">
-          <UpcomingLesson :lesson="upcomingLessonDisplay" />
           <DailyQuests :quests="dailyQuests" />
           <WordOfDay @save="saveWord" />
           <WeeklyChallenge :progress="challengeProgress" />
@@ -44,7 +43,6 @@
 import axios from 'axios';
 import DashboardHero from '../components/dashboard/DashboardHero.vue';
 import DashboardStats from '../components/dashboard/DashboardStats.vue';
-import UpcomingLesson from '../components/dashboard/UpcomingLesson.vue';
 import WordOfDay from '../components/dashboard/WordOfDay.vue';
 import WeeklyChallenge from '../components/dashboard/WeeklyChallenge.vue';
 import GoalProgress from '../components/dashboard/GoalProgress.vue';
@@ -55,7 +53,7 @@ import DailyQuests from '../components/dashboard/DailyQuests.vue';
 
 export default {
   name: 'DashboardPage',
-  components: { DashboardHero, DashboardStats, UpcomingLesson, WordOfDay, WeeklyChallenge, GoalProgress, MiniGame, WeeklySchedule, Leaderboard, DailyQuests },
+  components: { DashboardHero, DashboardStats, WordOfDay, WeeklyChallenge, GoalProgress, MiniGame, WeeklySchedule, Leaderboard, DailyQuests },
   props: ['user'],
   inject: ['addToast'],
   data() {
@@ -75,19 +73,7 @@ export default {
   computed: {
     goalPercent() { return Math.min(100, Math.round((this.stats.meetings / 50) * 100)); },
     goalRemaining() { return Math.max(0, 50 - this.stats.meetings); },
-    nextAchievement() { return this.allAchievements.filter(a => !a.earned)[0] || null; },
-    upcomingLessonDisplay() {
-      const now = new Date();
-      if (!this.weeklySlots?.length) return null;
-      const upcoming = this.weeklySlots
-        .filter(s => {
-          const start = new Date(s.start_time);
-          const diff = start - now;
-          return diff > 0 && diff <= 3600000;
-        })
-        .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
-      return upcoming[0] || null;
-    }
+    nextAchievement() { return this.allAchievements.filter(a => !a.earned)[0] || null; }
   },
   async mounted() {
     try {
@@ -117,6 +103,10 @@ export default {
       axios.post('/api/words', { en: word.en, ru: word.ru }).then(() => {
         this.addToast(`"${word.en}" добавлено в словарь! 📖`, 'success');
       }).catch(() => {});
+    },
+    goToAchievements() {
+      localStorage.setItem('profile_tab', 'achievements');
+      this.$router.push('/profile');
     }
   }
 };
