@@ -1,73 +1,141 @@
 <template>
-  <transition name="overlay-fade">
-    <div v-if="visible" class="unlock-overlay" @click.self="close">
-      <!-- Конфетти -->
-      <div class="confetti-container">
-        <div v-for="i in 50" :key="i" class="confetti-particle"
-          :style="{
-            left: randomPos() + '%',
-            animationDelay: Math.random() * 0.5 + 's',
-            animationDuration: 1.5 + Math.random() * 2 + 's',
-            backgroundColor: randomColor()
-          }">
+  <Teleport to="body">
+    <Transition name="overlay-fade">
+      <div v-if="visible" class="unlock-overlay" @click.self="close">
+        <!-- ==================== КОНФЕТТИ ==================== -->
+        <div class="confetti-container" aria-hidden="true">
+          <div
+            v-for="i in 60"
+            :key="i"
+            class="confetti-piece"
+            :style="{
+              left: random(5, 95) + '%',
+              top: random(-10, -2) + '%',
+              width: random(6, 12) + 'px',
+              height: random(6, 12) + 'px',
+              backgroundColor: randomColor(),
+              animationDelay: random(0, 0.8) + 's',
+              animationDuration: random(2, 4) + 's',
+              borderRadius: Math.random() > 0.5 ? '50%' : '3px',
+              transform: 'rotate(' + random(0, 360) + 'deg)'
+            }"
+          ></div>
         </div>
-      </div>
 
-      <!-- Карточка -->
-      <div class="unlock-card">
-        <div class="unlock-icon-wrapper">
-          <span class="unlock-icon">{{ achievement?.icon || '🏆' }}</span>
+        <!-- ==================== КАРТОЧКА ==================== -->
+        <div class="unlock-card">
+          <!-- Иконка -->
+          <div class="unlock-icon-wrap">
+            <component
+              :is="iconComponent"
+              :size="80"
+              stroke-width="1.5"
+              class="unlock-icon-svg"
+            />
+          </div>
+
+          <!-- Заголовок -->
+          <div class="unlock-badge">🎉 Новое достижение!</div>
+
+          <!-- Название -->
+          <h2 class="unlock-name">{{ achievement?.name || 'Достижение' }}</h2>
+
+          <!-- Описание -->
+          <p class="unlock-desc">{{ achievement?.description || '' }}</p>
+
+          <!-- Кнопка -->
+          <button class="unlock-btn" @click="close">
+            Круто! 🚀
+          </button>
         </div>
-        <div class="unlock-title">🎉 Новое достижение!</div>
-        <h2 class="unlock-name">{{ achievement?.name || 'Достижение' }}</h2>
-        <p class="unlock-desc">{{ achievement?.description || '' }}</p>
-        <div class="unlock-rarity" v-if="achievement?.rarity">
-          {{ rarityLabel(achievement.rarity) }}
-        </div>
-        <button class="unlock-btn" @click="close">Круто! 🚀</button>
       </div>
-    </div>
-  </transition>
+    </Transition>
+  </Teleport>
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import {
+  Star, MessageCircle, MessagesSquare, Mic, Flame,
+  UserPlus, Calendar, Shield, Award, Crown,
+  BookOpen, Library, Globe, ScrollText,
+  Target, Medal, Clock, CalendarDays, Building, Cake
+} from 'lucide-vue-next';
+
+// Массив цветов для конфетти
+const CONFETTI_COLORS = [
+  '#fbbf24', // золотой
+  '#a78bfa', // фиолетовый
+  '#2dd4bf', // бирюзовый
+  '#f472b6', // розовый
+  '#6366f1', // индиго
+  '#10b981', // зелёный
+  '#f59e0b', // янтарный
+];
 
 export default {
   name: 'AchievementUnlock',
+  components: {
+    Star, MessageCircle, MessagesSquare, Mic, Flame,
+    UserPlus, Calendar, Shield, Award, Crown,
+    BookOpen, Library, Globe, ScrollText,
+    Target, Medal, Clock, CalendarDays, Building, Cake
+  },
   props: {
-    achievement: Object
+    achievement: {
+      type: Object,
+      default: () => ({})
+    }
   },
   emits: ['close'],
   setup(props, { emit }) {
     const visible = ref(true);
     let timer = null;
 
+    // Карта иконок
+    const iconMap = {
+      'message-circle': MessageCircle,
+      'messages-square': MessagesSquare,
+      'mic': Mic,
+      'flame': Flame,
+      'user-plus': UserPlus,
+      'calendar': Calendar,
+      'shield': Shield,
+      'star': Star,
+      'book-open': BookOpen,
+      'library': Library,
+      'globe': Globe,
+      'scroll': ScrollText,
+      'target': Target,
+      'medal': Medal,
+      'award': Award,
+      'crown': Crown,
+      'clock': Clock,
+      'calendar-days': CalendarDays,
+      'building': Building,
+      'cake': Cake
+    };
+
+    const iconComponent = computed(() => {
+      const iconName = props.achievement?.icon;
+      return iconMap[iconName] || Star;
+    });
+
     function close() {
       visible.value = false;
-      setTimeout(() => emit('close'), 300);
+      setTimeout(() => emit('close'), 350);
     }
 
-    function randomPos() {
-      return Math.floor(Math.random() * 100);
+    function random(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
     }
 
     function randomColor() {
-      const colors = ['#fbbf24', '#a78bfa', '#2dd4bf', '#f472b6', '#6366f1', '#10b981', '#f59e0b'];
-      return colors[Math.floor(Math.random() * colors.length)];
-    }
-
-    function rarityLabel(r) {
-      const labels = {
-        bronze: '🥉 БРОНЗОВЫЙ ТРОФЕЙ',
-        silver: '🥈 СЕРЕБРЯНЫЙ ТРОФЕЙ',
-        gold: '🥇 ЗОЛОТОЙ ТРОФЕЙ',
-        platinum: '💎 ПЛАТИНОВЫЙ ТРОФЕЙ'
-      };
-      return labels[r] || '';
+      return CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
     }
 
     onMounted(() => {
+      // Автоисчезновение через 5 секунд
       timer = setTimeout(close, 5000);
     });
 
@@ -75,32 +143,33 @@ export default {
       clearTimeout(timer);
     });
 
-    return { visible, close, randomPos, randomColor, rarityLabel };
+    return {
+      visible,
+      iconComponent,
+      close,
+      random,
+      randomColor
+    };
   }
 };
 </script>
 
 <style scoped>
-/* Оверлей */
+/* ==================== ОВЕРЛЕЙ ==================== */
 .unlock-overlay {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0,0,0,0.7);
+  background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   overflow: hidden;
 }
 
-.overlay-fade-enter-active { animation: overlayIn 0.3s ease; }
-.overlay-fade-leave-active { animation: overlayOut 0.3s ease; }
-@keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes overlayOut { from { opacity: 1; } to { opacity: 0; } }
-
-/* Конфетти */
+/* ==================== КОНФЕТТИ ==================== */
 .confetti-container {
   position: absolute;
   inset: 0;
@@ -108,65 +177,79 @@ export default {
   overflow: hidden;
 }
 
-.confetti-particle {
+.confetti-piece {
   position: absolute;
-  top: -20px;
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
   animation: confettiFall linear forwards;
 }
 
 @keyframes confettiFall {
-  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(105vh) rotate(720deg);
+    opacity: 0;
+  }
 }
 
-/* Карточка */
+/* ==================== КАРТОЧКА ==================== */
 .unlock-card {
+  position: relative;
+  z-index: 10;
+  width: 90%;
+  max-width: 380px;
+  padding: 36px 28px;
+  text-align: center;
   background: rgba(15, 15, 35, 0.95);
   backdrop-filter: blur(30px);
   -webkit-backdrop-filter: blur(30px);
   border: 2px solid rgba(251, 191, 36, 0.5);
   border-radius: 28px;
-  padding: 40px 32px;
-  text-align: center;
-  max-width: 380px;
-  width: 90%;
-  box-shadow: 0 0 60px rgba(251, 191, 36, 0.2), 0 20px 60px rgba(0,0,0,0.5);
-  animation: cardPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  position: relative;
-  z-index: 10;
+  box-shadow: 0 0 60px rgba(251, 191, 36, 0.2), 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: cardSpring 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-@keyframes cardPop {
-  0% { transform: scale(0.5); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
+@keyframes cardSpring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
-.unlock-icon-wrapper {
+/* ==================== ИКОНКА ==================== */
+.unlock-icon-wrap {
+  display: inline-block;
   margin-bottom: 16px;
-}
-
-.unlock-icon {
-  font-size: 6rem;
-  display: block;
-  animation: iconBounce 0.6s ease infinite alternate;
+  animation: iconBounceIn 0.6s ease infinite alternate;
   filter: drop-shadow(0 0 20px rgba(251, 191, 36, 0.5));
 }
 
-@keyframes iconBounce {
-  from { transform: translateY(0) scale(1); }
-  to { transform: translateY(-8px) scale(1.05); }
+.unlock-icon-svg {
+  color: #fbbf24;
 }
 
-.unlock-title {
+@keyframes iconBounceIn {
+  from {
+    transform: translateY(0) scale(1);
+  }
+  to {
+    transform: translateY(-6px) scale(1.05);
+  }
+}
+
+/* ==================== ТЕКСТ ==================== */
+.unlock-badge {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 700;
   color: #fbbf24;
   text-transform: uppercase;
-  letter-spacing: 2px;
+  letter-spacing: 1.5px;
   margin-bottom: 8px;
 }
 
@@ -182,28 +265,23 @@ export default {
   font-family: 'Inter', sans-serif;
   font-size: 0.9rem;
   color: #94a3b8;
-  margin-bottom: 12px;
-}
-
-.unlock-rarity {
-  font-size: 0.8rem;
-  font-weight: 700;
   margin-bottom: 20px;
-  color: #fbbf24;
+  line-height: 1.5;
 }
 
+/* ==================== КНОПКА ==================== */
 .unlock-btn {
-  background: linear-gradient(135deg, #6366f1, #2dd4bf);
-  color: #fff;
-  border: none;
   padding: 12px 32px;
-  border-radius: 50px;
   font-family: 'Inter', sans-serif;
   font-size: 1rem;
   font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #6366f1 0%, #2dd4bf 100%);
+  border: none;
+  border-radius: 50px;
   cursor: pointer;
-  animation: btnPulse 2s ease infinite;
   transition: transform 0.2s;
+  animation: btnPulse 2s ease-in-out infinite;
 }
 
 .unlock-btn:hover {
@@ -211,7 +289,23 @@ export default {
 }
 
 @keyframes btnPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.4); }
-  50% { box-shadow: 0 0 0 15px rgba(99,102,241,0); }
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 16px rgba(99, 102, 241, 0);
+  }
+}
+
+/* ==================== TRANSITIONS ==================== */
+.overlay-fade-enter-active {
+  transition: opacity 0.3s ease;
+}
+.overlay-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.overlay-fade-enter-from,
+.overlay-fade-leave-to {
+  opacity: 0;
 }
 </style>
