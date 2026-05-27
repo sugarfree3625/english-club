@@ -46,25 +46,19 @@ module.exports = (app, supabase) => {
   app.get('/api/achievements', auth, async (req, res) => {
     try {
       const uid = req.session.userId;
-      
       const [bookings, msgs, words] = await Promise.all([
         supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('user_id', uid),
         supabase.from('msg').select('*', { count: 'exact', head: true }).eq('sender_id', uid),
         supabase.from('words').select('*', { count: 'exact', head: true }).eq('user_id', uid)
       ]);
-      
       const { data: topUsers } = await supabase.from('users').select('id').order('rating', { ascending: false }).limit(50);
       const rank = topUsers?.findIndex(u => u.id === uid) + 1 || 51;
-      
       const { data: userData } = await supabase.from('users').select('created_at').eq('id', uid).single();
       const ageDays = userData?.created_at ? Math.floor((Date.now() - new Date(userData.created_at).getTime()) / 86400000) : 0;
-      
       const stats = { meetings_count: bookings?.count || 0, messages_count: msgs?.count || 0, words_count: words?.count || 0, rating_rank: rank, account_age_days: ageDays };
-      
       const { data: allAchievements } = await supabase.from('achievements').select('*');
       const { data: earned } = await supabase.from('user_achievements').select('achievement_id').eq('user_id', uid);
       const earnedIds = earned?.map(e => e.achievement_id) || [];
-      
       for (const a of (allAchievements || [])) {
         if (earnedIds.includes(a.id)) continue;
         let ok = false;
@@ -77,11 +71,9 @@ module.exports = (app, supabase) => {
         }
         if (ok) { await supabase.from('user_achievements').insert({ user_id: uid, achievement_id: a.id }); earnedIds.push(a.id); }
       }
-      
       const { data: fresh } = await supabase.from('user_achievements').select('achievement_id, earned_at').eq('user_id', uid);
       const earnedMap = {};
       fresh?.forEach(e => { earnedMap[e.achievement_id] = e.earned_at; });
-      
       const result = (allAchievements || []).map(a => {
         const earned = !!earnedMap[a.id];
         let cv = 0;
@@ -94,7 +86,6 @@ module.exports = (app, supabase) => {
         }
         return { ...a, earned, earned_at: earnedMap[a.id] || null, current_value: cv, condition_value: a.condition_value, progressPercent: earned ? 100 : Math.min(100, Math.round((cv / a.condition_value) * 100)) };
       });
-      
       res.json(result);
     } catch(e) { res.json([]); }
   });
@@ -102,4 +93,8 @@ module.exports = (app, supabase) => {
   // Родительский кабинет
   app.get('/api/parent/students', auth, async (req, res) => { if (req.session.role !== 'parent') return res.json([]); const { data: links } = await supabase.from('student_parents').select('student_id').eq('parent_id', req.session.userId); if (!links?.length) return res.json([]); const ids = links.map(l => l.student_id); const { data: students } = await supabase.from('users').select('id, username, level, rating, avatar_url').in('id', ids); res.json(students || []); });
   app.post('/api/parent/bind', auth, async (req, res) => { const { student_id, parent_id } = req.body; if (!student_id || !parent_id) return res.status(400).json({ error: 'Нет данных' }); await supabase.from('student_parents').insert({ student_id, parent_id }); res.json({ success: true }); });
+  app.delete('/api/parent/unbind/:studentId/:parentId', auth, async (req, res) => {
+    await supabase.from('student_parents').delete().eq('student_id', req.params.studentId).eq('parent_id', req.params.parentId);
+    res.json({ success: true });
+  });
 };
