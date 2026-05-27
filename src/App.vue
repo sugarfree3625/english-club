@@ -2,8 +2,9 @@
   <div id="app-root" @keydown="handleGlobalKeydown">
     <header class="header">
       <div class="header-inner">
-        <div class="logo" @click="$router.push('/')">
+        <div class="logo" @click="$router.push('/dashboard')">
           <span class="logo-text">{{ settings.club_name || 'English Club' }}</span>
+          <span class="logo-badge">Главная</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           <button class="btn btn-o btn-sm search-trigger" @click="showGlobalSearch = true" title="Поиск (Ctrl+K)">
@@ -12,7 +13,7 @@
           </button>
           <button class="btn btn-o btn-sm theme-btn" @click="toggleTheme">
             <span class="theme-icon-wrapper">
-              <span class="theme-icon" :class="{ dark: isDark }">{{ isDark ? '☀️' : '🌙' }}</span>
+              <span class="theme-icon">{{ isDark ? '☀️' : '🌙' }}</span>
             </span>
           </button>
           <div v-if="!user"><button class="btn btn-p btn-sm ripple" @click="showLogin = true">Войти</button></div>
@@ -27,7 +28,7 @@
                 <a @click="$router.push('/messages');menuOpen=false"><i class="fas fa-comments"></i> Сообщения</a>
                 <a @click="$router.push('/dashboard');menuOpen=false"><i class="fas fa-chart-line"></i> Главная</a>
                 <a @click="$router.push('/profile');menuOpen=false"><i class="fas fa-user"></i> Профиль</a>
-                <a @click="showPricing = true; menuOpen=false"><i class="fas fa-crown"></i> Тарифы</a>
+                <a @click="showPricing = true; menuOpen=false" v-if="user?.role === 'admin'"><i class="fas fa-crown"></i> Тарифы</a>
                 <a @click="$router.push('/admin');menuOpen=false" v-if="user?.role === 'admin'"><i class="fas fa-sliders-h"></i> Управление сайтом</a>
                 <a @click="logout();menuOpen=false"><i class="fas fa-sign-out-alt"></i> Выйти</a>
               </div>
@@ -37,10 +38,7 @@
       </div>
     </header>
 
-    <!-- Приветственное окно -->
-    <WelcomeModal v-if="showWelcome" :user="user" :isNew="isNewUser" @close="showWelcome = false; localStorage.setItem('welcome_dismissed', Date.now().toString())" />
-
-    <!-- Тарифы -->
+    <WelcomeModal v-if="showWelcome" :user="user" :isNew="isNewUser" @close="showWelcome = false" />
     <PricingModal v-if="showPricing" @close="showPricing = false" />
 
     <router-view v-slot="{ Component }">
@@ -50,7 +48,6 @@
     </router-view>
     <ScrollToTop />
 
-    <!-- Глобальный поиск -->
     <div class="modal-overlay" v-if="showGlobalSearch" @click.self="showGlobalSearch = false">
       <div class="global-search-modal">
         <div class="global-search-header"><i class="fas fa-search"></i><input ref="globalSearchInput" v-model="globalSearchQuery" @input="globalSearch" placeholder="Поиск по сайту... (Esc для закрытия)" class="global-search-input" @keydown.esc="showGlobalSearch = false"><span class="search-shortcut-badge">ESC</span></div>
@@ -62,22 +59,18 @@
       </div>
     </div>
 
-    <!-- Онбординг (новые пользователи) -->
     <div class="onboarding-overlay" v-if="showOnboarding">
       <div class="onboarding-card"><div class="onboarding-icon">{{ onboardingSteps[currentOnboardingStep].icon }}</div><h2>{{ onboardingSteps[currentOnboardingStep].title }}</h2><p>{{ onboardingSteps[currentOnboardingStep].text }}</p><div class="onboarding-steps"><div v-for="(step, i) in onboardingSteps" :key="i" class="onboarding-step-dot" :class="{ active: i === currentOnboardingStep }"></div></div><div class="onboarding-actions"><button v-if="currentOnboardingStep > 0" class="btn btn-o btn-sm" @click="currentOnboardingStep--">← Назад</button><button class="btn btn-p btn-sm" @click="nextOnboardingStep">{{ currentOnboardingStep < onboardingSteps.length - 1 ? 'Далее →' : 'Понятно! 🎉' }}</button></div><button class="onboarding-skip" @click="showOnboarding = false">Пропустить</button></div>
     </div>
 
-    <!-- Тосты -->
     <div class="toast-container">
       <transition-group name="toast-list">
         <div v-for="toast in toasts" :key="toast.id" class="toast" :class="toast.type" @click="removeToast(toast.id)"><span class="toast-icon">{{ toast.type === 'error' ? '❌' : toast.type === 'success' ? '✅' : 'ℹ️' }}</span><span class="toast-msg">{{ toast.message }}</span></div>
       </transition-group>
     </div>
 
-    <!-- Логин -->
     <div class="modal-overlay" v-if="showLogin" @click.self="showLogin = false"><div class="modal"><h3>👋 Войти</h3><input class="input" v-model="loginEmail" placeholder="Email"><input class="input" v-model="loginPassword" placeholder="Пароль" type="password"><button class="btn btn-p w-100 ripple" @click="login">Войти</button><p style="margin-top:14px;text-align:center;font-size:0.85rem;color:var(--t2)">Нет аккаунта? <a href="#" @click.prevent="showLogin=false;showReg=true" style="color:var(--p);font-weight:600">Регистрация</a></p><button class="btn btn-o w-100 mt-2" @click="showLogin=false">Закрыть</button></div></div>
 
-    <!-- Регистрация -->
     <div class="modal-overlay" v-if="showReg" @click.self="showReg = false"><div class="modal"><h3>✨ Регистрация</h3><input class="input" v-model="regUsername" placeholder="Имя"><input class="input" v-model="regEmail" placeholder="Email"><input class="input" v-model="regPassword" placeholder="Пароль" type="password"><select class="input" v-model="regLevel"><option value="A1">🟢 Beginner</option><option value="B1" selected>🔵 Intermediate</option><option value="C1">🟣 Advanced</option></select><button class="btn btn-p w-100 ripple" @click="register">Зарегистрироваться</button><p style="margin-top:14px;text-align:center;font-size:0.85rem;color:var(--t2)">Есть аккаунт? <a href="#" @click.prevent="showReg=false;showLogin=true" style="color:var(--p);font-weight:600">Войти</a></p><button class="btn btn-o w-100 mt-2" @click="showReg=false">Закрыть</button></div></div>
   </div>
 </template>
@@ -111,7 +104,12 @@ export default {
   methods: {
     addToast(m, t='info', d=3000) { const id=++this.toastId; this.toasts.push({id,message:m,type:t}); setTimeout(()=>this.removeToast(id),d); },
     removeToast(id) { this.toasts=this.toasts.filter(t=>t.id!==id); },
-    toggleTheme() { this.isDark=!this.isDark; document.body.classList.toggle('dark',this.isDark); document.body.classList.toggle('light',!this.isDark); localStorage.setItem('theme',this.isDark?'dark':'light'); },
+    toggleTheme() { 
+      this.isDark = !this.isDark; 
+      document.documentElement.classList.toggle('dark', this.isDark);
+      document.documentElement.classList.toggle('light', !this.isDark);
+      localStorage.setItem('theme', this.isDark ? 'dark' : 'light'); 
+    },
     async globalSearch() { if(this.globalSearchQuery.length<2){this.globalResults={posts:[],sessions:[]};return;} try{const r=await axios.get(`/api/search?q=${this.globalSearchQuery}`);this.globalResults=r.data;}catch(e){this.globalResults={posts:[],sessions:[]};} },
     handleGlobalKeydown(e) { if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();this.showGlobalSearch=true;this.$nextTick(()=>this.$refs.globalSearchInput?.focus());} if(e.key==='Escape'){this.showGlobalSearch=false;this.menuOpen=false;} },
     nextOnboardingStep() { if(this.currentOnboardingStep<this.onboardingSteps.length-1){this.currentOnboardingStep++;}else{this.showOnboarding=false;localStorage.setItem('onboarding_done','true');} },
@@ -124,11 +122,16 @@ export default {
   async created() {
     try{const r=await axios.get('/api/me');if(r.data.ok){this.user=r.data.user;this.checkOnboarding();this.checkWelcome();}}catch(e){}
     try{const s=await axios.get('/api/settings');this.settings=s.data;}catch(e){}
-    const saved=localStorage.getItem('theme');
-    if(saved==='dark'){this.isDark=true;document.body.classList.add('dark');}
-    else if(saved==='light'){this.isDark=false;document.body.classList.add('light');}
-    else if(window.matchMedia('(prefers-color-scheme:dark)').matches){this.isDark=true;document.body.classList.add('dark');}
+    const saved = localStorage.getItem('theme');
+    if (saved === 'dark') { this.isDark = true; document.documentElement.classList.add('dark'); }
+    else if (saved === 'light') { this.isDark = false; document.documentElement.classList.add('light'); }
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches) { this.isDark = true; document.documentElement.classList.add('dark'); }
   },
   provide() { return { addToast:this.addToast }; }
 };
 </script>
+
+<style scoped>
+.logo { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.logo-badge { font-size: 0.65rem; background: linear-gradient(135deg, #6366f1, #2dd4bf); color: #fff; padding: 2px 8px; border-radius: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+</style>
