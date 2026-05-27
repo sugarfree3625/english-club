@@ -17,6 +17,9 @@
             <span class="profile-rating">{{ user?.rating }}🏆</span>
           </div>
           <button class="btn btn-p btn-sm w-100" @click="linkTelegram"><i class="fab fa-telegram"></i> Telegram</button>
+          <button class="btn btn-o btn-sm w-100" @click="bindVK">
+            <i class="fab fa-vk"></i> Привязать ВК
+          </button>
           <button class="btn btn-o btn-sm w-100" @click="exportPDF">
             📊 Экспорт прогресса
           </button>
@@ -136,6 +139,15 @@ export default {
           this.showConfetti = true;
         }
       } catch(e) {} 
+    },
+    async bindVK() {
+      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+      try {
+        await axios.put('/api/me', { vk_bind_code: code });
+        this.addToast(`Твой код привязки: ${code}\nОтправь боту ВК: /bind ${code}`, 'info', 10000);
+      } catch(e) {
+        this.addToast('Ошибка', 'error');
+      }
     },
     async exportPDF() {
       try {
