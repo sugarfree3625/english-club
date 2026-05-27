@@ -304,7 +304,70 @@ export default {
   font-size: 0.9rem;
   color: #94a3b8;
 }
+/* 3D-эффекты для карточек */
+.ach-card {
+  transform-style: preserve-3d;
+  perspective: 800px;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
 
+.ach-card:hover {
+  transform: translateY(-8px) rotateX(5deg) rotateY(-3deg) scale(1.03);
+  box-shadow: 
+    0 20px 40px rgba(0, 0, 0, 0.4),
+    0 0 30px rgba(99, 102, 241, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.ach-card.ach-earned:hover {
+  box-shadow: 
+    0 20px 50px rgba(0, 0, 0, 0.5),
+    0 0 40px rgba(16, 185, 129, 0.4),
+    0 0 80px rgba(16, 185, 129, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* Глянцевый блик на иконке */
+.ach-icon-area {
+  position: relative;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+.ach-icon-area::after {
+  content: '';
+  position: absolute;
+  top: -10%;
+  left: -10%;
+  width: 40%;
+  height: 40%;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.3) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* 3D для геро-карточки */
+.hero-card {
+  box-shadow: 
+    0 25px 50px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 1px 0 rgba(255, 255, 255, 0.1) inset;
+}
+
+/* Объёмный прогресс-бар */
+.hero-ring-wrap {
+  filter: drop-shadow(0 0 20px rgba(99, 102, 241, 0.4));
+}
+
+.ring-fill {
+  filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.6));
+}
+
+/* Инфо-бейджи с объёмом */
+.info-badge {
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
 /* Круговой прогресс-бар */
 .hero-ring-wrap {
   position: relative;
