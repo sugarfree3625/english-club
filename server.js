@@ -34,5 +34,12 @@ require('./server/socket/chat')(io, supabase);
 // Telegram бот
 startTelegramBot(supabase);
 
+// ВК Бот
+if (process.env.VK_TOKEN && process.env.VK_GROUP_ID) {
+  const { bot } = require('./server/utils/vkbot');
+  bot.startPolling();
+  console.log('🤖 ВК бот запущен');
+}
+
 app.get('*', (req, res) => { if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io')) return res.status(404).json({ error: 'Not found' }); res.sendFile(path.join(__dirname, 'dist', 'index.html')); });
 server.listen(process.env.PORT || 3000, () => { console.log('🚀 Сервер запущен'); });
