@@ -17,12 +17,7 @@
             <span class="profile-rating">{{ user?.rating }}🏆</span>
           </div>
           <button class="btn btn-p btn-sm w-100" @click="linkTelegram"><i class="fab fa-telegram"></i> Telegram</button>
-          <button class="btn btn-o btn-sm w-100" @click="bindVK">
-            <i class="fab fa-vk"></i> Привязать ВК
-          </button>
-          <button class="btn btn-o btn-sm w-100" @click="exportPDF">
-            📊 Экспорт прогресса
-          </button>
+          <button class="btn btn-o btn-sm w-100" @click="exportPDF">📊 Экспорт прогресса</button>
           <nav class="sidebar-nav">
             <button v-for="btn in sidebarButtons" :key="btn.tab" class="sidebar-btn" :class="{ active: tab === btn.tab }" @click="switchTab(btn)">
               <i :class="btn.icon"></i> {{ btn.label }}
@@ -47,7 +42,7 @@
           <div v-if="tab === 'myhomework'" class="card fade-in"><h3>Мои задания</h3><div class="homework-widget" v-for="h in myHomework" :key="h.id" :class="{ done: h.status === 'completed' }"><div class="homework-widget-header"><span>{{ h.status === 'completed' ? '✅' : '📝' }}</span><strong>{{ h.title }}</strong></div></div><p v-if="!myHomework.length" class="empty-text">Нет заданий</p></div>
 
           <ProfileTabStudents v-if="tab === 'children'" :students="myStudents" title="Мои дети" @view="viewStudent" />
-          <ProfileTabStudents v-if="tab === 'students'" :students="allStudents" title="Ученики" :showActions="true" @view="viewStudent" @bind="bindParent" @homework="addHomework" @feedback="addFeedback" />
+          <ProfileTabStudents v-if="tab === 'students'" :students="allStudents" title="Ученики" :showActions="true" :isAdmin="user?.role === 'admin'" @view="viewStudent" @bind="bindParent" @homework="addHomework" @feedback="addFeedback" />
 
           <div v-if="tab === 'homework'" class="card fade-in"><h3>Создать задание</h3><select class="input" v-model="hwStudent"><option value="">Выберите ученика</option><option v-for="s in allStudents" :key="s.id" :value="s.id">{{ s.username }}</option></select><input class="input" v-model="hwTitle" placeholder="Название"><textarea class="input note-area" v-model="hwDesc" rows="3" placeholder="Описание"></textarea><input class="input" v-model="hwDueDate" type="date"><button class="btn btn-p btn-sm w-100" @click="createHomework">Создать</button></div>
 
@@ -89,8 +84,7 @@ export default {
       mySlots: [], showBindParent: false, bindStudentId: null, parentSearch: '', parentResults: [],
       showFeedback: false, fbStudentId: null, fbRating: 3, fbTopic: '', fbGood: '', fbImprove: '',
       hwStudent: '', hwTitle: '', hwDesc: '', hwDueDate: '',
-      newAchievement: null,
-      prevEarnedCodes: []
+      newAchievement: null
     };
   },
   computed: {
@@ -140,15 +134,6 @@ export default {
         }
       } catch(e) {} 
     },
-    async bindVK() {
-      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-      try {
-        await axios.put('/api/me', { vk_bind_code: code });
-        this.addToast(`Твой код привязки: ${code}\nОтправь боту ВК: /bind ${code}`, 'info', 10000);
-      } catch(e) {
-        this.addToast('Ошибка', 'error');
-      }
-    },
     async exportPDF() {
       try {
         const achRes = await axios.get('/api/achievements');
@@ -159,13 +144,11 @@ export default {
           achievements: this.allAchievements.filter(a => a.earned).length
         };
         exportProgressPDF(this.user, stats, achRes.data || []);
-      } catch(e) {
-        this.addToast('Ошибка экспорта', 'error');
-      }
+      } catch(e) { this.addToast('Ошибка экспорта', 'error'); }
     },
     async loadMyHomework() { try { this.myHomework = (await axios.get('/api/homework/my')).data || []; } catch(e) {} },
     async loadMyStudents() { try { this.myStudents = (await axios.get('/api/parent/students')).data || []; } catch(e) {} },
-    async loadAllStudents() { try { this.allStudents = ((await axios.get('/api/users')).data || []).filter(u => u.role !== 'admin'); } catch(e) {} },
+    async loadAllStudents() { try { this.allStudents = ((await axios.get('/api/users')).data || []).filter(u => u.role !== 'admin' && u.role !== 'host'); } catch(e) {} },
     async loadMySlots() { try { this.mySlots = (await axios.get('/api/slots')).data || []; } catch(e) {} },
     async viewStudent(s) { try { this.viewingStudent = (await axios.get(`/api/parent/student/${s.id}`)).data; } catch(e) {} },
     bindParent(s) { this.bindStudentId = s.id; this.showBindParent = true; },
@@ -215,17 +198,6 @@ h3 { color: #fff; font-family: 'Space Grotesk', sans-serif; }
 .info-item strong { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; }
 .info-item span { font-size: 1rem; font-weight: 500; color: #e2e8f0; }
 .full-width { grid-column: 1 / -1; }
-.achieve-stats { display: flex; gap: 20px; margin-bottom: 20px; }
-.achieve-stat { text-align: center; flex: 1; }
-.achieve-stat-value { display: block; font-size: 2rem; font-weight: 800; background: linear-gradient(135deg, #6366f1, #2dd4bf); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.achieve-stat-label { font-size: 0.8rem; color: #94a3b8; }
-.achievements-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 16px; }
-.achieve-badge-card { background: rgba(255,255,255,0.03); border-radius: 20px; padding: 20px 14px; text-align: center; cursor: pointer; border: 2px solid rgba(255,255,255,0.06); transition: all 0.3s; }
-.achieve-badge-card.earned { border-color: rgba(16,185,129,0.5); }
-.achieve-icon { font-size: 2.5rem; display: block; }
-.achieve-name { font-size: 0.75rem; font-weight: 600; margin-top: 4px; color: #cbd5e1; }
-.achieve-progress-mini { height: 4px; background: rgba(255,255,255,0.05); border-radius: 2px; margin-top: 10px; overflow: hidden; }
-.achieve-progress-mini-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #2dd4bf); border-radius: 2px; max-width: 100%; }
 .schedule-list { display: flex; flex-direction: column; gap: 10px; }
 .schedule-list-item { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-radius: 14px; background: rgba(255,255,255,0.03); border-left: 4px solid; }
 .schedule-list-item.slot-online { border-color: #10b981; }
@@ -245,16 +217,6 @@ h3 { color: #fff; font-family: 'Space Grotesk', sans-serif; }
 .session-item strong { color: #fff; }
 .session-item small { color: #94a3b8; }
 .empty-text { text-align: center; color: #64748b; padding: 30px; }
-.student-card { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; cursor: pointer; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 8px; transition: background 0.2s; }
-.student-card:hover { background: rgba(99,102,241,0.05); }
-.student-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
-.student-info { flex: 1; }
-.student-info strong { display: block; font-size: 0.9rem; color: #fff; }
-.student-info small { color: #94a3b8; }
-.student-actions { display: flex; gap: 6px; }
-.homework-widget { padding: 14px; background: rgba(255,255,255,0.03); border-radius: 14px; margin-bottom: 8px; border-left: 4px solid #f59e0b; cursor: pointer; color: #cbd5e1; }
-.homework-widget.done { border-left-color: #10b981; opacity: 0.7; }
-.homework-widget-header { display: flex; align-items: center; gap: 8px; }
 .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 50px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border: none; font-family: inherit; transition: all 0.2s; }
 .btn-p { background: linear-gradient(135deg, #6366f1, #2dd4bf); color: #fff; }
 .btn-o { border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; background: rgba(255,255,255,0.05); }
