@@ -21,6 +21,7 @@ app.use(session({ secret: 'sp-club-2026', resave: false, saveUninitialized: fals
 // Роуты
 require('./server/routes/auth')(app, supabase);
 require('./server/routes/files')(app, supabase);
+require('./server/routes/payments')(app, supabase);
 require('./server/routes/chat')(app, supabase);
 require('./server/routes/posts')(app, supabase);
 require('./server/routes/sessions')(app, supabase);
