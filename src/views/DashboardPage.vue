@@ -9,12 +9,12 @@
       <div class="quick-actions">
         <button class="quick-action-btn" @click="$router.push('/messages')">💬 Чат</button>
         <button class="quick-action-btn" @click="$router.push('/calendar')">📅 Встречи</button>
-        <button class="quick-action-btn" @click="$router.push('/profile')">🏆 Ачивки</button>
+        <button class="quick-action-btn" @click="$router.push('/profile')">🏆 Достижения</button>
       </div>
       
       <div class="dashboard-grid">
         <div class="main-col">
-          <UpcomingLesson :lesson="upcomingLesson" />
+          <UpcomingLesson :lesson="upcomingLessonDisplay" />
           <DailyQuests :quests="dailyQuests" />
           <WordOfDay @save="saveWord" />
           <WeeklyChallenge :progress="challengeProgress" />
@@ -30,6 +30,7 @@
               <div class="ach-mini-track"><div class="ach-mini-fill" :style="{ width: nextAchievement.progressPercent + '%' }"></div></div>
               <span class="ach-mini-nums">{{ nextAchievement.current_value || 0 }}/{{ nextAchievement.condition_value }}</span>
             </div>
+            <p v-else class="empty-text">Все ачивки получены! 🎉</p>
           </div>
           <MiniGame />
         </div>
@@ -61,21 +62,32 @@ export default {
     return {
       streak: 0,
       stats: { messages: 0, meetings: 0, words: 0, achievements: 0 },
-      upcomingLesson: null,
       weeklySlots: [],
       allAchievements: [],
       challengeProgress: 0,
       dailyQuests: [
-        { id: 1, icon: '💬', title: 'Отправь 5 сообщений', target: 5, current: 0, xp: 10 },
-        { id: 2, icon: '📚', title: 'Добавь 3 слова', target: 3, current: 0, xp: 15 },
-        { id: 3, icon: '🎤', title: 'Запиши голосовое', target: 1, current: 0, xp: 20 }
+        { id: 1, icon: '💬', title: 'Отправь 5 сообщений', target: 5, current: 0, xp: 10, field: 'messages_count' },
+        { id: 2, icon: '📚', title: 'Добавь 3 слова', target: 3, current: 0, xp: 15, field: 'words_count' },
+        { id: 3, icon: '🎤', title: 'Запиши голосовое', target: 1, current: 0, xp: 20, field: 'messages_count' }
       ]
     };
   },
   computed: {
     goalPercent() { return Math.min(100, Math.round((this.stats.meetings / 50) * 100)); },
     goalRemaining() { return Math.max(0, 50 - this.stats.meetings); },
-    nextAchievement() { return this.allAchievements.filter(a => !a.earned)[0] || null; }
+    nextAchievement() { return this.allAchievements.filter(a => !a.earned)[0] || null; },
+    upcomingLessonDisplay() {
+      const now = new Date();
+      if (!this.weeklySlots?.length) return null;
+      const upcoming = this.weeklySlots
+        .filter(s => {
+          const start = new Date(s.start_time);
+          const diff = start - now;
+          return diff > 0 && diff <= 3600000;
+        })
+        .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+      return upcoming[0] || null;
+    }
   },
   async mounted() {
     try {
@@ -86,16 +98,26 @@ export default {
       this.allAchievements = achRes.data || [];
       const earned = this.allAchievements.filter(a => a.earned);
       this.stats.achievements = earned.length;
-      this.stats.messages = this.allAchievements.find(a => a.condition_field === 'messages_count')?.current_value || 0;
+      
+      const msgCount = this.allAchievements.find(a => a.condition_field === 'messages_count')?.current_value || 0;
+      const wordCount = this.allAchievements.find(a => a.condition_field === 'words_count')?.current_value || 0;
+      this.stats.messages = msgCount;
       this.stats.meetings = this.allAchievements.find(a => a.condition_field === 'meetings_count')?.current_value || 0;
-      this.stats.words = this.allAchievements.find(a => a.condition_field === 'words_count')?.current_value || 0;
-      const slots = slotsRes.data || [];
-      this.upcomingLesson = slots.filter(s => new Date(s.start_time) >= new Date()).sort((a, b) => new Date(a.start_time) - new Date(b.start_time))[0] || null;
-      this.weeklySlots = slots;
+      this.stats.words = wordCount;
+      
+      this.dailyQuests[0].current = Math.min(msgCount, 5);
+      this.dailyQuests[1].current = Math.min(wordCount, 3);
+      this.dailyQuests[2].current = msgCount >= 1 ? 1 : 0;
+      
+      this.weeklySlots = slotsRes.data || [];
     } catch(e) {}
   },
   methods: {
-    saveWord(word) { axios.post('/api/words', { en: word.en, ru: word.ru }).then(() => this.addToast(`"${word.en}" добавлено! 📖`, 'success')).catch(() => {}); }
+    saveWord(word) {
+      axios.post('/api/words', { en: word.en, ru: word.ru }).then(() => {
+        this.addToast(`"${word.en}" добавлено в словарь! 📖`, 'success');
+      }).catch(() => {});
+    }
   }
 };
 </script>
@@ -108,7 +130,8 @@ export default {
 @keyframes floatOrb { 0%,100%{transform:translate(0,0)scale(1)} 50%{transform:translate(30px,-30px)scale(1.05)} }
 .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; position: relative; z-index: 1; display: flex; flex-direction: column; gap: 20px; }
 .quick-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.quick-action-btn { padding: 10px 20px; background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3); border-radius: 14px; color: #fff; cursor: pointer; font-weight: 600; font-size: 0.85rem; }
+.quick-action-btn { padding: 10px 20px; background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3); border-radius: 14px; color: #fff; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: all 0.2s; }
+.quick-action-btn:hover { background: rgba(99,102,241,0.2); transform: translateY(-2px); }
 .dashboard-grid { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
 @media (max-width: 768px) { .dashboard-grid { grid-template-columns: 1fr; } }
 .main-col, .side-col { display: flex; flex-direction: column; gap: 16px; }
@@ -121,4 +144,5 @@ export default {
 .ach-mini-track { width: 100%; height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
 .ach-mini-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #2dd4bf); border-radius: 2px; }
 .ach-mini-nums { font-size: 0.7rem; color: #94a3b8; }
+.empty-text { font-size: 0.85rem; color: #94a3b8; }
 </style>
