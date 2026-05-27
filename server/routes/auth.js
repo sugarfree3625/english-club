@@ -44,6 +44,7 @@ module.exports = (app, supabase) => {
     if (req.body.avatar_url) u.avatar_url = req.body.avatar_url;
     if (req.body.bio !== undefined) u.bio = req.body.bio;
     if (req.body.level) u.level = req.body.level;
+    if (req.body.vk_bind_code) u.vk_bind_code = req.body.vk_bind_code;
     await supabase.from('users').update(u).eq('id', req.session.userId);
     res.json({ success: true });
   });
