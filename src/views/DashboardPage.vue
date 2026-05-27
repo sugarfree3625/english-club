@@ -47,7 +47,8 @@ import GoalProgress from '../components/dashboard/GoalProgress.vue';
 import MiniGame from '../components/dashboard/MiniGame.vue';
 import WeeklySchedule from '../components/dashboard/WeeklySchedule.vue';
 import Leaderboard from '../components/dashboard/Leaderboard.vue';
-  
+import { requestNotificationPermission, sendNotification, playNotificationSound, checkUpcomingLessons } from '../composables/useNotifications.js';
+
 export default {
   name: 'DashboardPage',
   components: { DashboardHero, DashboardStats, UpcomingLesson, WordOfDay, WeeklyChallenge, GoalProgress, MiniGame, WeeklySchedule, Leaderboard },
@@ -60,7 +61,8 @@ export default {
       upcomingLesson: null,
       weeklySlots: [],
       allAchievements: [],
-      challengeProgress: 0
+      challengeProgress: 0,
+      _lessonCheck: null
     };
   },
   computed: {
@@ -71,6 +73,8 @@ export default {
     }
   },
   async mounted() {
+    requestNotificationPermission();
+    
     try {
       const [streakRes, achRes, slotsRes] = await Promise.all([
         axios.get('/api/streak'),
@@ -89,7 +93,24 @@ export default {
       const now = new Date();
       this.upcomingLesson = slots.filter(s => new Date(s.start_time) >= now).sort((a, b) => new Date(a.start_time) - new Date(b.start_time))[0] || null;
       this.weeklySlots = slots;
+
+      // Проверка встреч для уведомлений
+      if (this.weeklySlots.length > 0) {
+        checkUpcomingLessons(this.weeklySlots, (title, body) => {
+          sendNotification(title, body);
+          playNotificationSound();
+        });
+        this._lessonCheck = setInterval(() => {
+          checkUpcomingLessons(this.weeklySlots, (title, body) => {
+            sendNotification(title, body);
+            playNotificationSound();
+          });
+        }, 300000);
+      }
     } catch(e) {}
+  },
+  beforeUnmount() {
+    if (this._lessonCheck) clearInterval(this._lessonCheck);
   },
   methods: {
     saveWord(word) {
