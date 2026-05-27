@@ -8,13 +8,12 @@
       <div class="lesson-date">{{ formatDate(lesson.start_time) }} в {{ formatTime(lesson.start_time) }}</div>
       <div class="lesson-title">{{ lesson.title }}</div>
       <a v-if="lesson.meeting_link" :href="lesson.meeting_link" target="_blank" class="lesson-join-btn">
-        Войти в класс 📹
+        Подключиться 📹
       </a>
-      <button class="lesson-reschedule-btn">Перенести</button>
     </div>
     <div v-else class="lesson-empty">
       <Calendar :size="40" class="empty-icon" />
-      <p>Уроков пока нет</p>
+      <p>Уроков в ближайший час нет</p>
       <button class="btn btn-p btn-sm" @click="$router.push('/calendar')">Записаться</button>
     </div>
   </div>
@@ -42,7 +41,6 @@ export default {
 .lesson-date { font-size: 0.85rem; color: #94a3b8; }
 .lesson-title { font-size: 1rem; font-weight: 600; color: #fff; }
 .lesson-join-btn { display: inline-flex; align-items: center; justify-content: center; padding: 10px 20px; background: linear-gradient(135deg, #6366f1, #2dd4bf); color: #fff; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 0.9rem; margin-top: 4px; }
-.lesson-reschedule-btn { background: none; border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; padding: 8px 16px; border-radius: 10px; cursor: pointer; font-size: 0.8rem; }
 .lesson-empty { text-align: center; padding: 20px 0; color: #94a3b8; }
 .lesson-empty p { margin: 8px 0 12px; }
 .empty-icon { opacity: 0.3; }
