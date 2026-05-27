@@ -2,9 +2,8 @@
   <div id="app-root" @keydown="handleGlobalKeydown">
     <header class="header">
       <div class="header-inner">
-        <div class="logo" @click="$router.push('/dashboard')">
+        <div class="logo" @click="goHome">
           <span class="logo-text">{{ settings.club_name || 'English Club' }}</span>
-          <span class="logo-badge">Главная</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           <button class="btn btn-o btn-sm search-trigger" @click="showGlobalSearch = true" title="Поиск (Ctrl+K)">
@@ -104,10 +103,14 @@ export default {
   methods: {
     addToast(m, t='info', d=3000) { const id=++this.toastId; this.toasts.push({id,message:m,type:t}); setTimeout(()=>this.removeToast(id),d); },
     removeToast(id) { this.toasts=this.toasts.filter(t=>t.id!==id); },
+    goHome() {
+      if (this.user) this.$router.push('/dashboard');
+      else this.$router.push('/');
+    },
     toggleTheme() { 
       this.isDark = !this.isDark; 
-      document.documentElement.classList.toggle('dark', this.isDark);
-      document.documentElement.classList.toggle('light', !this.isDark);
+      document.body.classList.toggle('dark', this.isDark);
+      document.body.classList.toggle('light', !this.isDark);
       localStorage.setItem('theme', this.isDark ? 'dark' : 'light'); 
     },
     async globalSearch() { if(this.globalSearchQuery.length<2){this.globalResults={posts:[],sessions:[]};return;} try{const r=await axios.get(`/api/search?q=${this.globalSearchQuery}`);this.globalResults=r.data;}catch(e){this.globalResults={posts:[],sessions:[]};} },
@@ -123,9 +126,9 @@ export default {
     try{const r=await axios.get('/api/me');if(r.data.ok){this.user=r.data.user;this.checkOnboarding();this.checkWelcome();}}catch(e){}
     try{const s=await axios.get('/api/settings');this.settings=s.data;}catch(e){}
     const saved = localStorage.getItem('theme');
-    if (saved === 'dark') { this.isDark = true; document.documentElement.classList.add('dark'); }
-    else if (saved === 'light') { this.isDark = false; document.documentElement.classList.add('light'); }
-    else if (window.matchMedia('(prefers-color-scheme: dark)').matches) { this.isDark = true; document.documentElement.classList.add('dark'); }
+    if (saved === 'dark') { this.isDark = true; document.body.classList.add('dark'); }
+    else if (saved === 'light') { this.isDark = false; document.body.classList.add('light'); }
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches) { this.isDark = true; document.body.classList.add('dark'); }
   },
   provide() { return { addToast:this.addToast }; }
 };
@@ -133,5 +136,4 @@ export default {
 
 <style scoped>
 .logo { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-.logo-badge { font-size: 0.65rem; background: linear-gradient(135deg, #6366f1, #2dd4bf); color: #fff; padding: 2px 8px; border-radius: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
 </style>
