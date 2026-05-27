@@ -14,6 +14,7 @@
         </div>
         <div class="side-col">
           <GoalProgress :percent="goalPercent" :remaining="goalRemaining" />
+          <Leaderboard :currentUserId="user?.id" />
           <div class="card achievements-mini">
             <h3>🏆 Ближайшая ачивка</h3>
             <div v-if="nextAchievement" class="next-ach">
@@ -45,10 +46,11 @@ import WeeklyChallenge from '../components/dashboard/WeeklyChallenge.vue';
 import GoalProgress from '../components/dashboard/GoalProgress.vue';
 import MiniGame from '../components/dashboard/MiniGame.vue';
 import WeeklySchedule from '../components/dashboard/WeeklySchedule.vue';
-
+import Leaderboard from '../components/dashboard/Leaderboard.vue';
+  
 export default {
   name: 'DashboardPage',
-  components: { DashboardHero, DashboardStats, UpcomingLesson, WordOfDay, WeeklyChallenge, GoalProgress, MiniGame, WeeklySchedule },
+  components: { DashboardHero, DashboardStats, UpcomingLesson, WordOfDay, WeeklyChallenge, GoalProgress, MiniGame, WeeklySchedule, Leaderboard },
   props: ['user'],
   inject: ['addToast'],
   data() {
