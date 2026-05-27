@@ -35,9 +35,16 @@
           <div><strong>{{ activeChatName }}</strong><small :class="{ online: isPartnerOnline }">{{ isPartnerOnline ? '🟢 Онлайн' : '⚫ Оффлайн' }}</small></div>
         </div>
         <div style="display:flex;gap:6px">
+          <button class="btn btn-o btn-sm interactive-btn" @click="startVideoCall" title="Видеозвонок">📹</button>
           <button class="btn btn-o btn-sm interactive-btn" @click="soundEnabled = !soundEnabled" :title="soundEnabled ? 'Звук вкл' : 'Звук выкл'">{{ soundEnabled ? '🔊' : '🔇' }}</button>
           <button class="btn btn-o btn-sm interactive-btn" @click="showMsgSearch = !showMsgSearch"><i class="fas fa-search"></i></button>
         </div>
+      </div>
+
+      <!-- Jitsi Meet -->
+      <div v-if="jitsiActive" class="jitsi-container">
+        <button class="jitsi-close" @click="closeVideoCall">✕ Завершить звонок</button>
+        <iframe :src="jitsiUrl" allow="camera; microphone; fullscreen; display-capture" class="jitsi-frame"></iframe>
       </div>
 
       <div class="msg-search" v-if="showMsgSearch">
@@ -82,7 +89,7 @@
         </div>
       </div>
 
-      <div class="chat-input">
+      <div class="chat-input" v-if="!jitsiActive">
         <button class="btn btn-o btn-sm emoji-btn interactive-btn" @click="showEmoji = !showEmoji">😊</button>
         <div v-if="showEmoji" class="emoji-picker"><span v-for="e in emojis" :key="e" @click="msgText += e" class="emoji-item">{{ e }}</span></div>
         <button class="btn btn-o btn-sm interactive-btn" @click="$refs.fileInput.click()"><i class="fas fa-paperclip"></i></button>
@@ -113,6 +120,7 @@ import { useFiles } from '../composables/useFiles.js';
 import { useSocket } from '../composables/useSocket.js';
 import { useDebounce } from '../composables/useDebounce.js';
 import { translateWord } from '../composables/useTranslator.js';
+import { sendNotification, playNotificationSound } from '../composables/useNotifications.js';
 import AppAvatar from '../components/AppAvatar.vue';
 
 const { uploadFile, getFileType, getFileIcon, proxifyUrl } = useFiles();
@@ -131,7 +139,9 @@ export default {
       isPartnerOnline: false, chunks: [], showSidebar: true, showMsgSearch: false,
       msgSearchQuery: '', showTranslate: false, selectedWord: '', translatedText: '',
       translating: false, recordingTime: 0, recordingTimer: null, soundEnabled: false,
-      emojis: ['😀','😂','🤣','😍','🥰','😘','😎','🤩','😇','🤔','😴','🥳','❤️','🔥','🎉','⭐','✅','💯','🙏','💪','🚀','🌈']
+      emojis: ['😀','😂','🤣','😍','🥰','😘','😎','🤩','😇','🤔','😴','🥳','❤️','🔥','🎉','⭐','✅','💯','🙏','💪','🚀','🌈'],
+      jitsiActive: false,
+      jitsiUrl: ''
     };
   },
   computed: { isDark() { return document.body.classList.contains('dark'); } },
@@ -153,6 +163,17 @@ export default {
     proxifyUrl,
     fileIcon: getFileIcon,
 
+    startVideoCall() {
+      const roomName = `english-club-${this.currentUserId}-${this.activeChat}`;
+      this.jitsiUrl = `https://meet.jit.si/${roomName}`;
+      this.jitsiActive = true;
+      this.addToast('Видеозвонок начат! 📹', 'info');
+    },
+    closeVideoCall() {
+      this.jitsiActive = false;
+      this.jitsiUrl = '';
+    },
+
     handleIncomingMessage(msg) {
       if (typeof msg.files === 'string') { try { msg.files = JSON.parse(msg.files); } catch(e) { msg.files = null; } }
       if (msg.from === this.currentUserId) { this.loadDialogs(); return; }
@@ -161,7 +182,10 @@ export default {
           this.messages.push(msg); this.filterMessages(); this.$nextTick(() => this.scrollToBottom());
         }
       }
-      if (document.hidden && msg.from !== this.currentUserId) this.sendBrowserNotification(msg);
+      if (document.hidden && msg.from !== this.currentUserId) {
+        sendNotification(`💬 ${msg.fn || 'Новое сообщение'}`, msg.msg || msg.message || '📎 Файл');
+        playNotificationSound();
+      }
       this.loadDialogs();
     },
 
@@ -252,7 +276,6 @@ export default {
     playSendSound() { if (!this.soundEnabled) return; try { const ctx = new (window.AudioContext || window.webkitAudioContext)(); const o = ctx.createOscillator(); const g = ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.frequency.value = 1200; o.type = 'sine'; g.gain.setValueAtTime(0.08, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1); o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.1); } catch(e) {} },
     replyTo(msg) { this.msgText = `↩ ${msg.fn || ''}: ${(msg.msg || msg.message || '').substring(0, 50)}\n`; this.$nextTick(() => this.$el.querySelector('textarea')?.focus()); },
     async deleteMsg(id) { if (!confirm('Удалить?')) return; try { await axios.delete(`/api/msg/${id}`); this.messages = this.messages.filter(m => m.id !== id); this.filterMessages(); this.addToast('Удалено 🗑', 'success'); } catch(e) {} },
-    sendBrowserNotification(msg) { if (!('Notification' in window) || Notification.permission !== 'granted') return; try { new Notification(`💬 ${msg.fn || 'Новое сообщение'}`, { body: (msg.msg || msg.message || '📎 Файл').substring(0, 100), icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🗣️</text></svg>', tag: 'engclub' }); } catch(e) {} },
     async translateMsg(m) { if (!m.message) return; const word = m.message.split(' ').find(w => /^[a-zA-Z]+$/.test(w)); if (!word) { this.addToast('Нет английских слов', 'info'); return; } this.selectedWord = word; this.showTranslate = true; this.translating = true; try { this.translatedText = await translateWord(word); } catch(e) { this.translatedText = 'Ошибка'; } finally { this.translating = false; } },
     async copyTranslation() { try { await navigator.clipboard.writeText(this.translatedText); this.addToast('Перевод скопирован 📋', 'success'); } catch(e) {} }
   }
@@ -287,6 +310,9 @@ export default {
 .tilt-avatar:hover { transform: scale(1.1) rotate(-3deg); }
 .chat-header small { font-size: 0.75rem; color: var(--t2); }
 .chat-header small.online { color: #22c55e; }
+.jitsi-container { position: relative; width: 100%; height: 500px; margin-bottom: 8px; }
+.jitsi-frame { width: 100%; height: 100%; border: none; border-radius: 16px; }
+.jitsi-close { position: absolute; top: 8px; right: 8px; z-index: 10; padding: 8px 16px; background: #ef4444; color: #fff; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; }
 .msg-search { display: flex; gap: 8px; padding: 10px 22px; background: var(--surface); border-bottom: 1px solid var(--b); }
 .chat-messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 14px; }
 .msg { max-width: 72%; padding: 12px 18px; border-radius: 20px; background: var(--surface); align-self: flex-start; box-shadow: 0 2px 8px rgba(0,0,0,0.04); position: relative; }
@@ -348,5 +374,5 @@ export default {
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.08); } }
 @keyframes wave { 0%, 100% { height: 4px; } 50% { height: 16px; } }
-@media (max-width: 768px) { .chat-sidebar { width: 100%; position: absolute; inset: 0; z-index: 10; } .chat-sidebar.mobile-hidden { display: none; } .chat-main { display: none; width: 100%; } .chat-main.mobile-show { display: flex; } .empty-chat { display: flex; } .mobile-back { display: block; padding: 14px 22px; background: var(--surface); border-bottom: 1px solid var(--b); font-weight: 600; cursor: pointer; border: none; width: 100%; text-align: left; color: var(--t); font-family: inherit; } .msg { max-width: 85%; } .emoji-picker { width: 260px; } }
+@media (max-width: 768px) { .chat-sidebar { width: 100%; position: absolute; inset: 0; z-index: 10; } .chat-sidebar.mobile-hidden { display: none; } .chat-main { display: none; width: 100%; } .chat-main.mobile-show { display: flex; } .empty-chat { display: flex; } .mobile-back { display: block; padding: 14px 22px; background: var(--surface); border-bottom: 1px solid var(--b); font-weight: 600; cursor: pointer; border: none; width: 100%; text-align: left; color: var(--t); font-family: inherit; } .msg { max-width: 85%; } .emoji-picker { width: 260px; } .jitsi-container { height: 350px; } }
 </style>
