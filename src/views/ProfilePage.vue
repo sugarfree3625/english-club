@@ -158,15 +158,16 @@ export default {
 
     // Достижения
     async loadAchievements() {
-      try {
-        const r = await axios.get('/api/achievements');
-        const newData = (r.data || []).map(a => ({ ...a, progressPercent: a.progressPercent || a.progress_percent || (a.earned ? 100 : 0) }));
-        const newlyUnlocked = newData.filter(a => { const old = this.allAchievements.find(o => o.code === a.code); return old && !old.earned && a.earned; });
-        this.allAchievements = newData;
-        this.earnedCount = newData.filter(a => a.earned).length;
-        if (newlyUnlocked.length > 0 && !this._shown) { this._shown = true; this.newAchievement = newlyUnlocked[0]; this.showConfetti = true; }
-      } catch (e) { console.error('Ошибка достижений:', e); }
-    },
+  try {
+    const r = await axios.get('/api/achievements');
+    const newData = (r.data || []).map(a => ({ ...a, progressPercent: a.progressPercent || a.progress_percent || (a.earned ? 100 : 0) }));
+    const newlyUnlocked = newData.filter(a => { const old = this.allAchievements.find(o => o.code === a.code); return old && !old.earned && a.earned; });
+    this.allAchievements = newData;
+    this.totalCount = newData.length; // ← ВОТ ЭТУ СТРОКУ ДОБАВЬ
+    this.earnedCount = newData.filter(a => a.earned).length;
+    if (newlyUnlocked.length > 0 && !this._shown) { this._shown = true; this.newAchievement = newlyUnlocked[0]; this.showConfetti = true; }
+  } catch (e) { console.error('Ошибка достижений:', e); }
+},
 
     // Фидбеки
     async loadFeedbacks() { try { this.feedbacks = (await axios.get('/api/feedback/my')).data || []; } catch { this.addToast('Ошибка загрузки', 'error'); } },
