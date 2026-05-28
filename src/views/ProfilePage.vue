@@ -149,7 +149,17 @@ export default {
       } catch(e) {} finally { this.homeworkLoading = false; }
     },
     openHomeworkTab(s) { this.hwStudent = s.id; this.tab = 'homework'; },
-    async createHomework(d) { try { await axios.post('/api/homework', d); this.addToast('Создано! 📝', 'success'); await this.loadMyHomework(); } catch(e) { this.addToast(e.response?.data?.error || 'Ошибка', 'error'); } },
+    async createHomework(formData) {
+  try {
+    await axios.post('/api/homework', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    this.addToast('Задание создано! 📝', 'success');
+    await this.loadMyHomework();
+  } catch(e) {
+    this.addToast(e.response?.data?.error || 'Ошибка', 'error');
+  }
+},
     async submitHomeworkAnswer({ answer }) { try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { student_answer: answer, status: 'submitted' }); this.selectedHomework = null; this.addToast('Отправлено! 📤', 'success'); } catch { this.addToast('Ошибка', 'error'); } },
     async submitHomeworkGrade({ grade, comment }) { try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { grade, teacher_comment: comment, status: 'completed' }); this.selectedHomework = null; this.addToast('Оценено! ⭐', 'success'); } catch { this.addToast('Ошибка', 'error'); } },
     async changeHomeworkStatus({ status }) { try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { status }); this.selectedHomework = null; this.addToast('Обновлён! ✅', 'success'); } catch { this.addToast('Ошибка', 'error'); } },
