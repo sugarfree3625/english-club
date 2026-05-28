@@ -20,7 +20,15 @@ module.exports = (app, supabase) => {
     }
   });
 
+  // Добавить слово (С ДЕБАГ-ЛОГОМ)
   app.post('/api/words', auth, async (req, res) => {
+    // 🔍 ВРЕМЕННЫЙ ЛОГ ДЛЯ ОТЛАДКИ
+    console.log('🔍 DEBUG words:', JSON.stringify({
+      sessionUserId: req.session?.userId,
+      userId: req.userId,
+      body: req.body
+    }));
+    
     try {
       const { en, ru } = req.body;
       
@@ -28,7 +36,7 @@ module.exports = (app, supabase) => {
         return res.status(400).json({ error: 'Заполните оба поля' });
       }
       
-      // Проверка на дубликат (maybeSingle вместо single!)
+      // Проверка на дубликат
       const { data: existing } = await supabase
         .from('words')
         .select('id')
@@ -49,18 +57,22 @@ module.exports = (app, supabase) => {
           ru: ru.trim()
         });
       
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Supabase insert error:', error);
+        throw error;
+      }
       
-      // Обновление рейтинга (без прерывания при ошибке)
+      // Обновление рейтинга
       try {
         await updateRating(supabase, req.session.userId, 3, getLevel);
       } catch (ratingErr) {
         console.error('Rating update error:', ratingErr);
       }
       
+      console.log('✅ Слово успешно добавлено');
       res.status(201).json({ success: true });
     } catch (err) {
-      console.error('POST /api/words error:', err);
+      console.error('❌ POST /api/words error:', err.message, err.stack);
       res.status(500).json({ error: 'Не удалось добавить слово' });
     }
   });
