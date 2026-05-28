@@ -27,6 +27,13 @@ require('./server/routes/posts')(app, supabase);
 require('./server/routes/sessions')(app, supabase);
 require('./server/routes/slots')(app, supabase);
 require('./server/routes/other')(app, supabase);
+require('./server/routes/words')(app, supabase);
+require('./server/routes/notes')(app, supabase);
+require('./server/routes/achievements')(app, supabase);
+require('./server/routes/parent')(app, supabase);
+require('./server/routes/homework')(app, supabase);
+require('./server/routes/feedback')(app, supabase);
+require('./server/routes/other')(app, supabase);
 
 // Socket.IO
 require('./server/socket/chat')(io, supabase);
