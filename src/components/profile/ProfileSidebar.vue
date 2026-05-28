@@ -46,12 +46,16 @@ export default {
         { tab: 'myschedule', icon: 'fas fa-calendar-check', label: 'Расписание', load: 'loadMySlots' },
         { tab: 'words', icon: 'fas fa-book', label: 'Словарь', show: this.isStudent || this.isTutor },
         { tab: 'notes', icon: 'fas fa-sticky-note', label: 'Блокнот', show: this.isStudent },
-        { tab: 'myhomework', icon: 'fas fa-tasks', label: 'Задания', show: this.isStudent, load: 'loadMyHomework' },
+        // ✅ Задания (просмотр) — видят ВСЕ
+        { tab: 'myhomework', icon: 'fas fa-clipboard-list', label: 'Мои задания', show: this.isStudent, load: 'loadMyHomework' },
         { tab: 'children', icon: 'fas fa-child', label: 'Мои дети', show: this.isParent, load: 'loadMyStudents' },
         { tab: 'feedbacks', icon: 'fas fa-star', label: 'Мои фидбеки', show: this.isParent, load: 'loadFeedbacks' },
         { tab: 'allfeedbacks', icon: 'fas fa-star', label: 'Все фидбеки', show: this.isTutor, load: 'loadAllFeedbacks' },
         { tab: 'students', icon: 'fas fa-users', label: 'Ученики', show: this.isTutor, load: 'loadAllStudents' },
-        { tab: 'homework', icon: 'fas fa-tasks', label: 'Задания', show: this.isTutor },
+        // ✅ Проверка заданий — для админа/репетитора
+        { tab: 'allhomework', icon: 'fas fa-clipboard-check', label: 'Все задания', show: this.isTutor, load: 'loadMyHomework' },
+        // ✅ Создать задание — для админа/репетитора
+        { tab: 'homework', icon: 'fas fa-plus-circle', label: 'Создать задание', show: this.isTutor },
         { tab: 'history', icon: 'fas fa-history', label: 'История' }
       ];
       return btns.filter(b => b.show !== false);
