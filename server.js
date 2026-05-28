@@ -26,7 +26,6 @@ require('./server/routes/chat')(app, supabase);
 require('./server/routes/posts')(app, supabase);
 require('./server/routes/sessions')(app, supabase);
 require('./server/routes/slots')(app, supabase);
-require('./server/routes/other')(app, supabase);
 require('./server/routes/words')(app, supabase);
 require('./server/routes/notes')(app, supabase);
 require('./server/routes/achievements')(app, supabase);
