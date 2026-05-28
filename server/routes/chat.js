@@ -1,4 +1,4 @@
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 
 module.exports = (app, supabase) => {
   app.get('/api/dialogs', auth, async (req, res) => {
