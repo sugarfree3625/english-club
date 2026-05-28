@@ -1,5 +1,5 @@
 const bcrypt = require('bcrypt');
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');  // <-- ИСПРАВЛЕНО: деструктуризация
 
 module.exports = (app, supabase) => {
   const { notifyUser, updateRating } = require('../utils/telegram');
@@ -25,59 +25,56 @@ module.exports = (app, supabase) => {
     res.json({ success: true });
   });
 
-  // Вход (обновлённый — с JWT токеном)
-app.post('/api/login', async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Заполните все поля' });
+  // Вход с JWT токеном
+  app.post('/api/login', async (req, res) => {
+    try {
+      const { email, password } = req.body;  // Фронтенд шлёт email
+      
+      if (!email || !password) {
+        return res.status(400).json({ error: 'Заполните все поля' });
+      }
+      
+      // Ищем пользователя по email
+      const { data: user, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .maybeSingle();
+      
+      if (error || !user) {
+        return res.status(401).json({ error: 'Неверный логин или пароль' });
+      }
+      
+      // Проверяем пароль (поддерживаем и хэшированные, и обычные)
+      let validPassword = false;
+      
+      if (user.password && user.password.startsWith('$2')) {
+        validPassword = await bcrypt.compare(password, user.password);
+      } else {
+        validPassword = user.password === password;
+      }
+      
+      if (!validPassword) {
+        return res.status(401).json({ error: 'Неверный логин или пароль' });
+      }
+      
+      // Генерируем JWT токен
+      const { generateToken } = require('../middleware/auth');
+      const token = generateToken(user.id, user.role);
+      
+      // Сохраняем в сессии
+      req.session.userId = user.id;
+      req.session.role = user.role;
+      
+      // Не отправляем пароль клиенту
+      const { password: _, ...userWithoutPassword } = user;
+      
+      res.json({ user: userWithoutPassword, token });
+    } catch (err) {
+      console.error('Login error:', err);
+      res.status(500).json({ error: 'Ошибка входа' });
     }
-    
-    // Ищем пользователя
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('username', username)
-      .maybeSingle();
-    
-    if (error || !user) {
-      return res.status(401).json({ error: 'Неверный логин или пароль' });
-    }
-    
-    // Проверяем пароль (поддерживаем и хэшированные, и обычные)
-    let validPassword = false;
-    
-    if (user.password && user.password.startsWith('$2')) {
-      // Пароль захэширован через bcrypt
-      const bcrypt = require('bcryptjs');
-      validPassword = await bcrypt.compare(password, user.password);
-    } else {
-      // Простое сравнение (для старых пользователей)
-      validPassword = user.password === password;
-    }
-    
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Неверный логин или пароль' });
-    }
-    
-    // Генерируем JWT токен
-    const { generateToken } = require('../middleware/auth');
-    const token = generateToken(user.id, user.role);
-    
-    // Сохраняем в сессии (для обратной совместимости)
-    req.session.userId = user.id;
-    req.session.role = user.role;
-    
-    // Не отправляем пароль клиенту
-    const { password: _, ...userWithoutPassword } = user;
-    
-    res.json({ user: userWithoutPassword, token });
-  } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ error: 'Ошибка входа' });
-  }
-});
+  });
 
   app.get('/api/me', async (req, res) => {
     if (!req.session.userId) return res.json({ ok: false });
