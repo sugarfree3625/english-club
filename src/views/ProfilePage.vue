@@ -22,7 +22,7 @@
           <ProfileTabInfo v-if="tab === 'info'" :user="user" />
           <ProfileTabAchievements v-if="tab === 'achievements'" :achievements="allAchievements" :earned="earnedCount" :total="totalCount" :percent="completionPercent" />
           <ProfileTabSchedule v-if="tab === 'myschedule'" :upcoming="myUpcomingSlots" :past="myPastSlots" :showStudent="isParent" @export="exportMyICS" />
-          <ProfileTabWords v-if="tab === 'words'" :words="words" :loading="wordsLoading" @add-word="addWord" @delete-word="delWord" />
+          <ProfileTabWords v-if="tab === 'words'" :words="words" :loading="wordsLoading" @add-word="addWord" @delete-word="delWord" @update-word-status="updateWordStatus" />
           <ProfileTabNotes v-if="tab === 'notes'" :note="note" @update-note="updateNote" />
 
           <div v-if="tab === 'myhomework'" class="card fade-in">
@@ -92,7 +92,7 @@ export default {
       tab: 'info',
       words: [], wordsLoading: false,
       note: '', allBookings: [],
-      allAchievements: [], earnedCount: 0, totalCount: 30, showConfetti: false,
+      allAchievements: [], earnedCount: 0, totalCount: 50, showConfetti: false,
       myHomework: [], homeworkLoading: false,
       myStudents: [], allStudents: [], viewingStudent: null,
       mySlots: [],
@@ -130,11 +130,11 @@ export default {
     },
     switchTab(btn) { this.tab = btn.tab; if (btn.load) this[btn.load](); },
 
-    // Словарь
-    async addWord({ en, ru }) {
+    // ==================== СЛОВАРЬ (ОБНОВЛЁННЫЙ) ====================
+    async addWord({ en, ru, transcription, part_of_speech, category, example }) {
       this.wordsLoading = true;
       try {
-        const res = await axios.post('/api/words', { en, ru });
+        const res = await axios.post('/api/words', { en, ru, transcription, part_of_speech, category, example });
         if (res.status === 201 || res.status === 200) {
           const wordsRes = await axios.get('/api/words');
           this.words = wordsRes.data || [];
@@ -145,6 +145,24 @@ export default {
         this.addToast(msg, 'error');
       } finally { this.wordsLoading = false; }
     },
+    
+    async updateWordStatus({ id, status, next_review, repeat_count, correct_count, wrong_count }) {
+      try {
+        await axios.put(`/api/words/${id}`, { status, next_review, repeat_count, correct_count, wrong_count });
+        // Обновляем слово в локальном массиве
+        const word = this.words.find(w => w.id === id);
+        if (word) {
+          if (status) word.status = status;
+          if (next_review) word.next_review = next_review;
+          if (repeat_count !== undefined) word.repeat_count = repeat_count;
+          if (correct_count !== undefined) word.correct_count = correct_count;
+          if (wrong_count !== undefined) word.wrong_count = wrong_count;
+        }
+      } catch(e) {
+        console.error('Ошибка обновления слова:', e);
+      }
+    },
+    
     async delWord(id) {
       try {
         await axios.delete(`/api/words/${id}`);
@@ -158,16 +176,16 @@ export default {
 
     // Достижения
     async loadAchievements() {
-  try {
-    const r = await axios.get('/api/achievements');
-    const newData = (r.data || []).map(a => ({ ...a, progressPercent: a.progressPercent || a.progress_percent || (a.earned ? 100 : 0) }));
-    const newlyUnlocked = newData.filter(a => { const old = this.allAchievements.find(o => o.code === a.code); return old && !old.earned && a.earned; });
-    this.allAchievements = newData;
-    this.totalCount = newData.length; // ← ВОТ ЭТУ СТРОКУ ДОБАВЬ
-    this.earnedCount = newData.filter(a => a.earned).length;
-    if (newlyUnlocked.length > 0 && !this._shown) { this._shown = true; this.newAchievement = newlyUnlocked[0]; this.showConfetti = true; }
-  } catch (e) { console.error('Ошибка достижений:', e); }
-},
+      try {
+        const r = await axios.get('/api/achievements');
+        const newData = (r.data || []).map(a => ({ ...a, progressPercent: a.progressPercent || a.progress_percent || (a.earned ? 100 : 0) }));
+        const newlyUnlocked = newData.filter(a => { const old = this.allAchievements.find(o => o.code === a.code); return old && !old.earned && a.earned; });
+        this.allAchievements = newData;
+        this.totalCount = newData.length;
+        this.earnedCount = newData.filter(a => a.earned).length;
+        if (newlyUnlocked.length > 0 && !this._shown) { this._shown = true; this.newAchievement = newlyUnlocked[0]; this.showConfetti = true; }
+      } catch (e) { console.error('Ошибка достижений:', e); }
+    },
 
     // Фидбеки
     async loadFeedbacks() { try { this.feedbacks = (await axios.get('/api/feedback/my')).data || []; } catch { this.addToast('Ошибка загрузки', 'error'); } },
@@ -186,23 +204,20 @@ export default {
     openBindParent(s) { this.bindStudentId = s.id; this.showBindParent = true; },
     async searchParents(q) { try { this.parentResults = ((await axios.get(`/api/users?q=${q}`)).data || []).filter(u => u.role === 'parent'); } catch {} },
     async doBindParent(pid) { 
-  try { 
-    await axios.post('/api/parent/bind', { 
-      student_id: this.bindStudentId, 
-      parent_id: pid 
-    }); 
-    this.showBindParent = false; 
-    this.parentSearch = ''; 
-    this.addToast('Привязан! ✅', 'success'); 
-  } catch(e) { 
-    if (e.response?.status === 409) {
-      this.addToast('Эта связь уже существует', 'info');
-      this.showBindParent = false;
-    } else {
-      this.addToast(e.response?.data?.error || 'Ошибка', 'error');
-    }
-  } 
-},
+      try { 
+        await axios.post('/api/parent/bind', { student_id: this.bindStudentId, parent_id: pid }); 
+        this.showBindParent = false; 
+        this.parentSearch = ''; 
+        this.addToast('Привязан! ✅', 'success'); 
+      } catch(e) { 
+        if (e.response?.status === 409) {
+          this.addToast('Эта связь уже существует', 'info');
+          this.showBindParent = false;
+        } else {
+          this.addToast(e.response?.data?.error || 'Ошибка', 'error');
+        }
+      } 
+    },
 
     // Слоты и остальное
     async loadMySlots() { try { this.mySlots = (await axios.get('/api/slots')).data || []; } catch {} },
