@@ -17,13 +17,8 @@
           <ProfileTabWords v-if="tab === 'words'" :words="words" :loading="wordsLoading" @add-word="addWord" @delete-word="delWord" @update-word-status="updateWordStatus" />
           <ProfileTabNotes v-if="tab === 'notes'" :note="note" @update-note="updateNote" />
 
-          <!-- Задания: Репетитор -->
           <TeacherHomework v-if="tab === 'allhomework'" />
-
-          <!-- Задания: Ученик -->
           <StudentHomework v-if="tab === 'myhomework' && isStudent" />
-
-          <!-- Задания: Родитель -->
           <ParentHomework v-if="tab === 'myhomework' && isParent" />
 
           <ProfileTabStudents v-if="tab === 'children'" :students="myStudents" title="Мои дети" @view="viewStudent" />
@@ -40,9 +35,17 @@
         </div>
       </div>
 
-      <HomeworkModal v-if="selectedHomework" :homework="selectedHomework" :userRole="user?.role" :userId="user?.id"
-        @close="selectedHomework = null" @submit-answer="submitHomeworkAnswer"
-        @submit-grade="submitHomeworkGrade" @change-status="changeHomeworkStatus" />
+      <HomeworkModal 
+        v-if="selectedHomework" 
+        :homework="selectedHomework" 
+        :userRole="user?.role" 
+        :userId="user?.id"
+        @close="selectedHomework = null" 
+        @submit-answer="submitHomeworkAnswer"
+        @submit-grade="submitHomeworkGrade" 
+        @change-status="changeHomeworkStatus"
+        @return-homework="returnHomework"
+      />
 
       <ProfileModals :viewingStudent="viewingStudent" :showBindParent="showBindParent" :parentResults="parentResults"
         :showFeedback="showFeedback" @close-view="viewingStudent = null" @close-bind="showBindParent = false"
@@ -150,19 +153,23 @@ export default {
     },
     openHomeworkTab(s) { this.hwStudent = s.id; this.tab = 'homework'; },
     async createHomework(formData) {
-  try {
-    await axios.post('/api/homework', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-    this.addToast('Задание создано! 📝', 'success');
-    await this.loadMyHomework();
-  } catch(e) {
-    this.addToast(e.response?.data?.error || 'Ошибка', 'error');
-  }
-},
+      try {
+        await axios.post('/api/homework', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        this.addToast('Задание создано! 📝', 'success');
+        await this.loadMyHomework();
+      } catch(e) { this.addToast(e.response?.data?.error || 'Ошибка', 'error'); }
+    },
     async submitHomeworkAnswer({ answer }) { try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { student_answer: answer, status: 'submitted' }); this.selectedHomework = null; this.addToast('Отправлено! 📤', 'success'); } catch { this.addToast('Ошибка', 'error'); } },
     async submitHomeworkGrade({ grade, comment }) { try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { grade, teacher_comment: comment, status: 'completed' }); this.selectedHomework = null; this.addToast('Оценено! ⭐', 'success'); } catch { this.addToast('Ошибка', 'error'); } },
     async changeHomeworkStatus({ status }) { try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { status }); this.selectedHomework = null; this.addToast('Обновлён! ✅', 'success'); } catch { this.addToast('Ошибка', 'error'); } },
+    async returnHomework({ comment }) {
+      try {
+        await axios.put(`/api/homework/${this.selectedHomework.id}`, { teacher_comment: comment || 'Требуется доработка', status: 'in_progress' });
+        this.selectedHomework = null;
+        this.addToast('🔄 Возвращено на доработку. Фидбек создан!', 'info');
+        await this.loadMyHomework();
+      } catch(e) { this.addToast('Ошибка', 'error'); }
+    },
 
     async loadMyStudents() { try { this.myStudents = (await axios.get('/api/parent/students')).data || []; } catch {} },
     async loadAllStudents() { try { this.allStudents = ((await axios.get('/api/users')).data || []).filter(u => u.role !== 'admin' && u.role !== 'host'); } catch {} },
