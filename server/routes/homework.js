@@ -2,14 +2,13 @@ const { auth } = require('../middleware/auth');
 const { notifyUser } = require('../utils/telegram');
 const multer = require('multer');
 
-// Настройка multer для загрузки файлов в память
 const upload = multer({ 
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+  limits: { fileSize: 10 * 1024 * 1024 }
 });
 
 module.exports = (app, supabase) => {
-  // ==================== СОЗДАТЬ ЗАДАНИЕ (с файлом) ====================
+  // ==================== СОЗДАТЬ ЗАДАНИЕ ====================
   app.post('/api/homework', auth, upload.single('file'), async (req, res) => {
     try {
       if (req.session.role !== 'admin' && req.session.role !== 'host') {
@@ -20,19 +19,11 @@ module.exports = (app, supabase) => {
       if (!student_id || !title) return res.status(400).json({ error: 'Укажите ученика и название' });
       
       let attachment_url = null;
-      
       if (req.file) {
         const fileName = `homework/${Date.now()}_${req.file.originalname.replace(/\s+/g, '_')}`;
         const { error: uploadError } = await supabase.storage
-          .from('uploads')
-          .upload(fileName, req.file.buffer, {
-            contentType: req.file.mimetype,
-            upsert: false
-          });
-        
-        if (uploadError) {
-          console.error('Ошибка загрузки файла:', uploadError);
-        } else {
+          .from('uploads').upload(fileName, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+        if (!uploadError) {
           const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(fileName);
           attachment_url = urlData?.publicUrl || null;
         }
@@ -54,7 +45,7 @@ module.exports = (app, supabase) => {
     }
   });
 
-  // ==================== МОИ ЗАДАНИЯ (ученик) ====================
+  // ==================== МОИ ЗАДАНИЯ ====================
   app.get('/api/homework/my', auth, async (req, res) => {
     try {
       const { data } = await supabase.from('homework')
@@ -64,7 +55,7 @@ module.exports = (app, supabase) => {
     } catch (err) { res.json([]); }
   });
 
-  // ==================== ЗАДАНИЯ ДЕТЕЙ (родитель) ====================
+  // ==================== ЗАДАНИЯ ДЕТЕЙ ====================
   app.get('/api/homework/children', auth, async (req, res) => {
     try {
       if (req.session.role !== 'parent') return res.json([]);
@@ -82,7 +73,7 @@ module.exports = (app, supabase) => {
     } catch (err) { res.json([]); }
   });
 
-  // ==================== ВСЕ ЗАДАНИЯ (админ) ====================
+  // ==================== ВСЕ ЗАДАНИЯ ====================
   app.get('/api/homework/all', auth, async (req, res) => {
     try {
       if (req.session.role !== 'admin' && req.session.role !== 'host') {
@@ -96,10 +87,10 @@ module.exports = (app, supabase) => {
         student_avatar: h.student?.avatar_url, teacher_name: h.teacher?.username || 'Репетитор'
       }));
       res.json(result);
-    } catch (err) { console.error('GET /api/homework/all error:', err); res.json([]); }
+    } catch (err) { res.json([]); }
   });
 
-  // ==================== ОБНОВИТЬ ЗАДАНИЕ (с XP и рейтингом) ====================
+  // ==================== ОБНОВИТЬ ЗАДАНИЕ ====================
   app.put('/api/homework/:id', auth, async (req, res) => {
     try {
       const updates = {};
@@ -122,25 +113,38 @@ module.exports = (app, supabase) => {
         const maxXP = updates.experience || hw.experience || 50;
         
         if (hw.due_date && new Date(hw.due_date) < new Date()) {
-          // ❌ ПРОСРОЧЕНО — отнимаем 50% стоимости из рейтинга
           const penalty = -Math.round(maxXP * 0.5);
           updates.experience = 0;
           updates.overdue = true;
           try { await updateRating(supabase, hw.student_id, penalty, getLevel); } catch(e) {}
-          try { notifyUser(supabase, hw.student_id, `⚠️ Задание "${hw.title}" просрочено! Штраф: ${penalty} XP (50% от стоимости)`); } catch(e) {}
+          try { notifyUser(supabase, hw.student_id, `⚠️ Задание "${hw.title}" просрочено! Штраф: ${penalty} XP`); } catch(e) {}
         } else {
-          // ✅ ВОВРЕМЯ — начисляем 100% XP
           updates.experience = maxXP;
           try { await updateRating(supabase, hw.student_id, maxXP, getLevel); } catch(e) {}
           try { notifyUser(supabase, hw.student_id, `✅ Задание проверено! +${maxXP} XP. Оценка: ${updates.grade || '—'}/${updates.max_grade || hw.max_grade || 10}`); } catch(e) {}
         }
       }
       
-      // 🔄 ВОЗВРАТ НА ДОРАБОТКУ
+      // 🔄 ВОЗВРАТ НА ДОРАБОТКУ: сброс оценки + фидбек
       if (updates.status === 'in_progress' && hw.status === 'submitted') {
         const penaltyXP = -10;
+        updates.grade = null;
+        
         try { await updateRating(supabase, hw.student_id, penaltyXP, getLevel); } catch(e) {}
-        try { notifyUser(supabase, hw.student_id, `🔄 Задание "${hw.title}" возвращено на доработку. ${penaltyXP} XP`); } catch(e) {}
+        
+        // Создаём фидбек
+        try {
+          await supabase.from('feedbacks').insert({
+            student_id: hw.student_id,
+            rating: 3,
+            topic: `🔄 Возврат: ${hw.title}`,
+            good: 'Требуется доработка',
+            improve: req.body.teacher_comment || 'Не указано',
+            created_by: req.session.userId
+          });
+        } catch(e) {}
+        
+        try { notifyUser(supabase, hw.student_id, `🔄 Задание "${hw.title}" возвращено. ${penaltyXP} XP`); } catch(e) {}
       }
       
       updates.updated_at = new Date().toISOString();
