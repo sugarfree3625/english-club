@@ -27,6 +27,7 @@
                 <span class="role-badge student-badge">Ученик</span>
               </div>
               <button v-if="isAdmin" class="role-btn-sm" @click="toggleRole(child)" title="Сменить роль">🔄</button>
+              <button v-if="isAdmin" class="feedback-btn-sm" @click="$emit('feedback', child)" title="Фидбек">⭐</button>
               <button class="unlink-btn" @click="confirmUnlink(child, parent)"><Unlink :size="14" /> Отвязать</button>
             </div>
             <p v-if="!parent.children?.length" class="empty-text">Нет привязанных учеников</p>
@@ -49,6 +50,7 @@
             </span>
           </div>
           <button v-if="isAdmin" class="role-btn" @click="toggleRole(student)" :title="'Сделать ' + (student.role === 'student' ? 'родителем' : 'учеником')">🔄</button>
+          <button v-if="isAdmin" class="feedback-btn" @click="$emit('feedback', student)" title="Фидбек">⭐</button>
           <button class="link-btn" @click="openBindModal(student)"><Link :size="14" /> Привязать</button>
         </div>
         <p v-if="!unlinkedStudents.length" class="empty-text">Все ученики привязаны</p>
@@ -114,6 +116,7 @@ export default {
   components: { AppAvatar, CheckCircle, Link, Unlink },
   inject: ['addToast'],
   props: ['isAdmin'],
+  emits: ['view', 'bind', 'homework', 'feedback'],
   data() {
     return {
       boundParents: [],
@@ -214,6 +217,9 @@ export default {
 .role-btn, .role-btn-sm { display: flex; align-items: center; gap: 4px; padding: 5px 10px; background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3); border-radius: 8px; color: #818cf8; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
 .role-btn:hover, .role-btn-sm:hover { background: rgba(99,102,241,0.25); }
 .role-btn-sm { padding: 4px 8px; font-size: 0.8rem; }
+.feedback-btn, .feedback-btn-sm { display: flex; align-items: center; gap: 4px; padding: 5px 10px; background: rgba(251,191,36,0.15); border: 1px solid rgba(251,191,36,0.3); border-radius: 8px; color: #fbbf24; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+.feedback-btn:hover, .feedback-btn-sm:hover { background: rgba(251,191,36,0.25); }
+.feedback-btn-sm { padding: 4px 8px; font-size: 0.8rem; }
 .unlink-btn { display: flex; align-items: center; gap: 4px; padding: 5px 10px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; color: #ef4444; cursor: pointer; font-size: 0.75rem; font-weight: 600; }
 .unlink-btn:hover { background: rgba(239,68,68,0.2); }
 .link-btn { display: flex; align-items: center; gap: 4px; padding: 6px 14px; background: linear-gradient(135deg, #6366f1, #2dd4bf); border: none; border-radius: 10px; color: #fff; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
