@@ -1,4 +1,4 @@
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 const { notifyUser, updateRating } = require('../utils/telegram');
 const { getLevel } = require('../utils/helpers');
 
