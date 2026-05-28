@@ -38,7 +38,6 @@
         class="hw-card"
         :class="{ 'has-response': h.status === 'submitted' }"
       >
-        <!-- Шапка -->
         <div class="hw-card-header">
           <AppAvatar :src="h.student_avatar" :name="h.student_name" :size="40" />
           <div class="hw-card-user">
@@ -48,7 +47,6 @@
           <span class="hw-status-badge" :class="h.status">{{ statusLabel(h.status) }}</span>
         </div>
 
-        <!-- Тело -->
         <div class="hw-card-body">
           <div class="hw-type">{{ typeIcon(h.type) }} {{ typeLabel(h.type) }}</div>
           <h3>{{ h.title }}</h3>
@@ -62,16 +60,12 @@
           </div>
         </div>
 
-        <!-- Действия -->
         <div class="hw-card-actions">
           <button class="action-btn" @click="openEditModal(h)" title="Редактировать">
             <i class="fas fa-edit"></i>
           </button>
           <button class="action-btn" @click="confirmDelete(h)" title="Удалить">
             <i class="fas fa-trash"></i>
-          </button>
-          <button class="action-btn" @click="openCommentModal(h)" title="Комментировать">
-            <i class="fas fa-comment"></i>
           </button>
           <button
             v-if="h.status === 'submitted'"
@@ -86,14 +80,12 @@
           </button>
         </div>
 
-        <!-- Ответ ученика (если есть) -->
         <div v-if="h.student_answer && h.status === 'submitted'" class="student-answer-preview">
           <i class="fas fa-file-alt"></i> Ответ прикреплён
         </div>
       </div>
     </div>
 
-    <!-- Пусто -->
     <div v-else class="empty-section">
       <div class="empty-icon">📭</div>
       <p class="empty-text">Нет заданий в этой категории</p>
@@ -109,7 +101,6 @@
               <button class="close-btn" @click="reviewingHomework = null">✕</button>
             </div>
 
-            <!-- Инфо -->
             <div class="review-info">
               <div class="review-student">
                 <AppAvatar :src="reviewingHomework.student_avatar" :name="reviewingHomework.student_name" :size="48" />
@@ -124,19 +115,16 @@
               </div>
             </div>
 
-            <!-- Текст задания -->
             <div class="review-section" v-if="reviewingHomework.description">
               <h4>📋 Текст задания</h4>
               <p>{{ reviewingHomework.description }}</p>
             </div>
 
-            <!-- Ответ ученика -->
             <div class="review-section answer-section" v-if="reviewingHomework.student_answer">
               <h4>📤 Ответ ученика</h4>
               <div class="answer-content">
                 <p>{{ reviewingHomework.student_answer }}</p>
               </div>
-              <!-- Превью файла -->
               <div v-if="reviewingHomework.answer_attachment_url" class="attachment-preview">
                 <div v-if="isImage(reviewingHomework.answer_attachment_url)" class="image-preview">
                   <img :src="reviewingHomework.answer_attachment_url" alt="Файл ученика" />
@@ -152,7 +140,6 @@
               </div>
             </div>
 
-            <!-- Оценка и комментарий -->
             <div class="review-section">
               <h4>⭐ Оценка</h4>
               <div class="grade-input-row">
@@ -169,7 +156,6 @@
               ></textarea>
             </div>
 
-            <!-- Кнопки -->
             <div class="review-actions">
               <button class="btn btn-accept" @click="acceptHomework">
                 <i class="fas fa-check"></i> Принять (✅ Выполнено)
@@ -221,7 +207,6 @@
       </transition>
     </Teleport>
 
-    <!-- Конфетти -->
     <ConfettiExplosion :active="showConfetti" />
   </div>
 </template>
@@ -271,95 +256,58 @@ export default {
     },
     filteredHomework() {
       let list = this.homework;
-      
-      // Фильтр по статусу
-      if (this.activeTab !== 'all') {
-        list = list.filter(h => h.status === this.activeTab);
-      }
-      
-      // Поиск
+      if (this.activeTab !== 'all') list = list.filter(h => h.status === this.activeTab);
       if (this.searchQuery) {
         const q = this.searchQuery.toLowerCase();
-        list = list.filter(h => 
-          (h.student_name || '').toLowerCase().includes(q) ||
-          (h.title || '').toLowerCase().includes(q)
-        );
+        list = list.filter(h => (h.student_name || '').toLowerCase().includes(q) || (h.title || '').toLowerCase().includes(q));
       }
-      
       return list;
     }
   },
-  async mounted() {
-    await this.loadHomework();
-  },
+  async mounted() { await this.loadHomework(); },
   methods: {
     async loadHomework() {
       try {
         const { data } = await axios.get('/api/homework/all');
         this.homework = data || [];
-      } catch(e) {
-        console.error('Ошибка загрузки заданий:', e);
-      }
+      } catch(e) {}
     },
 
-    // Хелперы
-    typeIcon(t) { const i = { homework: '📝', test: '🎯', essay: '📄', audio: '🎤' }; return i[t] || '📝'; },
-    typeLabel(t) { const l = { homework: 'Домашка', test: 'Тест', essay: 'Эссе', audio: 'Аудио' }; return l[t] || t; },
-    statusLabel(s) { const l = { assigned: 'Назначено', in_progress: 'В работе', submitted: 'На проверке', completed: 'Выполнено' }; return l[s] || s; },
+    typeIcon(t) { const i = { homework:'📝', test:'🎯', essay:'📄', audio:'🎤' }; return i[t]||'📝'; },
+    typeLabel(t) { const l = { homework:'Домашка', test:'Тест', essay:'Эссе', audio:'Аудио' }; return l[t]||t; },
+    statusLabel(s) { const l = { assigned:'Назначено', in_progress:'В работе', submitted:'На проверке', completed:'Выполнено' }; return l[s]||s; },
     isOverdue(h) { return h.due_date && new Date(h.due_date) < new Date() && h.status !== 'completed'; },
-    formatDate(d) { return d ? new Date(d).toLocaleDateString('ru', { day: 'numeric', month: 'short', year: 'numeric' }) : ''; },
-    isImage(url) { return /\.(jpg|jpeg|png|gif|webp)$/i.test(url); },
-    isAudio(url) { return /\.(mp3|wav|ogg)$/i.test(url); },
+    formatDate(d) { return d ? new Date(d).toLocaleDateString('ru',{day:'numeric',month:'short',year:'numeric'}) : ''; },
+    isImage(u) { return /\.(jpg|jpeg|png|gif|webp)$/i.test(u); },
+    isAudio(u) { return /\.(mp3|wav|ogg)$/i.test(u); },
 
-    // Модалки
     openReviewModal(h) {
       this.reviewingHomework = h;
-      this.reviewGrade = h.grade || h.max_grade || 10;
-      this.reviewComment = h.teacher_comment || '';
+      this.reviewGrade = h.max_grade || 10;
+      this.reviewComment = '';
     },
     openViewModal(h) { this.viewingHomework = h; },
-    
     openEditModal(h) {
       this.editingHomework = h;
-      this.editForm = {
-        title: h.title || '',
-        description: h.description || '',
-        due_date: h.due_date ? h.due_date.split('T')[0] : ''
-      };
+      this.editForm = { title: h.title || '', description: h.description || '', due_date: h.due_date ? h.due_date.split('T')[0] : '' };
     },
-
     async saveEdit() {
       this.saving = true;
       try {
         await axios.put(`/api/homework/${this.editingHomework.id}`, this.editForm);
         this.editingHomework = null;
-        this.addToast('Задание обновлено! ✏️', 'success');
+        this.addToast('Обновлено! ✏️', 'success');
         await this.loadHomework();
-      } catch(e) {
-        this.addToast('Ошибка сохранения', 'error');
-      } finally {
-        this.saving = false;
-      }
+      } catch(e) { this.addToast('Ошибка', 'error'); }
+      finally { this.saving = false; }
     },
-
     async confirmDelete(h) {
-      if (!confirm(`Удалить задание "${h.title}"?`)) return;
-      try {
-        await axios.delete(`/api/homework/${h.id}`);
-        this.addToast('Удалено! 🗑', 'info');
-        await this.loadHomework();
-      } catch(e) {
-        this.addToast('Ошибка удаления', 'error');
-      }
+      if (!confirm(`Удалить "${h.title}"?`)) return;
+      try { await axios.delete(`/api/homework/${h.id}`); this.addToast('Удалено! 🗑', 'info'); await this.loadHomework(); }
+      catch(e) { this.addToast('Ошибка', 'error'); }
     },
 
-    openCommentModal(h) {
-      this.reviewingHomework = h;
-      this.reviewGrade = h.grade || h.max_grade || 10;
-      this.reviewComment = h.teacher_comment || '';
-    },
-
-    // Проверка
+    // 🔥 ПРИНЯТЬ
     async acceptHomework() {
       try {
         await axios.put(`/api/homework/${this.reviewingHomework.id}`, {
@@ -369,26 +317,23 @@ export default {
         });
         this.reviewingHomework = null;
         this.showConfetti = true;
-        this.addToast('✅ Принято! Ученик получил XP!', 'success');
+        this.addToast('✅ Принято!', 'success');
         await this.loadHomework();
         setTimeout(() => { this.showConfetti = false; }, 3000);
-      } catch(e) {
-        this.addToast('Ошибка', 'error');
-      }
+      } catch(e) { this.addToast('Ошибка', 'error'); }
     },
 
+    // 🔥 ВЕРНУТЬ (сброс оценки + фидбек)
     async returnHomework() {
       try {
         await axios.put(`/api/homework/${this.reviewingHomework.id}`, {
-          teacher_comment: this.reviewComment,
+          teacher_comment: this.reviewComment || 'Требуется доработка',
           status: 'in_progress'
         });
         this.reviewingHomework = null;
-        this.addToast('🔄 Возвращено в работу', 'info');
+        this.addToast('🔄 Возвращено на доработку. Фидбек создан!', 'info');
         await this.loadHomework();
-      } catch(e) {
-        this.addToast('Ошибка', 'error');
-      }
+      } catch(e) { this.addToast('Ошибка', 'error'); }
     }
   }
 };
@@ -396,12 +341,9 @@ export default {
 
 <style scoped>
 .teacher-homework { display: flex; flex-direction: column; gap: 20px; color: #e2e8f0; }
-
 .page-header { margin-bottom: 4px; }
 .page-header h2 { font-family: 'Space Grotesk', sans-serif; font-size: 1.5rem; font-weight: 700; color: #fff; margin: 0; }
 .header-line { height: 3px; width: 60px; background: linear-gradient(90deg, #6366f1, #2dd4bf); border-radius: 2px; margin-top: 8px; }
-
-/* Табы */
 .tabs-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .tab-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; background: rgba(255,255,255,0.03); color: #94a3b8; cursor: pointer; font-size: 0.8rem; font-weight: 500; transition: all 0.2s; font-family: inherit; }
 .tab-btn:hover { border-color: rgba(99,102,241,0.3); color: #fff; }
@@ -411,54 +353,39 @@ export default {
 .tab-count { padding: 2px 8px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; background: rgba(255,255,255,0.08); }
 .tab-count.submitted { background: rgba(16,185,129,0.15); color: #10b981; }
 .tab-count.completed { background: rgba(16,185,129,0.2); color: #34d399; }
-
-/* Поиск */
 .search-row { }
 .search-input { width: 100%; padding: 10px 16px; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; background: rgba(255,255,255,0.04); color: #fff; font-size: 0.85rem; outline: none; font-family: inherit; }
 .search-input:focus { border-color: #6366f1; }
-
-/* Сетка */
 .homework-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 14px; }
 @media (max-width: 768px) { .homework-grid { grid-template-columns: 1fr; } }
-
-/* Карточка */
 .hw-card { background: rgba(255,255,255,0.04); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; padding: 18px; transition: all 0.3s; }
 .hw-card:hover { border-color: rgba(99,102,241,0.3); box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
 .hw-card.has-response { border-color: rgba(16,185,129,0.3); box-shadow: 0 0 20px rgba(16,185,129,0.1); }
-
 .hw-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .hw-card-user strong { color: #fff; font-size: 0.85rem; display: block; }
 .hw-card-user small { color: #94a3b8; font-size: 0.7rem; }
-
 .hw-status-badge { margin-left: auto; padding: 3px 10px; border-radius: 8px; font-size: 0.7rem; font-weight: 600; }
 .hw-status-badge.assigned { background: rgba(99,102,241,0.15); color: #818cf8; }
 .hw-status-badge.in_progress { background: rgba(251,191,36,0.15); color: #fbbf24; }
 .hw-status-badge.submitted { background: rgba(16,185,129,0.15); color: #10b981; }
 .hw-status-badge.completed { background: rgba(16,185,129,0.2); color: #34d399; }
-
 .hw-card-body h3 { color: #fff; font-size: 0.95rem; margin: 0 0 4px; font-family: 'Space Grotesk', sans-serif; }
 .hw-desc { color: #94a3b8; font-size: 0.8rem; margin: 0 0 8px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .hw-type { color: #64748b; font-size: 0.7rem; text-transform: uppercase; margin-bottom: 4px; }
 .hw-meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 0.75rem; color: #94a3b8; }
 .hw-due.overdue { color: #ef4444; font-weight: 600; }
 .hw-grade { color: #fbbf24; font-weight: 700; }
-
 .hw-card-actions { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
 .action-btn { display: flex; align-items: center; gap: 4px; padding: 6px 12px; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.04); color: #94a3b8; cursor: pointer; font-size: 0.78rem; transition: all 0.2s; font-family: inherit; }
 .action-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
 .action-btn.review-btn { background: rgba(16,185,129,0.15); border-color: rgba(16,185,129,0.3); color: #10b981; font-weight: 600; }
 .action-btn.review-btn:hover { background: rgba(16,185,129,0.25); }
-
 .pulse { animation: pulse 2s infinite; }
 @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); } 50% { box-shadow: 0 0 20px 5px rgba(16,185,129,0.2); } }
-
 .student-answer-preview { margin-top: 10px; padding: 8px 12px; background: rgba(16,185,129,0.08); border-radius: 8px; color: #10b981; font-size: 0.8rem; }
-
 .empty-section { text-align: center; padding: 48px 24px; }
 .empty-icon { font-size: 3rem; margin-bottom: 12px; }
 .empty-text { color: #64748b; }
-
-/* Модалки */
 .modal-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 20px; }
 .modal-card { background: rgba(15,15,30,0.98); border: 1px solid rgba(255,255,255,0.12); border-radius: 24px; padding: 28px; width: 100%; max-height: 85vh; overflow-y: auto; color: #e2e8f0; animation: modalPop 0.3s ease; }
 @keyframes modalPop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -467,50 +394,40 @@ export default {
 .modal-header h2 { font-family: 'Space Grotesk', sans-serif; color: #fff; margin: 0; }
 .close-btn { background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer; }
 .close-btn:hover { color: #fff; }
-
 .review-info { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.06); }
 .review-student { display: flex; align-items: center; gap: 10px; }
 .review-student strong { color: #fff; display: block; }
 .review-student small { color: #94a3b8; }
 .review-meta { display: flex; gap: 12px; font-size: 0.8rem; color: #94a3b8; }
-
 .review-section { margin-bottom: 16px; }
 .review-section h4 { font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; margin: 0 0 8px; }
 .review-section p { color: #cbd5e1; font-size: 0.9rem; line-height: 1.5; margin: 0; }
 .answer-section { background: rgba(99,102,241,0.06); padding: 14px; border-radius: 14px; border: 1px solid rgba(99,102,241,0.15); }
 .answer-content { margin-bottom: 10px; }
-
 .attachment-preview { margin-top: 10px; }
 .image-preview img { max-width: 100%; max-height: 200px; border-radius: 10px; }
 .audio-preview { display: flex; align-items: center; gap: 10px; color: #818cf8; }
 .audio-preview audio { flex: 1; }
 .file-preview { display: flex; align-items: center; gap: 8px; color: #ef4444; }
 .file-preview a { color: #818cf8; }
-
 .grade-input-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .grade-select { padding: 8px 14px; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; background: rgba(255,255,255,0.05); color: #fbbf24; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit; }
 .grade-max { color: #94a3b8; font-size: 1rem; }
-
 .comment-input { width: 100%; padding: 10px 14px; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; background: rgba(255,255,255,0.04); color: #fff; font-size: 0.85rem; outline: none; resize: vertical; font-family: inherit; }
 .comment-input:focus { border-color: #6366f1; }
-
 .review-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .btn-accept { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 12px 20px; background: linear-gradient(135deg, #10b981, #34d399); border: none; border-radius: 12px; color: #fff; font-weight: 700; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; font-family: inherit; }
 .btn-accept:hover { transform: translateY(-1px); box-shadow: 0 10px 25px rgba(16,185,129,0.3); }
 .btn-return { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 12px 20px; background: rgba(251,191,36,0.15); border: 1px solid rgba(251,191,36,0.3); border-radius: 12px; color: #fbbf24; font-weight: 600; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; font-family: inherit; }
 .btn-return:hover { background: rgba(251,191,36,0.25); }
-
 .view-info p { margin-bottom: 8px; color: #cbd5e1; }
-
 .input { width: 100%; padding: 10px 14px; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; background: rgba(255,255,255,0.04); color: #fff; font-size: 0.85rem; outline: none; margin-bottom: 8px; font-family: inherit; resize: vertical; }
 .input:focus { border-color: #6366f1; }
-
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 20px; border-radius: 50px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border: none; font-family: inherit; transition: all 0.2s; }
 .btn-p { background: linear-gradient(135deg, #6366f1, #2dd4bf); color: #fff; }
 .btn-o { border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; background: rgba(255,255,255,0.05); }
 .w-100 { width: 100%; }
 .mt-2 { margin-top: 10px; }
-
 .modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.3s ease; }
 .modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
 </style>
