@@ -36,6 +36,7 @@
           <ProfileTabStudents v-if="tab === 'children'" :students="myStudents" title="Мои дети" @view="viewStudent" />
           <ProfileTabStudents v-if="tab === 'students'" :students="allStudents" title="Ученики" :showActions="true" :isAdmin="user?.role === 'admin'" @view="viewStudent" @bind="openBindParent" @homework="openHomeworkTab" @feedback="openFeedback" />
           <ProfileTabFeedbacks v-if="tab === 'feedbacks'" :feedbacks="feedbacks" />
+          <ProfileTabAllFeedbacks v-if="tab === 'allfeedbacks'" :isAdmin="isTutor" />
           <ProfileTabHomework v-if="tab === 'homework'" :students="allStudents" :loading="homeworkLoading" @create-homework="createHomework" />
 
           <div v-if="tab === 'history'" class="card fade-in">
@@ -72,6 +73,7 @@ import ConfettiExplosion from '../components/ConfettiExplosion.vue';
 import ProfileSidebar from '../components/profile/ProfileSidebar.vue';
 import ProfileTabInfo from '../components/profile/ProfileTabInfo.vue';
 import ProfileTabAchievements from '../components/profile/ProfileTabAchievements.vue';
+import ProfileTabAllFeedbacks from '../components/profile/ProfileTabAllFeedbacks.vue';
 import ProfileTabSchedule from '../components/profile/ProfileTabSchedule.vue';
 import ProfileTabStudents from '../components/profile/ProfileTabStudents.vue';
 import ProfileTabWords from '../components/profile/ProfileTabWords.vue';
@@ -84,7 +86,7 @@ import { exportProgressPDF } from '../composables/useExportPDF.js';
 
 export default {
   name: 'ProfilePage',
-  components: { ConfettiExplosion, ProfileSidebar, ProfileTabInfo, ProfileTabAchievements, ProfileTabSchedule, ProfileTabStudents, ProfileTabWords, ProfileTabNotes, ProfileTabFeedbacks, ProfileTabHomework, ProfileModals, AchievementUnlock },
+  components: { ConfettiExplosion, ProfileSidebar, ProfileTabAllFeedbacks, ProfileTabInfo, ProfileTabAchievements, ProfileTabSchedule, ProfileTabStudents, ProfileTabWords, ProfileTabNotes, ProfileTabFeedbacks, ProfileTabHomework, ProfileModals, AchievementUnlock },
   props: ['user'],
   inject: ['addToast'],
   data() {
@@ -189,6 +191,7 @@ export default {
 
     // Фидбеки
     async loadFeedbacks() { try { this.feedbacks = (await axios.get('/api/feedback/my')).data || []; } catch { this.addToast('Ошибка загрузки', 'error'); } },
+    async loadAllFeedbacks() {},
     openFeedback(s) { this.fbStudentId = s.id; this.showFeedback = true; },
     async doAddFeedback(data) { try { await axios.post('/api/feedback', { ...data, student_id: this.fbStudentId }); this.showFeedback = false; this.addToast('Отправлено! 📊', 'success'); } catch { this.addToast('Ошибка', 'error'); } },
 
