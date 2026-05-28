@@ -25,12 +25,40 @@
           <ProfileTabWords v-if="tab === 'words'" :words="words" :loading="wordsLoading" @add-word="addWord" @delete-word="delWord" @update-word-status="updateWordStatus" />
           <ProfileTabNotes v-if="tab === 'notes'" :note="note" @update-note="updateNote" />
 
-          <div v-if="tab === 'myhomework'" class="card fade-in">
-            <h3>📋 Мои задания</h3>
-            <div class="homework-widget" v-for="h in myHomework" :key="h.id" :class="{ done: h.status === 'completed' }">
-              <div class="homework-widget-header"><span>{{ h.status === 'completed' ? '✅' : '📝' }}</span><strong>{{ h.title }}</strong></div>
-            </div>
-            <p v-if="!myHomework.length" class="empty-text">Нет заданий</p>
+          <!-- ЗАДАНИЯ (ОБНОВЛЁННАЯ ВКЛАДКА) -->
+          <div v-if="tab === 'myhomework'" class="homework-tab fade-in">
+            <h3 class="tab-title">📋 {{ isTutor ? 'Все задания' : isParent ? 'Задания детей' : 'Мои задания' }}</h3>
+            
+            <div v-if="homeworkLoading" class="empty-text">Загрузка...</div>
+            
+            <template v-else>
+              <div class="homework-list">
+                <div v-for="h in allHomework" :key="h.id" 
+                  class="homework-card" 
+                  :class="{ overdue: isOverdue(h), completed: h.status === 'completed' }"
+                  @click="selectedHomework = h">
+                  
+                  <div class="hw-left">
+                    <div class="hw-type-icon">{{ typeIcon(h.type) }}</div>
+                    <div class="hw-info">
+                      <div class="hw-title">{{ h.title }}</div>
+                      <div class="hw-meta">
+                        <span v-if="h.student_name" class="hw-student">👨‍🎓 {{ h.student_name }}</span>
+                        <span v-if="h.due_date" class="hw-due" :class="{ 'text-red': isOverdue(h) }">
+                          📅 {{ formatDate(h.due_date) }}
+                        </span>
+                        <span class="hw-status" :class="h.status">{{ statusLabel(h.status) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="hw-right">
+                    <div v-if="h.grade" class="hw-grade">⭐ {{ h.grade }}/{{ h.max_grade || 10 }}</div>
+                    <div v-else class="hw-xp">🎯 {{ h.experience || 50 }} XP</div>
+                  </div>
+                </div>
+              </div>
+              <p v-if="!allHomework.length" class="empty-text">Нет заданий</p>
+            </template>
           </div>
 
           <ProfileTabStudents v-if="tab === 'children'" :students="myStudents" title="Мои дети" @view="viewStudent" />
@@ -47,7 +75,19 @@
         </div>
       </div>
 
-      <!-- Все модалки в одном компоненте -->
+      <!-- Модалка задания -->
+      <HomeworkModal 
+        v-if="selectedHomework"
+        :homework="selectedHomework"
+        :userRole="user?.role"
+        :userId="user?.id"
+        @close="selectedHomework = null"
+        @submit-answer="submitHomeworkAnswer"
+        @submit-grade="submitHomeworkGrade"
+        @change-status="changeHomeworkStatus"
+      />
+
+      <!-- Остальные модалки -->
       <ProfileModals
         :viewingStudent="viewingStudent"
         :showBindParent="showBindParent"
@@ -82,11 +122,12 @@ import ProfileTabFeedbacks from '../components/profile/ProfileTabFeedbacks.vue';
 import ProfileTabHomework from '../components/profile/ProfileTabHomework.vue';
 import ProfileModals from '../components/profile/ProfileModals.vue';
 import AchievementUnlock from '../components/AchievementUnlock.vue';
+import HomeworkModal from '../components/profile/HomeworkModal.vue';
 import { exportProgressPDF } from '../composables/useExportPDF.js';
 
 export default {
   name: 'ProfilePage',
-  components: { ConfettiExplosion, ProfileSidebar, ProfileTabAllFeedbacks, ProfileTabInfo, ProfileTabAchievements, ProfileTabSchedule, ProfileTabStudents, ProfileTabWords, ProfileTabNotes, ProfileTabFeedbacks, ProfileTabHomework, ProfileModals, AchievementUnlock },
+  components: { ConfettiExplosion, ProfileSidebar, ProfileTabAllFeedbacks, ProfileTabInfo, ProfileTabAchievements, ProfileTabSchedule, ProfileTabStudents, ProfileTabWords, ProfileTabNotes, ProfileTabFeedbacks, ProfileTabHomework, ProfileModals, AchievementUnlock, HomeworkModal },
   props: ['user'],
   inject: ['addToast'],
   data() {
@@ -95,7 +136,8 @@ export default {
       words: [], wordsLoading: false,
       note: '', allBookings: [],
       allAchievements: [], earnedCount: 0, totalCount: 50, showConfetti: false,
-      myHomework: [], homeworkLoading: false,
+      allHomework: [], myHomework: [], homeworkLoading: false,
+      selectedHomework: null,
       myStudents: [], allStudents: [], viewingStudent: null,
       mySlots: [],
       showBindParent: false, bindStudentId: null, parentResults: [],
@@ -118,6 +160,7 @@ export default {
     this.restoreTab();
   },
   methods: {
+    // ==================== ЗАГРУЗКА ====================
     async loadInitialData() {
       try {
         const [w, n, b] = await Promise.all([axios.get('/api/words'), axios.get('/api/notes'), axios.get('/api/myb')]);
@@ -132,7 +175,7 @@ export default {
     },
     switchTab(btn) { this.tab = btn.tab; if (btn.load) this[btn.load](); },
 
-    // ==================== СЛОВАРЬ (ОБНОВЛЁННЫЙ) ====================
+    // ==================== СЛОВАРЬ ====================
     async addWord({ en, ru, transcription, part_of_speech, category, example }) {
       this.wordsLoading = true;
       try {
@@ -147,11 +190,9 @@ export default {
         this.addToast(msg, 'error');
       } finally { this.wordsLoading = false; }
     },
-    
     async updateWordStatus({ id, status, next_review, repeat_count, correct_count, wrong_count }) {
       try {
         await axios.put(`/api/words/${id}`, { status, next_review, repeat_count, correct_count, wrong_count });
-        // Обновляем слово в локальном массиве
         const word = this.words.find(w => w.id === id);
         if (word) {
           if (status) word.status = status;
@@ -160,11 +201,8 @@ export default {
           if (correct_count !== undefined) word.correct_count = correct_count;
           if (wrong_count !== undefined) word.wrong_count = wrong_count;
         }
-      } catch(e) {
-        console.error('Ошибка обновления слова:', e);
-      }
+      } catch(e) { console.error('Ошибка обновления слова:', e); }
     },
-    
     async delWord(id) {
       try {
         await axios.delete(`/api/words/${id}`);
@@ -173,10 +211,10 @@ export default {
       } catch { this.addToast('Ошибка удаления', 'error'); }
     },
 
-    // Заметки
+    // ==================== ЗАМЕТКИ ====================
     updateNote(val) { this.note = val; clearTimeout(this._t); this._t = setTimeout(() => axios.put('/api/notes', { note: this.note }).catch(() => {}), 500); },
 
-    // Достижения
+    // ==================== ДОСТИЖЕНИЯ ====================
     async loadAchievements() {
       try {
         const r = await axios.get('/api/achievements');
@@ -189,18 +227,60 @@ export default {
       } catch (e) { console.error('Ошибка достижений:', e); }
     },
 
-    // Фидбеки
+    // ==================== ФИДБЕКИ ====================
     async loadFeedbacks() { try { this.feedbacks = (await axios.get('/api/feedback/my')).data || []; } catch { this.addToast('Ошибка загрузки', 'error'); } },
     async loadAllFeedbacks() {},
     openFeedback(s) { this.fbStudentId = s.id; this.showFeedback = true; },
     async doAddFeedback(data) { try { await axios.post('/api/feedback', { ...data, student_id: this.fbStudentId }); this.showFeedback = false; this.addToast('Отправлено! 📊', 'success'); } catch { this.addToast('Ошибка', 'error'); } },
 
-    // Домашние задания
-    async loadMyHomework() { try { this.myHomework = (await axios.get('/api/homework/my')).data || []; } catch {} },
+    // ==================== ЗАДАНИЯ (ОБНОВЛЁННЫЕ) ====================
+    async loadMyHomework() {
+      this.homeworkLoading = true;
+      try {
+        if (this.isTutor) {
+          this.allHomework = (await axios.get('/api/homework/all')).data || [];
+        } else if (this.isParent) {
+          this.allHomework = (await axios.get('/api/homework/children')).data || [];
+        } else {
+          this.allHomework = (await axios.get('/api/homework/my')).data || [];
+        }
+      } catch(e) { console.error('Ошибка загрузки заданий:', e); }
+      finally { this.homeworkLoading = false; }
+    },
     openHomeworkTab(s) { this.hwStudent = s.id; this.tab = 'homework'; },
-    async createHomework(data) { try { await axios.post('/api/homework', data); this.addToast('Создано! 📝', 'success'); } catch (e) { this.addToast(e.response?.data?.error || 'Ошибка', 'error'); } },
+    async createHomework(data) {
+      try {
+        await axios.post('/api/homework', data);
+        this.addToast('Задание создано! 📝', 'success');
+        await this.loadMyHomework();
+      } catch(e) { this.addToast(e.response?.data?.error || 'Ошибка', 'error'); }
+    },
+    async submitHomeworkAnswer({ answer }) {
+      try {
+        await axios.put(`/api/homework/${this.selectedHomework.id}`, { student_answer: answer, status: 'submitted' });
+        this.addToast('Ответ отправлен! 📤', 'success');
+        this.selectedHomework = null;
+        await this.loadMyHomework();
+      } catch(e) { this.addToast('Ошибка', 'error'); }
+    },
+    async submitHomeworkGrade({ grade, comment }) {
+      try {
+        await axios.put(`/api/homework/${this.selectedHomework.id}`, { grade, teacher_comment: comment, status: 'completed' });
+        this.addToast('Оценено! ⭐', 'success');
+        this.selectedHomework = null;
+        await this.loadMyHomework();
+      } catch(e) { this.addToast('Ошибка', 'error'); }
+    },
+    async changeHomeworkStatus({ status }) {
+      try {
+        await axios.put(`/api/homework/${this.selectedHomework.id}`, { status });
+        this.addToast('Статус обновлён! ✅', 'success');
+        this.selectedHomework = null;
+        await this.loadMyHomework();
+      } catch(e) { this.addToast('Ошибка', 'error'); }
+    },
 
-    // Ученики и родители
+    // ==================== УЧЕНИКИ И РОДИТЕЛИ ====================
     async loadMyStudents() { try { this.myStudents = (await axios.get('/api/parent/students')).data || []; } catch { this.addToast('Ошибка загрузки', 'error'); } },
     async loadAllStudents() { try { this.allStudents = ((await axios.get('/api/users')).data || []).filter(u => u.role !== 'admin' && u.role !== 'host'); } catch {} },
     async viewStudent(s) { try { this.viewingStudent = (await axios.get(`/api/parent/student/${s.id}`)).data; } catch { this.addToast('Ошибка загрузки', 'error'); } },
@@ -213,18 +293,16 @@ export default {
         this.parentSearch = ''; 
         this.addToast('Привязан! ✅', 'success'); 
       } catch(e) { 
-        if (e.response?.status === 409) {
-          this.addToast('Эта связь уже существует', 'info');
-          this.showBindParent = false;
-        } else {
-          this.addToast(e.response?.data?.error || 'Ошибка', 'error');
-        }
+        if (e.response?.status === 409) { this.addToast('Эта связь уже существует', 'info'); this.showBindParent = false; }
+        else { this.addToast(e.response?.data?.error || 'Ошибка', 'error'); }
       } 
     },
 
-    // Слоты и остальное
+    // ==================== СЛОТЫ ====================
     async loadMySlots() { try { this.mySlots = (await axios.get('/api/slots')).data || []; } catch {} },
     exportMyICS() { window.open('/api/slots/export', '_blank'); },
+
+    // ==================== ПРОЧЕЕ ====================
     async exportPDF() {
       try { const r = await axios.get('/api/achievements'); const stats = { messages: 0, meetings: 0, words: 0, achievements: this.allAchievements.filter(a => a.earned).length }; exportProgressPDF(this.user, stats, r.data || []); } catch { this.addToast('Ошибка', 'error'); }
     },
@@ -232,7 +310,13 @@ export default {
     async uploadAvatar(e) {
       const file = e.target.files[0]; if (!file || file.size > 5*1024*1024) { this.addToast('Файл > 5MB', 'error'); return; }
       try { const form = new FormData(); form.append('img', file); const r = await axios.post('/api/nimg', form); if (r.data.url) { await axios.put('/api/me', { avatar_url: r.data.url }); this.user.avatar_url = r.data.url; this.$emit('update-user', { ...this.user, avatar_url: r.data.url }); this.addToast('Фото обновлено! 📸', 'success'); } } catch { this.addToast('Ошибка загрузки', 'error'); }
-    }
+    },
+
+    // ==================== ХЕЛПЕРЫ ====================
+    typeIcon(type) { const icons = { homework: '📝', test: '🎯', essay: '📄', audio: '🎤' }; return icons[type] || '📝'; },
+    statusLabel(status) { const labels = { assigned: 'Назначено', in_progress: 'В работе', submitted: 'На проверке', completed: 'Выполнено' }; return labels[status] || status; },
+    isOverdue(h) { return h.due_date && new Date(h.due_date) < new Date() && h.status !== 'completed'; },
+    formatDate(d) { return d ? new Date(d).toLocaleDateString('ru', { day: 'numeric', month: 'short' }) : ''; }
   }
 };
 </script>
@@ -253,6 +337,31 @@ export default {
 .session-item { padding: 14px 18px; background: rgba(255,255,255,0.03); border-radius: 14px; margin-bottom: 8px; border-left: 3px solid #6366f1; }
 .session-item strong { color: #fff; }
 .session-item small { color: #94a3b8; }
+
+/* ЗАДАНИЯ */
+.homework-tab { }
+.tab-title { font-family: 'Space Grotesk', sans-serif; font-size: 1.3rem; font-weight: 700; color: #fff; margin-bottom: 18px; }
+.homework-list { display: flex; flex-direction: column; gap: 8px; }
+.homework-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; cursor: pointer; transition: all 0.2s; }
+.homework-card:hover { background: rgba(255,255,255,0.06); border-color: rgba(99,102,241,0.3); transform: translateY(-1px); }
+.homework-card.overdue { border-left: 3px solid #ef4444; }
+.homework-card.completed { opacity: 0.7; border-left: 3px solid #10b981; }
+.hw-left { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+.hw-type-icon { font-size: 1.3rem; flex-shrink: 0; }
+.hw-info { flex: 1; min-width: 0; }
+.hw-title { color: #fff; font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hw-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; font-size: 0.75rem; color: #94a3b8; }
+.hw-student { color: #818cf8; }
+.hw-due.text-red { color: #ef4444; font-weight: 600; }
+.hw-status { padding: 2px 8px; border-radius: 6px; font-weight: 600; }
+.hw-status.assigned { background: rgba(251,191,36,0.1); color: #fbbf24; }
+.hw-status.in_progress { background: rgba(99,102,241,0.1); color: #818cf8; }
+.hw-status.submitted { background: rgba(16,185,129,0.1); color: #10b981; }
+.hw-status.completed { background: rgba(16,185,129,0.15); color: #34d399; }
+.hw-right { flex-shrink: 0; text-align: right; }
+.hw-grade { color: #fbbf24; font-weight: 700; font-size: 0.9rem; }
+.hw-xp { color: #94a3b8; font-size: 0.8rem; }
+
 .fade-in { animation: fadeIn 0.35s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 768px) { .profile-page { flex-direction: column; } }
