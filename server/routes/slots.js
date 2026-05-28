@@ -1,4 +1,4 @@
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 const { notifyUser } = require('../utils/telegram');
 
 module.exports = (app, supabase) => {
