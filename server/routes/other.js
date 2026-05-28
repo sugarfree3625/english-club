@@ -203,34 +203,127 @@ module.exports = (app, supabase) => {
   });
 
   // ==================== ДОСТИЖЕНИЯ ====================
-  app.get('/api/achievements', auth, async (req, res) => {
-    try {
-      const uid = req.session.userId;
-      const [bookings, msgs, words] = await Promise.all([
-        supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('user_id', uid),
-        supabase.from('msg').select('*', { count: 'exact', head: true }).eq('sender_id', uid),
-        supabase.from('words').select('*', { count: 'exact', head: true }).eq('user_id', uid)
-      ]);
-      const { data: topUsers } = await supabase.from('users').select('id').order('rating', { ascending: false }).limit(50);
-      const rank = topUsers?.findIndex(u => u.id === uid) + 1 || 51;
-      const { data: userData } = await supabase.from('users').select('created_at').eq('id', uid).single();
-      const ageDays = userData?.created_at ? Math.floor((Date.now() - new Date(userData.created_at).getTime()) / 86400000) : 0;
-      const stats = { meetings_count: bookings?.count || 0, messages_count: msgs?.count || 0, words_count: words?.count || 0, rating_rank: rank, account_age_days: ageDays };
-      const { data: allAchievements } = await supabase.from('achievements').select('*');
-      const { data: earned } = await supabase.from('user_achievements').select('achievement_id').eq('user_id', uid);
-      const earnedIds = earned?.map(e => e.achievement_id) || [];
-      for (const a of (allAchievements || [])) {
-        if (earnedIds.includes(a.id)) continue;
-        let ok = false;
-        switch (a.condition_field) { case 'meetings_count': ok = stats.meetings_count >= a.condition_value; break; case 'messages_count': ok = stats.messages_count >= a.condition_value; break; case 'words_count': ok = stats.words_count >= a.condition_value; break; case 'rating_rank': ok = stats.rating_rank <= a.condition_value && stats.rating_rank > 0; break; case 'account_age_days': ok = stats.account_age_days >= a.condition_value; break; }
-        if (ok) { const { error } = await supabase.from('user_achievements').insert({ user_id: uid, achievement_id: a.id }); if (!error) earnedIds.push(a.id); }
+  // ==================== ДОСТИЖЕНИЯ ====================
+app.get('/api/achievements', auth, async (req, res) => {
+  try {
+    const uid = req.session.userId;
+    
+    // Считаем статистику
+    const [bookingsRes, msgsRes, wordsRes] = await Promise.all([
+      supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('user_id', uid),
+      supabase.from('msg').select('*', { count: 'exact', head: true }).eq('sender_id', uid),
+      supabase.from('words').select('*', { count: 'exact', head: true }).eq('user_id', uid)
+    ]);
+    
+    // Получаем рейтинг и позицию
+    const { data: userData } = await supabase
+      .from('users')
+      .select('rating, created_at')
+      .eq('id', uid)
+      .single();
+    
+    const userRating = userData?.rating || 0;
+    
+    // Считаем позицию в рейтинге (сколько людей имеют рейтинг выше)
+    const { count: betterCount } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true })
+      .gt('rating', userRating);
+    
+    const rank = (betterCount || 0) + 1;
+    const ageDays = userData?.created_at 
+      ? Math.floor((Date.now() - new Date(userData.created_at).getTime()) / 86400000) 
+      : 0;
+    
+    const stats = {
+      meetings_count: bookingsRes?.count || 0,
+      messages_count: msgsRes?.count || 0,
+      words_count: wordsRes?.count || 0,
+      rating_rank: rank,
+      account_age_days: ageDays
+    };
+    
+    // Получаем все достижения
+    const { data: allAchievements } = await supabase.from('achievements').select('*');
+    const { data: earned } = await supabase.from('user_achievements').select('achievement_id').eq('user_id', uid);
+    const earnedIds = earned?.map(e => e.achievement_id) || [];
+    
+    // Проверяем новые достижения
+    for (const a of (allAchievements || [])) {
+      if (earnedIds.includes(a.id)) continue;
+      
+      let ok = false;
+      switch (a.condition_field) {
+        case 'meetings_count': ok = stats.meetings_count >= a.condition_value; break;
+        case 'messages_count': ok = stats.messages_count >= a.condition_value; break;
+        case 'words_count': ok = stats.words_count >= a.condition_value; break;
+        case 'rating_rank': ok = stats.rating_rank <= a.condition_value; break;
+        case 'account_age_days': ok = stats.account_age_days >= a.condition_value; break;
       }
-      const { data: fresh } = await supabase.from('user_achievements').select('achievement_id, earned_at').eq('user_id', uid);
-      const earnedMap = {}; fresh?.forEach(e => { earnedMap[e.achievement_id] = e.earned_at; });
-      const result = (allAchievements || []).map(a => { const earned = !!earnedMap[a.id]; let cv = 0; switch (a.condition_field) { case 'meetings_count': cv = stats.meetings_count; break; case 'messages_count': cv = stats.messages_count; break; case 'words_count': cv = stats.words_count; break; case 'rating_rank': cv = stats.rating_rank; break; case 'account_age_days': cv = stats.account_age_days; break; } return { ...a, earned, earned_at: earnedMap[a.id] || null, current_value: cv, condition_value: a.condition_value, progressPercent: earned ? 100 : Math.min(100, Math.round((cv / a.condition_value) * 100)) }; });
-      res.json(result);
-    } catch (err) { console.error('GET /api/achievements error:', err); res.json([]); }
-  });
+      
+      if (ok) {
+        const { error } = await supabase
+          .from('user_achievements')
+          .insert({ user_id: uid, achievement_id: a.id });
+        
+        if (!error) earnedIds.push(a.id);
+      }
+    }
+    
+    // Получаем свежие данные о полученных достижениях
+    const { data: fresh } = await supabase
+      .from('user_achievements')
+      .select('achievement_id, earned_at')
+      .eq('user_id', uid);
+    
+    const earnedMap = {};
+    fresh?.forEach(e => { earnedMap[e.achievement_id] = e.earned_at; });
+    
+    // Формируем результат
+    const result = (allAchievements || []).map(a => {
+      const earned = !!earnedMap[a.id];
+      let cv = 0;
+      
+      switch (a.condition_field) {
+        case 'meetings_count': cv = stats.meetings_count; break;
+        case 'messages_count': cv = stats.messages_count; break;
+        case 'words_count': cv = stats.words_count; break;
+        case 'rating_rank': cv = stats.rating_rank; break;
+        case 'account_age_days': cv = stats.account_age_days; break;
+      }
+      
+      // Прогресс в процентах
+      let progressPercent = 0;
+      if (earned) {
+        progressPercent = 100;
+      } else if (a.condition_field === 'rating_rank') {
+        // Для рейтинга: чем меньше ранг, тем лучше
+        // Если нужно попасть в топ-50, а ты на 100 месте: (50/100)*100 = 50%
+        progressPercent = a.condition_value > 0 
+          ? Math.min(100, Math.round((a.condition_value / cv) * 100))
+          : 0;
+      } else {
+        progressPercent = a.condition_value > 0 
+          ? Math.min(100, Math.round((cv / a.condition_value) * 100))
+          : 0;
+      }
+      
+      return {
+        ...a,
+        earned,
+        earned_at: earnedMap[a.id] || null,
+        current_value: cv,
+        condition_value: a.condition_value,
+        progressPercent
+      };
+    });
+    
+    res.json(result);
+  } catch (err) {
+    console.error('GET /api/achievements error:', err);
+    res.json([]);
+  }
+});
 
   // ==================== РОДИТЕЛЬСКИЙ КАБИНЕТ ====================
 
