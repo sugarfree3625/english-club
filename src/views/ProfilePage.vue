@@ -184,7 +184,24 @@ export default {
     async viewStudent(s) { try { this.viewingStudent = (await axios.get(`/api/parent/student/${s.id}`)).data; } catch { this.addToast('Ошибка загрузки', 'error'); } },
     openBindParent(s) { this.bindStudentId = s.id; this.showBindParent = true; },
     async searchParents(q) { try { this.parentResults = ((await axios.get(`/api/users?q=${q}`)).data || []).filter(u => u.role === 'parent'); } catch {} },
-    async doBindParent(pid) { try { await axios.post('/api/parent/bind', { student_id: this.bindStudentId, parent_id: pid }); this.showBindParent = false; this.addToast('Привязан! ✅', 'success'); } catch (e) { this.addToast(e.response?.data?.error || 'Ошибка', 'error'); } },
+    async doBindParent(pid) { 
+  try { 
+    await axios.post('/api/parent/bind', { 
+      student_id: this.bindStudentId, 
+      parent_id: pid 
+    }); 
+    this.showBindParent = false; 
+    this.parentSearch = ''; 
+    this.addToast('Привязан! ✅', 'success'); 
+  } catch(e) { 
+    if (e.response?.status === 409) {
+      this.addToast('Эта связь уже существует', 'info');
+      this.showBindParent = false;
+    } else {
+      this.addToast(e.response?.data?.error || 'Ошибка', 'error');
+    }
+  } 
+},
 
     // Слоты и остальное
     async loadMySlots() { try { this.mySlots = (await axios.get('/api/slots')).data || []; } catch {} },
