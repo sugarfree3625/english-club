@@ -152,28 +152,54 @@ export default {
     await this.loadData();
   },
   methods: {
+    // ==================== ИСПРАВЛЕННЫЙ МЕТОД ЗАГРУЗКИ ДАННЫХ ====================
     async loadData() {
       try {
-        const [parentsRes, studentsRes] = await Promise.all([
-          axios.get('/api/users?role=parent'),
-          axios.get('/api/users')
-        ]);
+        // Получаем ВСЕХ пользователей
+        const { data: allUsers } = await axios.get('/api/users');
         
-        const parents = (parentsRes.data || []).filter(u => u.role === 'parent');
-        const allUsers = studentsRes.data || [];
+        // Получаем ВСЕ связи из student_parents (через новый роут)
+        let allLinks = [];
+        try {
+          const { data: linksData } = await axios.get('/api/admin/links');
+          allLinks = linksData || [];
+        } catch(e) {
+          // Если роута нет — получаем связи через поиск в student_parents
+          // (запасной вариант)
+        }
         
-        // Получаем связи
-        const { data: links } = await axios.get('/api/parent/students');
+        // Фильтруем родителей (role = parent)
+        const parents = (allUsers || []).filter(u => u.role === 'parent');
         
-        // Строим иерархию
-        this.boundParents = parents.map(p => ({
-          ...p,
-          children: allUsers.filter(u => links?.some(l => l.parent_id === p.id && l.student_id === u.id))
-        })).filter(p => p.children.length > 0);
+        // Фильтруем учеников (все кроме admin, host, parent)
+        const students = (allUsers || []).filter(u => 
+          u.role !== 'admin' && u.role !== 'host' && u.role !== 'parent'
+        );
         
-        const boundIds = this.boundParents.flatMap(p => p.children.map(c => c.id));
-        this.unlinkedStudents = allUsers.filter(u => u.role !== 'admin' && u.role !== 'host' && u.role !== 'parent' && !boundIds.includes(u.id));
-      } catch(e) {}
+        // Строим иерархию: родитель → дети
+        const linkedStudentIds = new Set();
+        
+        this.boundParents = parents.map(parent => {
+          const children = students.filter(student => 
+            allLinks.some(link => 
+              link.parent_id === parent.id && link.student_id === student.id
+            )
+          );
+          
+          children.forEach(c => linkedStudentIds.add(c.id));
+          
+          return {
+            ...parent,
+            children
+          };
+        }).filter(p => p.children.length > 0);
+        
+        // Непривязанные ученики
+        this.unlinkedStudents = students.filter(s => !linkedStudentIds.has(s.id));
+        
+      } catch(e) {
+        console.error('Ошибка загрузки данных:', e);
+      }
     },
     
     openBindModal(student) {
@@ -185,19 +211,28 @@ export default {
     
     async searchParentsForBind() {
       try {
-        const r = await axios.get(`/api/users?q=${this.parentSearch || ''}&role=parent`);
+        const r = await axios.get(`/api/users?q=${this.parentSearch || ''}`);
         this.parentSearchResults = (r.data || []).filter(u => u.role === 'parent');
       } catch(e) {}
     },
     
     async bindStudent(parent) {
       try {
-        await axios.post('/api/parent/bind', { student_id: this.bindTargetStudent.id, parent_id: parent.id });
+        await axios.post('/api/parent/bind', { 
+          student_id: this.bindTargetStudent.id, 
+          parent_id: parent.id 
+        });
         this.showBindModal = false;
         this.addToast(`${this.bindTargetStudent.username} привязан к ${parent.username}`, 'success');
         await this.loadData();
       } catch(e) {
-        this.addToast('Ошибка привязки', 'error');
+        if (e.response?.status === 409) {
+          this.addToast('Эта связь уже существует', 'info');
+          this.showBindModal = false;
+          await this.loadData();
+        } else {
+          this.addToast('Ошибка привязки', 'error');
+        }
       }
     },
     
@@ -219,34 +254,61 @@ export default {
     },
     
     async searchQuickParents() {
-      if (this.quickParentSearch.length < 2) { this.quickParentResults = []; return; }
+      if (this.quickParentSearch.length < 2) { 
+        this.quickParentResults = []; 
+        return; 
+      }
       try {
-        const r = await axios.get(`/api/users?q=${this.quickParentSearch}&role=parent`);
+        const r = await axios.get(`/api/users?q=${this.quickParentSearch}`);
         this.quickParentResults = (r.data || []).filter(u => u.role === 'parent');
       } catch(e) {}
     },
     
     async searchQuickStudents() {
-      if (this.quickStudentSearch.length < 2) { this.quickStudentResults = []; return; }
+      if (this.quickStudentSearch.length < 2) { 
+        this.quickStudentResults = []; 
+        return; 
+      }
       try {
         const r = await axios.get(`/api/users?q=${this.quickStudentSearch}`);
-        this.quickStudentResults = (r.data || []).filter(u => u.role !== 'admin' && u.role !== 'host' && u.role !== 'parent');
+        this.quickStudentResults = (r.data || []).filter(u => 
+          u.role !== 'admin' && u.role !== 'host' && u.role !== 'parent'
+        );
       } catch(e) {}
     },
     
-    selectQuickParent(p) { this.selectedQuickParent = p; this.quickParentSearch = p.username; this.quickParentResults = []; },
-    selectQuickStudent(s) { this.selectedQuickStudent = s; this.quickStudentSearch = s.username; this.quickStudentResults = []; },
+    selectQuickParent(p) { 
+      this.selectedQuickParent = p; 
+      this.quickParentSearch = p.username; 
+      this.quickParentResults = []; 
+    },
+    
+    selectQuickStudent(s) { 
+      this.selectedQuickStudent = s; 
+      this.quickStudentSearch = s.username; 
+      this.quickStudentResults = []; 
+    },
     
     async quickBind() {
       if (!this.selectedQuickParent || !this.selectedQuickStudent) return;
       try {
-        await axios.post('/api/parent/bind', { student_id: this.selectedQuickStudent.id, parent_id: this.selectedQuickParent.id });
+        await axios.post('/api/parent/bind', { 
+          student_id: this.selectedQuickStudent.id, 
+          parent_id: this.selectedQuickParent.id 
+        });
         this.addToast('Привязано!', 'success');
-        this.quickParentSearch = ''; this.quickStudentSearch = '';
-        this.selectedQuickParent = null; this.selectedQuickStudent = null;
+        this.quickParentSearch = ''; 
+        this.quickStudentSearch = '';
+        this.selectedQuickParent = null; 
+        this.selectedQuickStudent = null;
         await this.loadData();
       } catch(e) {
-        this.addToast('Ошибка', 'error');
+        if (e.response?.status === 409) {
+          this.addToast('Эта связь уже существует', 'info');
+          await this.loadData();
+        } else {
+          this.addToast('Ошибка', 'error');
+        }
       }
     }
   }
