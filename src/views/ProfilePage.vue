@@ -17,12 +17,14 @@
           <ProfileTabWords v-if="tab === 'words'" :words="words" :loading="wordsLoading" @add-word="addWord" @delete-word="delWord" @update-word-status="updateWordStatus" />
           <ProfileTabNotes v-if="tab === 'notes'" :note="note" @update-note="updateNote" />
 
-          <!-- Задания (myhomework / allhomework) -->
-          <HomeworkList
-            v-if="tab === 'myhomework' || tab === 'allhomework'"
-            :homeworks="allHomework" :loading="homeworkLoading"
-            :title="homeworkTitle" @select="selectedHomework = $event"
-          />
+          <!-- Задания: Репетитор -->
+          <TeacherHomework v-if="tab === 'allhomework'" />
+
+          <!-- Задания: Ученик -->
+          <StudentHomework v-if="tab === 'myhomework' && isStudent" />
+
+          <!-- Задания: Родитель -->
+          <ParentHomework v-if="tab === 'myhomework' && isParent" />
 
           <ProfileTabStudents v-if="tab === 'children'" :students="myStudents" title="Мои дети" @view="viewStudent" />
           <ProfileTabStudents v-if="tab === 'students'" :students="allStudents" title="Ученики" :showActions="true" :isAdmin="user?.role === 'admin'" @view="viewStudent" @bind="openBindParent" @homework="openHomeworkTab" @feedback="openFeedback" />
@@ -66,7 +68,9 @@ import ProfileTabNotes from '../components/profile/ProfileTabNotes.vue';
 import ProfileTabFeedbacks from '../components/profile/ProfileTabFeedbacks.vue';
 import ProfileTabAllFeedbacks from '../components/profile/ProfileTabAllFeedbacks.vue';
 import ProfileTabHomework from '../components/profile/ProfileTabHomework.vue';
-import HomeworkList from '../components/profile/HomeworkList.vue';
+import TeacherHomework from '../components/profile/TeacherHomework.vue';
+import StudentHomework from '../components/profile/StudentHomework.vue';
+import ParentHomework from '../components/profile/ParentHomework.vue';
 import HomeworkModal from '../components/profile/HomeworkModal.vue';
 import ProfileModals from '../components/profile/ProfileModals.vue';
 import AchievementUnlock from '../components/AchievementUnlock.vue';
@@ -74,7 +78,7 @@ import { exportProgressPDF } from '../composables/useExportPDF.js';
 
 export default {
   name: 'ProfilePage',
-  components: { ConfettiExplosion, ProfileSidebar, ProfileTabInfo, ProfileTabAchievements, ProfileTabSchedule, ProfileTabStudents, ProfileTabWords, ProfileTabNotes, ProfileTabFeedbacks, ProfileTabAllFeedbacks, ProfileTabHomework, HomeworkList, HomeworkModal, ProfileModals, AchievementUnlock },
+  components: { ConfettiExplosion, ProfileSidebar, ProfileTabInfo, ProfileTabAchievements, ProfileTabSchedule, ProfileTabStudents, ProfileTabWords, ProfileTabNotes, ProfileTabFeedbacks, ProfileTabAllFeedbacks, ProfileTabHomework, TeacherHomework, StudentHomework, ParentHomework, HomeworkModal, ProfileModals, AchievementUnlock },
   props: ['user'],
   inject: ['addToast'],
   data() {
@@ -94,22 +98,15 @@ export default {
     pastBookings() { return this.allBookings.filter(b => b.status === 'attended' || new Date(b.date) < new Date()); },
     completionPercent() { return this.totalCount > 0 ? Math.round((this.earnedCount / this.totalCount) * 100) : 0; },
     myUpcomingSlots() { return this.mySlots.filter(s => new Date(s.start_time) >= new Date()); },
-    myPastSlots() { return this.mySlots.filter(s => new Date(s.start_time) < new Date()); },
-    homeworkTitle() {
-      if (this.tab === 'allhomework') return '📋 Все задания';
-      if (this.isTutor) return '📋 Все задания';
-      if (this.isParent) return '📋 Задания детей';
-      return '📋 Мои задания';
-    }
+    myPastSlots() { return this.mySlots.filter(s => new Date(s.start_time) < new Date()); }
   },
   async mounted() { await this.loadInitialData(); this.loadAchievements(); this.restoreTab(); },
   methods: {
-    // ==================== ЗАГРУЗКА ====================
     async loadInitialData() {
       try {
         const [w, n, b] = await Promise.all([axios.get('/api/words'), axios.get('/api/notes'), axios.get('/api/myb')]);
         this.words = w.data || []; this.note = n.data.note || ''; this.allBookings = b.data || [];
-      } catch (e) { console.error('Ошибка загрузки:', e); }
+      } catch (e) {}
     },
     restoreTab() {
       const s = localStorage.getItem('profile_tab');
@@ -117,31 +114,17 @@ export default {
     },
     switchTab(btn) { this.tab = btn.tab; if (btn.load) this[btn.load](); },
 
-    // ==================== СЛОВАРЬ ====================
     async addWord(data) {
       this.wordsLoading = true;
-      try {
-        const res = await axios.post('/api/words', data);
-        if (res.status === 201 || res.status === 200) { this.words = (await axios.get('/api/words')).data || []; this.addToast('Слово добавлено! 📚', 'success'); }
-      } catch (err) { this.addToast(err.response?.data?.error || 'Ошибка', 'error'); }
+      try { const r = await axios.post('/api/words', data); if (r.status === 201 || r.status === 200) { this.words = (await axios.get('/api/words')).data || []; this.addToast('Слово добавлено! 📚', 'success'); } }
+      catch (err) { this.addToast(err.response?.data?.error || 'Ошибка', 'error'); }
       finally { this.wordsLoading = false; }
     },
-    async updateWordStatus(u) {
-      try {
-        await axios.put(`/api/words/${u.id}`, u);
-        const w = this.words.find(x => x.id === u.id);
-        if (w) Object.assign(w, u);
-      } catch(e) {}
-    },
-    async delWord(id) {
-      try { await axios.delete(`/api/words/${id}`); this.words = this.words.filter(w => w.id !== id); this.addToast('Удалено', 'success'); }
-      catch { this.addToast('Ошибка удаления', 'error'); }
-    },
+    async updateWordStatus(u) { try { await axios.put(`/api/words/${u.id}`, u); const w = this.words.find(x => x.id === u.id); if (w) Object.assign(w, u); } catch(e) {} },
+    async delWord(id) { try { await axios.delete(`/api/words/${id}`); this.words = this.words.filter(w => w.id !== id); this.addToast('Удалено', 'success'); } catch { this.addToast('Ошибка удаления', 'error'); } },
 
-    // ==================== ЗАМЕТКИ ====================
     updateNote(v) { this.note = v; clearTimeout(this._t); this._t = setTimeout(() => axios.put('/api/notes', { note: this.note }).catch(() => {}), 500); },
 
-    // ==================== ДОСТИЖЕНИЯ ====================
     async loadAchievements() {
       try {
         const r = await axios.get('/api/achievements');
@@ -152,13 +135,11 @@ export default {
       } catch (e) {}
     },
 
-    // ==================== ФИДБЕКИ ====================
     async loadFeedbacks() { try { this.feedbacks = (await axios.get('/api/feedback/my')).data || []; } catch {} },
     async loadAllFeedbacks() {},
     openFeedback(s) { this.fbStudentId = s.id; this.showFeedback = true; },
     async doAddFeedback(d) { try { await axios.post('/api/feedback', { ...d, student_id: this.fbStudentId }); this.showFeedback = false; this.addToast('Отправлено! 📊', 'success'); } catch { this.addToast('Ошибка', 'error'); } },
 
-    // ==================== ЗАДАНИЯ ====================
     async loadMyHomework() {
       this.homeworkLoading = true;
       try {
@@ -169,11 +150,10 @@ export default {
     },
     openHomeworkTab(s) { this.hwStudent = s.id; this.tab = 'homework'; },
     async createHomework(d) { try { await axios.post('/api/homework', d); this.addToast('Создано! 📝', 'success'); await this.loadMyHomework(); } catch(e) { this.addToast(e.response?.data?.error || 'Ошибка', 'error'); } },
-    async submitHomeworkAnswer({ answer }) { try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { student_answer: answer, status: 'submitted' }); this.selectedHomework = null; this.addToast('Отправлено! 📤', 'success'); await this.loadMyHomework(); } catch { this.addToast('Ошибка', 'error'); } },
-    async submitHomeworkGrade({ grade, comment }) { try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { grade, teacher_comment: comment, status: 'completed' }); this.selectedHomework = null; this.addToast('Оценено! ⭐', 'success'); await this.loadMyHomework(); } catch { this.addToast('Ошибка', 'error'); } },
-    async changeHomeworkStatus({ status }) { try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { status }); this.selectedHomework = null; this.addToast('Обновлён! ✅', 'success'); await this.loadMyHomework(); } catch { this.addToast('Ошибка', 'error'); } },
+    async submitHomeworkAnswer({ answer }) { try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { student_answer: answer, status: 'submitted' }); this.selectedHomework = null; this.addToast('Отправлено! 📤', 'success'); } catch { this.addToast('Ошибка', 'error'); } },
+    async submitHomeworkGrade({ grade, comment }) { try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { grade, teacher_comment: comment, status: 'completed' }); this.selectedHomework = null; this.addToast('Оценено! ⭐', 'success'); } catch { this.addToast('Ошибка', 'error'); } },
+    async changeHomeworkStatus({ status }) { try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { status }); this.selectedHomework = null; this.addToast('Обновлён! ✅', 'success'); } catch { this.addToast('Ошибка', 'error'); } },
 
-    // ==================== УЧЕНИКИ ====================
     async loadMyStudents() { try { this.myStudents = (await axios.get('/api/parent/students')).data || []; } catch {} },
     async loadAllStudents() { try { this.allStudents = ((await axios.get('/api/users')).data || []).filter(u => u.role !== 'admin' && u.role !== 'host'); } catch {} },
     async viewStudent(s) { try { this.viewingStudent = (await axios.get(`/api/parent/student/${s.id}`)).data; } catch {} },
@@ -184,12 +164,9 @@ export default {
       catch(e) { this.addToast(e.response?.status === 409 ? 'Уже существует' : 'Ошибка', e.response?.status === 409 ? 'info' : 'error'); if (e.response?.status === 409) this.showBindParent = false; }
     },
 
-    // ==================== ПРОЧЕЕ ====================
     async loadMySlots() { try { this.mySlots = (await axios.get('/api/slots')).data || []; } catch {} },
     exportMyICS() { window.open('/api/slots/export', '_blank'); },
-    async exportPDF() {
-      try { const r = await axios.get('/api/achievements'); exportProgressPDF(this.user, { messages:0, meetings:0, words:0, achievements:this.allAchievements.filter(a=>a.earned).length }, r.data||[]); } catch {}
-    },
+    async exportPDF() { try { const r = await axios.get('/api/achievements'); exportProgressPDF(this.user, { messages:0, meetings:0, words:0, achievements:this.allAchievements.filter(a=>a.earned).length }, r.data||[]); } catch {} },
     async linkTelegram() { try { window.open((await axios.get('/api/tg-link')).data.link, '_blank'); } catch {} },
     async uploadAvatar(e) {
       const f = e.target.files[0]; if (!f || f.size > 5*1024*1024) { this.addToast('Файл > 5MB', 'error'); return; }
