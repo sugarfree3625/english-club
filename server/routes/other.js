@@ -249,6 +249,30 @@ module.exports = (app, supabase) => {
     }
   });
 
+  // Сменить роль пользователя (только админ)
+app.put('/api/users/:id/role', auth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin' && req.session.role !== 'host') {
+      return res.status(403).json({ error: 'Нет прав' });
+    }
+    
+    const { role } = req.body;
+    if (!role || !['student', 'parent'].includes(role)) {
+      return res.status(400).json({ error: 'Неверная роль' });
+    }
+    
+    const { error } = await supabase
+      .from('users')
+      .update({ role })
+      .eq('id', req.params.id);
+    
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Не удалось сменить роль' });
+  }
+});
+
   // Дети родителя (убрана проверка роли)
   app.get('/api/parent/students', auth, async (req, res) => {
     try {
