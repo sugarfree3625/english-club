@@ -48,7 +48,8 @@ export default {
         { tab: 'notes', icon: 'fas fa-sticky-note', label: 'Блокнот', show: this.isStudent },
         { tab: 'myhomework', icon: 'fas fa-tasks', label: 'Задания', show: this.isStudent, load: 'loadMyHomework' },
         { tab: 'children', icon: 'fas fa-child', label: 'Мои дети', show: this.isParent, load: 'loadMyStudents' },
-        { tab: 'feedbacks', icon: 'fas fa-star', label: 'Фидбеки', show: this.isParent, load: 'loadFeedbacks' },
+        { tab: 'feedbacks', icon: 'fas fa-star', label: 'Мои фидбеки', show: this.isParent, load: 'loadFeedbacks' },
+        { tab: 'allfeedbacks', icon: 'fas fa-star', label: 'Все фидбеки', show: this.isTutor, load: 'loadAllFeedbacks' },
         { tab: 'students', icon: 'fas fa-users', label: 'Ученики', show: this.isTutor, load: 'loadAllStudents' },
         { tab: 'homework', icon: 'fas fa-tasks', label: 'Задания', show: this.isTutor },
         { tab: 'history', icon: 'fas fa-history', label: 'История' }
