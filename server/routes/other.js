@@ -20,15 +20,7 @@ module.exports = (app, supabase) => {
     }
   });
 
-  // Добавить слово (С ДЕБАГ-ЛОГОМ)
   app.post('/api/words', auth, async (req, res) => {
-    // 🔍 ВРЕМЕННЫЙ ЛОГ ДЛЯ ОТЛАДКИ
-    console.log('🔍 DEBUG words:', JSON.stringify({
-      sessionUserId: req.session?.userId,
-      userId: req.userId,
-      body: req.body
-    }));
-    
     try {
       const { en, ru } = req.body;
       
@@ -36,7 +28,6 @@ module.exports = (app, supabase) => {
         return res.status(400).json({ error: 'Заполните оба поля' });
       }
       
-      // Проверка на дубликат
       const { data: existing } = await supabase
         .from('words')
         .select('id')
@@ -48,7 +39,6 @@ module.exports = (app, supabase) => {
         return res.status(409).json({ error: 'Такое слово уже есть в словаре' });
       }
       
-      // Вставка
       const { error } = await supabase
         .from('words')
         .insert({
@@ -57,22 +47,17 @@ module.exports = (app, supabase) => {
           ru: ru.trim()
         });
       
-      if (error) {
-        console.error('❌ Supabase insert error:', error);
-        throw error;
-      }
+      if (error) throw error;
       
-      // Обновление рейтинга
       try {
         await updateRating(supabase, req.session.userId, 3, getLevel);
       } catch (ratingErr) {
         console.error('Rating update error:', ratingErr);
       }
       
-      console.log('✅ Слово успешно добавлено');
       res.status(201).json({ success: true });
     } catch (err) {
-      console.error('❌ POST /api/words error:', err.message, err.stack);
+      console.error('POST /api/words error:', err);
       res.status(500).json({ error: 'Не удалось добавить слово' });
     }
   });
@@ -248,17 +233,45 @@ module.exports = (app, supabase) => {
   });
 
   // ==================== РОДИТЕЛЬСКИЙ КАБИНЕТ ====================
-  app.get('/api/parent/students', auth, async (req, res) => {
+
+  // Все связи (для админа)
+  app.get('/api/admin/links', auth, async (req, res) => {
     try {
-      if (req.session.role !== 'parent') return res.json([]);
-      const { data: links } = await supabase.from('student_parents').select('student_id').eq('parent_id', req.session.userId);
-      if (!links?.length) return res.json([]);
-      const ids = links.map(l => l.student_id);
-      const { data: students } = await supabase.from('users').select('id, username, level, rating, avatar_url').in('id', ids);
-      res.json(students || []);
-    } catch (err) { res.status(500).json({ error: 'Ошибка загрузки списка детей' }); }
+      if (req.session.role !== 'admin' && req.session.role !== 'host') {
+        return res.status(403).json({ error: 'Нет прав' });
+      }
+      const { data } = await supabase
+        .from('student_parents')
+        .select('student_id, parent_id');
+      res.json(data || []);
+    } catch (err) {
+      res.json([]);
+    }
   });
 
+  // Дети родителя (убрана проверка роли)
+  app.get('/api/parent/students', auth, async (req, res) => {
+    try {
+      const { data: links } = await supabase
+        .from('student_parents')
+        .select('student_id')
+        .eq('parent_id', req.session.userId);
+      
+      if (!links?.length) return res.json([]);
+      
+      const ids = links.map(l => l.student_id);
+      const { data: students } = await supabase
+        .from('users')
+        .select('id, username, level, rating, avatar_url')
+        .in('id', ids);
+      
+      res.json(students || []);
+    } catch (err) {
+      res.status(500).json({ error: 'Ошибка загрузки списка детей' });
+    }
+  });
+
+  // Привязать родителя
   app.post('/api/parent/bind', auth, async (req, res) => {
     try {
       const { student_id, parent_id } = req.body;
@@ -271,6 +284,7 @@ module.exports = (app, supabase) => {
     } catch (err) { res.status(500).json({ error: 'Не удалось привязать родителя' }); }
   });
 
+  // Отвязать родителя
   app.delete('/api/parent/unbind/:studentId/:parentId', auth, async (req, res) => {
     try {
       const { error } = await supabase.from('student_parents').delete().eq('student_id', req.params.studentId).eq('parent_id', req.params.parentId);
