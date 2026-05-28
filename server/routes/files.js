@@ -1,6 +1,6 @@
 const multer = require('multer');
 const path = require('path');
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 
 const upNw = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
