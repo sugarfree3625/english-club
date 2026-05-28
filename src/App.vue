@@ -118,7 +118,41 @@ export default {
     nextOnboardingStep() { if(this.currentOnboardingStep<this.onboardingSteps.length-1){this.currentOnboardingStep++;}else{this.showOnboarding=false;localStorage.setItem('onboarding_done','true');} },
     checkOnboarding() { if(!localStorage.getItem('onboarding_done')&&this.user){setTimeout(()=>{this.showOnboarding=true;},1000);} },
     checkWelcome() { if(this.user){ this.isNewUser=!localStorage.getItem('onboarding_done'); setTimeout(()=>{this.showWelcome=true;},800); } },
-    async login() { try{const r=await axios.post('/api/login',{email:this.loginEmail,password:this.loginPassword});if(r.data.success){this.user=r.data.user;this.showLogin=false;this.loginEmail='';this.loginPassword='';this.addToast('Добро пожаловать! 👋','success');this.$router.push('/dashboard');this.checkOnboarding();this.checkWelcome();}}catch(e){this.addToast(e.response?.data?.error||'Ошибка входа','error');} },
+    async login() { 
+  try {
+    const r = await axios.post('/api/login', {
+      email: this.loginEmail, 
+      password: this.loginPassword
+    });
+    
+    // Новый формат с токеном
+    if (r.data.token) {
+      localStorage.setItem('token', r.data.token);
+      localStorage.setItem('user', JSON.stringify(r.data.user));
+      this.user = r.data.user;
+      this.showLogin = false;
+      this.loginEmail = '';
+      this.loginPassword = '';
+      this.addToast('Добро пожаловать! 👋', 'success');
+      this.$router.push('/dashboard');
+      this.checkOnboarding();
+      this.checkWelcome();
+    } 
+    // Старый формат (обратная совместимость)
+    else if (r.data.success) {
+      this.user = r.data.user;
+      this.showLogin = false;
+      this.loginEmail = '';
+      this.loginPassword = '';
+      this.addToast('Добро пожаловать! 👋', 'success');
+      this.$router.push('/dashboard');
+      this.checkOnboarding();
+      this.checkWelcome();
+    }
+  } catch(e) {
+    this.addToast(e.response?.data?.error || 'Ошибка входа', 'error');
+  } 
+},
     async register() { try{const r=await axios.post('/api/reg',{username:this.regUsername,email:this.regEmail,password:this.regPassword,level:this.regLevel});if(r.data.success){this.showReg=false;this.showLogin=true;this.addToast('Регистрация успешна! ✨','success');}}catch(e){this.addToast(e.response?.data?.error||'Ошибка регистрации','error');} },
     async logout() { if(!confirm('Выйти из аккаунта?'))return; try{await axios.post('/api/out');this.addToast('До встречи! 👋','info'); localStorage.removeItem('welcome_dismissed'); }catch(e){} this.user=null;this.menuOpen=false;this.$router.push('/'); }
   },
