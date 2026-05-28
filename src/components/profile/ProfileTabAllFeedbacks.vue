@@ -126,18 +126,73 @@ export default {
 .empty-hint { color: #64748b; font-size: 0.8rem; margin: 0; }
 
 .feedback-list { display: flex; flex-direction: column; gap: 12px; }
-.feedback-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 20px; transition: all 0.2s; }
+.feedback-card { 
+  background: rgba(255,255,255,0.03); 
+  border: 1px solid rgba(255,255,255,0.06); 
+  border-radius: 16px; 
+  padding: 20px; 
+  transition: all 0.2s; 
+  overflow: hidden; 
+  max-width: 100%; 
+}
 .feedback-card:hover { border-color: rgba(251,191,36,0.2); box-shadow: 0 0 20px rgba(251,191,36,0.05); }
-.feedback-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
-.feedback-user strong { color: #fff; font-size: 0.9rem; display: block; }
+
+.feedback-header { 
+  display: flex; 
+  align-items: center; 
+  gap: 12px; 
+  margin-bottom: 12px; 
+  flex-wrap: wrap; 
+  max-width: 100%; 
+}
+.feedback-user { 
+  flex: 1; 
+  min-width: 0; 
+}
+.feedback-user strong { 
+  color: #fff; 
+  font-size: 0.9rem; 
+  display: block; 
+  white-space: nowrap; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+}
 .feedback-user small { color: #94a3b8; font-size: 0.7rem; }
-.feedback-rating { display: flex; gap: 2px; }
+
+.feedback-rating { display: flex; gap: 2px; flex-shrink: 0; }
 .star { font-size: 0.9rem; opacity: 0.3; }
 .star.filled { opacity: 1; }
-.feedback-date { margin-left: auto; color: #64748b; font-size: 0.75rem; }
-.feedback-body { display: flex; flex-direction: column; gap: 8px; padding-left: 56px; }
-.feedback-topic, .feedback-good, .feedback-improve { font-size: 0.85rem; color: #cbd5e1; }
-.label { font-weight: 600; color: #94a3b8; }
+.feedback-date { 
+  margin-left: auto; 
+  color: #64748b; 
+  font-size: 0.75rem; 
+  flex-shrink: 0; 
+}
+
+.feedback-body { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 8px; 
+  padding-left: 56px; 
+  max-width: 100%; 
+  overflow: hidden; 
+}
+
+.feedback-topic, .feedback-good, .feedback-improve { 
+  font-size: 0.85rem; 
+  color: #cbd5e1; 
+  word-break: break-word; 
+  overflow-wrap: break-word; 
+  max-width: 100%; 
+  line-height: 1.5; 
+}
+
+.label { font-weight: 600; color: #94a3b8; flex-shrink: 0; }
 .feedback-good { color: #10b981; }
 .feedback-improve { color: #f59e0b; }
+
+@media (max-width: 500px) {
+  .feedback-body { padding-left: 0; }
+  .feedback-header { gap: 8px; }
+}
 </style>
