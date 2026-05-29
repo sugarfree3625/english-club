@@ -16,6 +16,7 @@
           <ProfileTabSchedule v-if="tab === 'myschedule'" :upcoming="myUpcomingSlots" :past="myPastSlots" :showStudent="isParent" @export="exportMyICS" />
           <ProfileTabWords v-if="tab === 'words'" :words="words" :loading="wordsLoading" @add-word="addWord" @delete-word="delWord" @update-word-status="updateWordStatus" />
           <ProfileTabNotes v-if="tab === 'notes'" :note="note" @update-note="updateNote" />
+          <ProgressDashboard v-if="tab === 'progress'" />
 
           <TeacherHomework v-if="tab === 'allhomework'" />
           <StudentHomework v-if="tab === 'myhomework' && isStudent" />
@@ -69,6 +70,7 @@ import ProfileTabStudents from '../components/profile/ProfileTabStudents.vue';
 import ProfileTabWords from '../components/profile/ProfileTabWords.vue';
 import ProfileTabNotes from '../components/profile/ProfileTabNotes.vue';
 import ProfileTabFeedbacks from '../components/profile/ProfileTabFeedbacks.vue';
+import ProgressDashboard from '../components/profile/ProgressDashboard.vue';
 import ProfileTabAllFeedbacks from '../components/profile/ProfileTabAllFeedbacks.vue';
 import ProfileTabHomework from '../components/profile/ProfileTabHomework.vue';
 import TeacherHomework from '../components/profile/TeacherHomework.vue';
@@ -81,7 +83,7 @@ import { exportProgressPDF } from '../composables/useExportPDF.js';
 
 export default {
   name: 'ProfilePage',
-  components: { ConfettiExplosion, ProfileSidebar, ProfileTabInfo, ProfileTabAchievements, ProfileTabSchedule, ProfileTabStudents, ProfileTabWords, ProfileTabNotes, ProfileTabFeedbacks, ProfileTabAllFeedbacks, ProfileTabHomework, TeacherHomework, StudentHomework, ParentHomework, HomeworkModal, ProfileModals, AchievementUnlock },
+  components: { ConfettiExplosion, ProfileSidebar, ProfileTabInfo, ProfileTabAchievements, ProgressDashboard, ProfileTabSchedule, ProfileTabStudents, ProfileTabWords, ProfileTabNotes, ProfileTabFeedbacks, ProfileTabAllFeedbacks, ProfileTabHomework, TeacherHomework, StudentHomework, ParentHomework, HomeworkModal, ProfileModals, AchievementUnlock },
   props: ['user'],
   inject: ['addToast'],
   data() {
@@ -116,6 +118,8 @@ export default {
       if (s) { this.tab = s; localStorage.removeItem('profile_tab'); if (s === 'feedbacks') this.loadFeedbacks(); if (s === 'achievements') this.loadAchievements(); }
     },
     switchTab(btn) { this.tab = btn.tab; if (btn.load) this[btn.load](); },
+
+    async loadProgress() {},  // ← заглушка для сайдбара
 
     async addWord(data) {
       this.wordsLoading = true;
@@ -153,22 +157,15 @@ export default {
     },
     openHomeworkTab(s) { this.hwStudent = s.id; this.tab = 'homework'; },
     async createHomework(formData) {
-      try {
-        await axios.post('/api/homework', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-        this.addToast('Задание создано! 📝', 'success');
-        await this.loadMyHomework();
-      } catch(e) { this.addToast(e.response?.data?.error || 'Ошибка', 'error'); }
+      try { await axios.post('/api/homework', formData, { headers: { 'Content-Type': 'multipart/form-data' } }); this.addToast('Задание создано! 📝', 'success'); await this.loadMyHomework(); }
+      catch(e) { this.addToast(e.response?.data?.error || 'Ошибка', 'error'); }
     },
     async submitHomeworkAnswer({ answer }) { try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { student_answer: answer, status: 'submitted' }); this.selectedHomework = null; this.addToast('Отправлено! 📤', 'success'); } catch { this.addToast('Ошибка', 'error'); } },
     async submitHomeworkGrade({ grade, comment }) { try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { grade, teacher_comment: comment, status: 'completed' }); this.selectedHomework = null; this.addToast('Оценено! ⭐', 'success'); } catch { this.addToast('Ошибка', 'error'); } },
     async changeHomeworkStatus({ status }) { try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { status }); this.selectedHomework = null; this.addToast('Обновлён! ✅', 'success'); } catch { this.addToast('Ошибка', 'error'); } },
     async returnHomework({ comment }) {
-      try {
-        await axios.put(`/api/homework/${this.selectedHomework.id}`, { teacher_comment: comment || 'Требуется доработка', status: 'in_progress' });
-        this.selectedHomework = null;
-        this.addToast('🔄 Возвращено на доработку. Фидбек создан!', 'info');
-        await this.loadMyHomework();
-      } catch(e) { this.addToast('Ошибка', 'error'); }
+      try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { teacher_comment: comment || 'Требуется доработка', status: 'in_progress' }); this.selectedHomework = null; this.addToast('🔄 Возвращено. Фидбек создан!', 'info'); await this.loadMyHomework(); }
+      catch(e) { this.addToast('Ошибка', 'error'); }
     },
 
     async loadMyStudents() { try { this.myStudents = (await axios.get('/api/parent/students')).data || []; } catch {} },
