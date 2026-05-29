@@ -136,7 +136,7 @@ export default {
       tagInput: '',
       searchQuery: '',
       activeFolder: null,
-      showFolders: false,
+      showFolders: true,
       saving: false,
       lastSaved: null,
       colors: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#06b6d4', '#84cc16'],
@@ -145,9 +145,7 @@ export default {
   },
   computed: {
     folders() {
-      const f = new Set();
-      this.notes.forEach(n => { if (n.folder) f.add(n.folder); });
-      return [...f].sort();
+      return Object.keys(this.folderColors).sort();
     },
     filteredNotes() {
       let list = this.notes;
@@ -167,29 +165,18 @@ export default {
     }
   },
   watch: {
-    'currentNote.content': function() {
-      this.autoSave();
-    },
-    'currentNote.title': function() {
-      this.autoSave();
-    }
+    'currentNote.content': function() { this.autoSave(); },
+    'currentNote.title': function() { this.autoSave(); }
   },
   mounted() {
     this.loadNotes();
-    // Загружаем старую заметку если есть
-    if (this.note) {
-      this.currentNote.content = this.note;
-    }
+    if (this.note) { this.currentNote.content = this.note; }
   },
   methods: {
     loadNotes() {
       const saved = localStorage.getItem('notebook_notes');
       if (saved) {
-        try {
-          this.notes = JSON.parse(saved);
-        } catch(e) {
-          this.notes = [];
-        }
+        try { this.notes = JSON.parse(saved); } catch(e) { this.notes = []; }
       }
       const colors = localStorage.getItem('notebook_colors');
       if (colors) {
@@ -204,14 +191,10 @@ export default {
 
     addNote() {
       const note = {
-        id: Date.now(),
-        title: 'Новая заметка',
-        content: '',
-        tags: [],
+        id: Date.now(), title: 'Новая заметка', content: '', tags: [],
         folder: this.activeFolder || '',
         color: this.colors[Math.floor(Math.random() * this.colors.length)],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        created_at: new Date().toISOString(), updated_at: new Date().toISOString()
       };
       this.notes.push(note);
       this.saveNotes();
@@ -225,21 +208,16 @@ export default {
 
     async saveAndClose() {
       this.saving = true;
-      
-      // Сохраняем в localStorage
       const idx = this.notes.findIndex(n => n.id === this.currentNote.id);
       if (idx >= 0) {
         this.currentNote.updated_at = new Date().toISOString();
         this.notes[idx] = { ...this.currentNote };
       }
       this.saveNotes();
-
-      // Отправляем на сервер (автосохранение)
       try {
         const axios = (await import('axios')).default;
         await axios.put('/api/notes', { note: this.currentNote.content });
       } catch(e) {}
-
       const now = new Date().toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
       this.lastSaved = `в ${now}`;
       this.editingNote = false;
@@ -284,10 +262,12 @@ export default {
 
     addFolder() {
       const name = prompt('Название папки:');
-      if (name) {
+      if (name && name.trim()) {
+        const cleanName = name.trim();
         const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#06b6d4', '#84cc16'];
-        this.folderColors[name] = colors[Math.floor(Math.random() * colors.length)];
+        this.folderColors[cleanName] = colors[Math.floor(Math.random() * colors.length)];
         this.saveNotes();
+        this.$forceUpdate();
       }
     },
 
@@ -305,9 +285,7 @@ export default {
       const start = e.target.selectionStart;
       const end = e.target.selectionEnd;
       this.currentNote.content = this.currentNote.content.substring(0, start) + '  ' + this.currentNote.content.substring(end);
-      this.$nextTick(() => {
-        e.target.selectionStart = e.target.selectionEnd = start + 2;
-      });
+      this.$nextTick(() => { e.target.selectionStart = e.target.selectionEnd = start + 2; });
     },
 
     exportNotes() {
@@ -335,13 +313,11 @@ export default {
 <style scoped>
 .notebook-app { display: flex; flex-direction: column; gap: 16px; color: #e2e8f0; }
 
-/* Заголовок */
 .nb-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
 .nb-header h2 { font-family: 'Space Grotesk', sans-serif; font-size: 1.5rem; font-weight: 700; color: #fff; margin: 0; }
 .nb-stats { display: flex; gap: 14px; flex-wrap: wrap; }
 .nb-stat { font-size: 0.8rem; color: #94a3b8; display: flex; align-items: center; gap: 4px; }
 
-/* Туулбар */
 .nb-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .tool-btn {
   display: flex; align-items: center; gap: 6px;
@@ -357,7 +333,6 @@ export default {
 .search-input { width: 100%; padding: 8px 14px 8px 34px; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; background: rgba(255,255,255,0.04); color: #fff; font-size: 0.82rem; outline: none; font-family: inherit; }
 .search-input:focus { border-color: #6366f1; }
 
-/* Папки */
 .folders-panel { display: flex; gap: 6px; flex-wrap: wrap; }
 .folder-btn {
   display: flex; align-items: center; gap: 6px;
@@ -368,7 +343,6 @@ export default {
 .folder-btn:hover, .folder-btn.active { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.3); color: #fff; }
 .folder-count { padding: 1px 6px; background: rgba(255,255,255,0.08); border-radius: 6px; font-size: 0.7rem; }
 
-/* Сетка */
 .notes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
 @media (max-width: 640px) { .notes-grid { grid-template-columns: 1fr; } }
 
@@ -390,12 +364,10 @@ export default {
 .note-card:hover .note-delete { opacity: 0.7; }
 .note-delete:hover { opacity: 1; }
 
-/* Пусто */
 .empty-notes { text-align: center; padding: 60px 20px; grid-column: 1 / -1; }
 .empty-icon { font-size: 3rem; margin-bottom: 12px; }
 .empty-notes p { color: #94a3b8; margin-bottom: 16px; }
 
-/* Редактор */
 .note-editor { display: flex; flex-direction: column; gap: 14px; }
 .editor-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
 .back-btn {
