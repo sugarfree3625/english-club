@@ -42,7 +42,7 @@
             <i :class="stat.icon"></i>
           </div>
           <div class="stat-info">
-            <div class="stat-value" ref="statValues">{{ stat.value }}</div>
+            <div class="stat-value">{{ stat.value }}</div>
             <div class="stat-label">{{ stat.label }}</div>
           </div>
           <div class="stat-spark"></div>
@@ -69,6 +69,9 @@
       <!-- ОСНОВНАЯ СЕТКА -->
       <div class="dashboard-grid">
         <div class="main-col">
+          <!-- СЛОВО ДНЯ -->
+          <WordOfDay @save="saveWord" />
+
           <!-- ГРАФИК АКТИВНОСТИ -->
           <div class="card">
             <h3>📊 Активность за неделю</h3>
@@ -157,7 +160,7 @@
             </div>
           </div>
 
-          <!-- Мини-игра -->
+          <!-- МИНИ-ИГРА -->
           <MiniGame />
         </div>
       </div>
@@ -170,10 +173,11 @@ import axios from 'axios';
 import WeeklySchedule from '../components/dashboard/WeeklySchedule.vue';
 import Leaderboard from '../components/dashboard/Leaderboard.vue';
 import MiniGame from '../components/dashboard/MiniGame.vue';
+import WordOfDay from '../components/dashboard/WordOfDay.vue';
 
 export default {
   name: 'DashboardPage',
-  components: { WeeklySchedule, Leaderboard, MiniGame },
+  components: { WeeklySchedule, Leaderboard, MiniGame, WordOfDay },
   props: ['user'],
   inject: ['addToast'],
   data() {
@@ -286,6 +290,12 @@ export default {
       return Math.round((count / max) * 100);
     },
 
+    saveWord(word) {
+      axios.post('/api/words', { en: word.en, ru: word.ru, transcription: word.transcription, example: word.example }).then(() => {
+        this.addToast(`"${word.en}" добавлено в словарь! 📖`, 'success');
+      }).catch(() => {});
+    },
+
     checkDailyBonus() {
       const today = new Date().toDateString();
       const lastClaim = localStorage.getItem('daily_bonus_date');
@@ -317,7 +327,6 @@ export default {
 @keyframes floatOrb { 0%,100%{transform:translate(0,0)scale(1)} 50%{transform:translate(40px,-40px)scale(1.08)} }
 .container { max-width: 1140px; margin: 0 auto; padding: 28px 20px; position: relative; z-index: 1; display: flex; flex-direction: column; gap: 20px; }
 
-/* ПРИВЕТСТВИЕ */
 .welcome-section { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
 .welcome-left { display: flex; align-items: center; gap: 16px; }
 .welcome-avatar { position: relative; width: 64px; height: 64px; }
@@ -340,7 +349,6 @@ export default {
 .bonus-text { color: #10b981; font-weight: 600; font-size: 0.8rem; }
 .bonus-xp { color: #34d399; font-size: 0.75rem; font-weight: 700; }
 
-/* СТАТИСТИКА */
 .stats-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
 @media (max-width: 900px) { .stats-row { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 500px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
@@ -358,7 +366,6 @@ export default {
 .stat-value { font-size: 1.4rem; font-weight: 700; color: #fff; font-family: 'Space Grotesk', sans-serif; }
 .stat-label { font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; }
 
-/* ДЕЙСТВИЯ + ТАЙМЕР */
 .actions-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
 .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .quick-btn { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; color: #cbd5e1; cursor: pointer; font-weight: 600; font-size: 0.82rem; transition: all 0.2s; font-family: inherit; }
@@ -369,7 +376,6 @@ export default {
 .meeting-title { display: block; color: #fff; font-size: 0.8rem; font-weight: 600; }
 .meeting-time { color: #10b981; font-size: 0.75rem; }
 
-/* СЕТКА */
 .dashboard-grid { display: grid; grid-template-columns: 1fr 340px; gap: 20px; }
 @media (max-width: 768px) { .dashboard-grid { grid-template-columns: 1fr; } }
 .main-col, .side-col { display: flex; flex-direction: column; gap: 16px; }
@@ -377,7 +383,6 @@ export default {
 .card { background: rgba(255,255,255,0.04); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 24px; color: #e2e8f0; }
 .card h3 { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 1rem; color: #fff; margin: 0 0 14px; }
 
-/* ГРАФИК */
 .activity-chart { display: flex; align-items: flex-end; gap: 8px; height: 130px; padding: 0 4px; }
 .chart-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; }
 .chart-bar-wrap { flex: 1; width: 100%; display: flex; align-items: flex-end; }
@@ -387,7 +392,6 @@ export default {
 .chart-bar:hover .chart-tooltip { opacity: 1; }
 .chart-day { font-size: 0.65rem; color: #64748b; }
 
-/* ЗАДАНИЯ */
 .quests-list { display: flex; flex-direction: column; gap: 10px; }
 .quest-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: rgba(255,255,255,0.03); border-radius: 14px; transition: all 0.2s; }
 .quest-item.completed { background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.2); }
@@ -402,7 +406,6 @@ export default {
 .quest-xp { font-size: 0.75rem; color: #fbbf24; font-weight: 600; }
 .quest-check { color: #10b981; font-size: 1.1rem; }
 
-/* АЧИВКА */
 .next-ach-big { display: flex; align-items: center; gap: 16px; }
 .next-ach-icon { font-size: 2.5rem; }
 .next-ach-name { font-size: 0.95rem; font-weight: 600; color: #fff; }
@@ -416,7 +419,6 @@ export default {
 .ach-fill.platinum { background: linear-gradient(90deg, #6366f1, #2dd4bf); }
 .ach-nums { font-size: 0.7rem; color: #94a3b8; }
 
-/* УРОВЕНЬ */
 .level-ring-wrap { position: relative; width: 130px; height: 130px; margin: 0 auto; }
 .level-ring-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .level-ring-track { fill: none; stroke: rgba(255,255,255,0.06); stroke-width: 8; }
