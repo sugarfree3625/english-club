@@ -17,6 +17,7 @@
           <ProfileTabWords v-if="tab === 'words'" :words="words" :loading="wordsLoading" @add-word="addWord" @delete-word="delWord" @update-word-status="updateWordStatus" />
           <ProfileTabNotes v-if="tab === 'notes'" :note="note" @update-note="updateNote" />
           <ProgressDashboard v-if="tab === 'progress'" />
+          <GamesHub v-if="tab === 'games'" />
 
           <TeacherHomework v-if="tab === 'allhomework'" />
           <StudentHomework v-if="tab === 'myhomework' && isStudent" />
@@ -71,6 +72,7 @@ import ProfileTabWords from '../components/profile/ProfileTabWords.vue';
 import ProfileTabNotes from '../components/profile/ProfileTabNotes.vue';
 import ProfileTabFeedbacks from '../components/profile/ProfileTabFeedbacks.vue';
 import ProgressDashboard from '../components/profile/ProgressDashboard.vue';
+import GamesHub from '../components/profile/GamesHub.vue';
 import ProfileTabAllFeedbacks from '../components/profile/ProfileTabAllFeedbacks.vue';
 import ProfileTabHomework from '../components/profile/ProfileTabHomework.vue';
 import TeacherHomework from '../components/profile/TeacherHomework.vue';
@@ -83,7 +85,7 @@ import { exportProgressPDF } from '../composables/useExportPDF.js';
 
 export default {
   name: 'ProfilePage',
-  components: { ConfettiExplosion, ProfileSidebar, ProfileTabInfo, ProfileTabAchievements, ProgressDashboard, ProfileTabSchedule, ProfileTabStudents, ProfileTabWords, ProfileTabNotes, ProfileTabFeedbacks, ProfileTabAllFeedbacks, ProfileTabHomework, TeacherHomework, StudentHomework, ParentHomework, HomeworkModal, ProfileModals, AchievementUnlock },
+  components: { ConfettiExplosion, ProfileSidebar, ProfileTabInfo, ProfileTabAchievements, ProgressDashboard, GamesHub, ProfileTabSchedule, ProfileTabStudents, ProfileTabWords, ProfileTabNotes, ProfileTabFeedbacks, ProfileTabAllFeedbacks, ProfileTabHomework, TeacherHomework, StudentHomework, ParentHomework, HomeworkModal, ProfileModals, AchievementUnlock },
   props: ['user'],
   inject: ['addToast'],
   data() {
@@ -119,7 +121,8 @@ export default {
     },
     switchTab(btn) { this.tab = btn.tab; if (btn.load) this[btn.load](); },
 
-    async loadProgress() {},  // ← заглушка для сайдбара
+    async loadProgress() {},
+    async loadGames() {},
 
     async addWord(data) {
       this.wordsLoading = true;
