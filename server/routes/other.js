@@ -18,6 +18,85 @@ module.exports = (app, supabase) => {
     } catch (err) { res.status(500).json({ error: 'Ошибка' }); }
   });
 
+  // Статистика ученика
+app.get('/api/stats', auth, async (req, res) => {
+  try {
+    const uid = req.session.userId;
+    
+    // Задания
+    const { data: homework } = await supabase.from('homework')
+      .select('*').eq('student_id', uid);
+    
+    const totalHW = homework?.length || 0;
+    const completedHW = homework?.filter(h => h.status === 'completed').length || 0;
+    const overdueHW = homework?.filter(h => h.overdue).length || 0;
+    const avgGrade = completedHW > 0 
+      ? Math.round((homework.filter(h => h.grade).reduce((sum, h) => sum + h.grade, 0) / homework.filter(h => h.grade).length) * 10) / 10
+      : 0;
+    const totalXP = homework?.reduce((sum, h) => sum + (h.experience || 0), 0) || 0;
+    
+    // Слова
+    const { count: wordsCount } = await supabase.from('words')
+      .select('*', { count: 'exact', head: true }).eq('user_id', uid);
+    
+    // Сообщения
+    const { count: msgsCount } = await supabase.from('msg')
+      .select('*', { count: 'exact', head: true }).eq('sender_id', uid);
+    
+    // Стрик
+    const { data: bookings } = await supabase.from('bookings')
+      .select('created_at').eq('user_id', uid)
+      .order('created_at', { ascending: false });
+    
+    let streak = 0;
+    if (bookings?.length) {
+      const today = new Date(); today.setHours(0,0,0,0);
+      for (let i = 0; i < 365; i++) {
+        const d = new Date(today); d.setDate(d.getDate() - i);
+        if (bookings.some(b => {
+          const bd = new Date(b.created_at); bd.setHours(0,0,0,0);
+          return bd.getTime() === d.getTime();
+        })) streak++;
+        else break;
+      }
+    }
+    
+    // По неделям (последние 8 недель)
+    const weeklyData = [];
+    for (let i = 7; i >= 0; i--) {
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - (i * 7 + weekStart.getDay()));
+      weekStart.setHours(0,0,0,0);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      weekEnd.setHours(23,59,59,999);
+      
+      const weekHW = homework?.filter(h => 
+        h.completed_at && new Date(h.completed_at) >= weekStart && new Date(h.completed_at) <= weekEnd
+      ).length || 0;
+      
+      weeklyData.push({
+        week: `Нед ${8 - i}`,
+        completed: weekHW,
+        start: weekStart.toISOString(),
+        end: weekEnd.toISOString()
+      });
+    }
+    
+    res.json({
+      totalHW, completedHW, overdueHW,
+      avgGrade, totalXP,
+      wordsCount: wordsCount || 0,
+      msgsCount: msgsCount || 0,
+      streak,
+      weeklyData
+    });
+  } catch (err) {
+    console.error('GET /api/stats error:', err);
+    res.json({});
+  }
+});
+
   // Поиск
   app.get('/api/search', auth, async (req, res) => {
     try {
