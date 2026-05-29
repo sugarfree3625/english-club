@@ -37,6 +37,9 @@
         <i class="fas fa-folder" :style="{ color: folderColors[folder] || '#94a3b8' }"></i>
         {{ folder }}
         <span class="folder-count">{{ getFolderCount(folder) }}</span>
+        <span class="folder-delete" @click.stop="deleteFolder(folder)" title="Удалить папку">
+          <i class="fas fa-times"></i>
+        </span>
       </button>
       <button class="folder-btn add-folder" @click="addFolder">
         <i class="fas fa-plus"></i> Новая папка
@@ -271,6 +274,16 @@ export default {
       }
     },
 
+    deleteFolder(folder) {
+      if (!confirm(`Удалить папку "${folder}"? Заметки останутся, но будут без папки.`)) return;
+      this.notes.forEach(n => {
+        if (n.folder === folder) n.folder = '';
+      });
+      delete this.folderColors[folder];
+      if (this.activeFolder === folder) this.activeFolder = null;
+      this.saveNotes();
+    },
+
     getFolderCount(folder) {
       return this.notes.filter(n => n.folder === folder).length;
     },
@@ -342,6 +355,19 @@ export default {
 }
 .folder-btn:hover, .folder-btn.active { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.3); color: #fff; }
 .folder-count { padding: 1px 6px; background: rgba(255,255,255,0.08); border-radius: 6px; font-size: 0.7rem; }
+
+.folder-delete {
+  margin-left: auto;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #ef4444;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+  font-size: 0.7rem;
+}
+.folder-btn:hover .folder-delete { opacity: 0.7; }
+.folder-delete:hover { opacity: 1; background: rgba(239,68,68,0.15); }
 
 .notes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
 @media (max-width: 640px) { .notes-grid { grid-template-columns: 1fr; } }
