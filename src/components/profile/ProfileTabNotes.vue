@@ -117,7 +117,11 @@ export default {
     folders() { return Object.keys(this.folderColors).sort(); },
     filteredNotes() {
       let list = this.notes;
-      if (this.activeFolder) list = list.filter(n => n.folder === this.activeFolder);
+      if (this.activeFolder) {
+  list = list.filter(n => n.folder === this.activeFolder);
+} else {
+  list = list.filter(n => !n.folder); // ← Только без папки!
+}
       if (this.searchQuery) {
         const q = this.searchQuery.toLowerCase();
         list = list.filter(n => (n.title||'').toLowerCase().includes(q) || (n.content||'').toLowerCase().includes(q) || (n.tags||[]).some(t => t.toLowerCase().includes(q)));
