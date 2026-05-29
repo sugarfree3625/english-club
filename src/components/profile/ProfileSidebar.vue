@@ -107,7 +107,7 @@ export default {
         { tab: 'myschedule', icon: 'fas fa-calendar-alt', label: 'Расписание', load: 'loadMySlots' },
         { tab: 'games', icon: 'fas fa-gamepad', label: 'Игры', show: this.isStudent || this.isTutor, load: 'loadGames' },
         { tab: 'words', icon: 'fas fa-book-open', label: 'Словарь', show: this.isStudent || this.isTutor },
-        { tab: 'notes', icon: 'fas fa-sticky-note', label: 'Блокнот', show: this.isStudent },
+        { tab: 'notes', icon: 'fas fa-sticky-note', label: 'Блокнот', show: this.isStudent || this.isTutor },
         { tab: 'progress', icon: 'fas fa-chart-line', label: 'Прогресс', show: this.isStudent, load: 'loadProgress' },
         { tab: 'myhomework', icon: 'fas fa-clipboard-list', label: 'Мои задания', show: this.isStudent, load: 'loadMyHomework' },
         { tab: 'children', icon: 'fas fa-child', label: 'Мои дети', show: this.isParent, load: 'loadMyStudents' },
