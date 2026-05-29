@@ -141,7 +141,9 @@ export default {
       
       for (const word of shuffled) {
         try {
-          const { data } = await axios.get(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+          const { data } = await axios.get(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`, {
+  withCredentials: false
+});
           if (data?.length) available.push(word);
         } catch(e) {}
       }
@@ -151,7 +153,9 @@ export default {
 
     async fetchWordDetails(word) {
       try {
-        const { data } = await axios.get(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+        const { data } = await axios.get(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`, {
+  withCredentials: false
+});
         
         if (!data?.length) return {};
         
