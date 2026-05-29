@@ -44,6 +44,7 @@ export default {
         { tab: 'info', icon: 'fas fa-user', label: 'Инфо' },
         { tab: 'achievements', icon: 'fas fa-trophy', label: 'Достижения', load: 'loadAchievements' },
         { tab: 'myschedule', icon: 'fas fa-calendar-check', label: 'Расписание', load: 'loadMySlots' },
+        { tab: 'games', icon: 'fas fa-gamepad', label: 'Игры', show: this.isStudent, load: 'loadGames' },
         { tab: 'words', icon: 'fas fa-book', label: 'Словарь', show: this.isStudent || this.isTutor },
         { tab: 'notes', icon: 'fas fa-sticky-note', label: 'Блокнот', show: this.isStudent },
         // ✅ Задания (просмотр) — видят ВСЕ
