@@ -103,20 +103,45 @@ module.exports = (app, supabase) => {
   });
 
   // ==================== ОБНОВИТЬ СЛОТ ====================
-  app.put('/api/slots/:id', auth, async (req, res) => {
-    try {
-      if (req.session.role !== 'admin' && req.session.role !== 'host') {
-        return res.status(403).json({ error: 'Нет прав' });
-      }
-      const { error } = await supabase.from('schedule_slots')
-        .update(req.body)
-        .eq('id', req.params.id);
-      if (error) throw error;
-      res.json({ success: true });
-    } catch(err) {
-      res.status(500).json({ error: 'Не удалось обновить' });
+app.put('/api/slots/:id', auth, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin' && req.session.role !== 'host') {
+      return res.status(403).json({ error: 'Нет прав' });
     }
-  });
+    
+    // Фильтруем только разрешённые поля
+    const allowedFields = [
+      'title', 'lesson_type', 'student_id', 'start_time', 'end_time',
+      'duration', 'notes', 'color', 'group_students', 'meeting_link',
+      'repeat', 'repeat_count'
+    ];
+    
+    const updates = {};
+    allowedFields.forEach(field => {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field];
+      }
+    });
+    
+    // Убираем поля, которых нет в таблице
+    delete updates.repeat_count; // если нет колонки
+    
+    const { error } = await supabase
+      .from('schedule_slots')
+      .update(updates)
+      .eq('id', req.params.id);
+    
+    if (error) {
+      console.error('PUT /api/slots error:', error);
+      throw error;
+    }
+    
+    res.json({ success: true });
+  } catch(err) {
+    console.error('PUT /api/slots error:', err);
+    res.status(500).json({ error: 'Не удалось обновить: ' + (err.message || '') });
+  }
+});
 
   // ==================== УДАЛИТЬ СЛОТ ====================
   app.delete('/api/slots/:id', auth, async (req, res) => {
