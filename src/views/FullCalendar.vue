@@ -147,6 +147,7 @@ export default {
       const wd=this.weekDaysList; if(!wd.length)return[];
       return this.events.filter(e=>{const d=new Date(e.start_time).toISOString().split('T')[0];return d>=wd[0].date&&d<=wd[6].date;}).sort((a,b)=>new Date(a.start_time)-new Date(b.start_time));
     },
+    // 🔥 ИСПРАВЛЕННОЕ ПОЗИЦИОНИРОВАНИЕ — без наложений
     positionedEvents() {
       const evs = this.weekEvents; if (!evs.length) return [];
       const res = [], sh = 8, tm = 15 * 60, byDay = {};
@@ -160,12 +161,15 @@ export default {
           if (!placed) cols.push([ev]);
         });
         const total = cols.length;
+        const cellWidth = 100 / 7;
         cols.forEach((col, ci) => { col.forEach(ev => {
           const sd = new Date(ev.start_time), ed = new Date(ev.end_time), di = this.weekDaysList.findIndex(d => d.date === sd.toISOString().split('T')[0]);
           if (di === -1) return;
           const startMin = (sd.getHours() - sh) * 60 + sd.getMinutes(), endMin = (ed.getHours() - sh) * 60 + ed.getMinutes();
           const cs = Math.max(0, startMin), ce = Math.min(tm, endMin), dur = Math.max(ce - cs, 30);
-          ev._style = { top: (cs / tm * 100) + '%', height: (dur / tm * 100) + '%', left: (di * 100 / 7 + ci * 100 / 7 / total) + '%', width: (100 / 7 / total - 0.5) + '%', minHeight: '18px', overflow: 'hidden' };
+          const slotWidth = (col.length === 1 && total === 1) ? (cellWidth - 0.5) : (cellWidth / total - 0.5);
+          const slotLeft = di * cellWidth + ci * (cellWidth / total);
+          ev._style = { top: (cs / tm * 100) + '%', height: (dur / tm * 100) + '%', left: slotLeft + '%', width: slotWidth + '%', minHeight: '18px', overflow: 'hidden' };
           res.push(ev);
         });});
       });
@@ -184,34 +188,21 @@ export default {
     monthName(date) { return new Date(date).toLocaleDateString('ru',{month:'long'}); },
     onDayClick(day) { if (day.isOtherMonth) return; this.popover.event = null; if (this.getDayEvents(day.date).length === 0 && this.isTutor) { this.quickForm = { date: day.date, title: '' }; } },
     async saveQuick() { if (!this.quickForm.title) return; const start = new Date(this.quickForm.date+'T10:00:00'), end = new Date(start.getTime()+30*60000); try { await axios.post('/api/slots',{title:this.quickForm.title,lesson_type:'online',start_time:start.toISOString(),end_time:end.toISOString(),color:'#10b981',notes:'',student_id:null}); this.quickForm.date = null; this.addToast?.('✅ Создано','success'); this.loadEvents(); } catch(e) { this.addToast?.('Ошибка','error'); } },
-
-    // 🔥 ПОПОВЕР ТОЛЬКО ПО КЛИКУ
     openPopover(e, ev) { if (this.wasDragged) { this.wasDragged = false; return; } this.popover = { event: ev, x: Math.min(e.clientX-10, window.innerWidth-200), y: Math.min(e.clientY-10, window.innerHeight-150) }; },
     onClickOutside() { if (this.popover.event) this.popover.event = null; },
-
     createAt(date, h, m) { if (!this.isTutor) return; this.modal = { show: true, event: null, form: { student_id:'',type:'online',title:'',date,time:`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`,duration:30,notes:'',color:'#10b981',repeat:'none',repeat_count:4 } }; },
     openModal(ev) { if (ev) { const sd = new Date(ev.start_time); this.modal = { show: true, event: ev, form: { student_id:ev.student_id||'',type:ev.lesson_type||'online',title:ev.title||'',date:sd.toISOString().split('T')[0],time:this.fmtTime(ev.start_time),duration:Math.round((new Date(ev.end_time)-sd)/60000)||30,notes:ev.notes||'',color:ev.color||'#6366f1',repeat:ev.repeat||'none',repeat_count:ev.repeat_count||4 } }; } else { this.modal = { show: true, event: null, form: { student_id:'',type:'online',title:'',date:new Date().toISOString().split('T')[0],time:'10:00',duration:30,notes:'',color:'#10b981',repeat:'none',repeat_count:4 } }; } },
     closeModal() { this.modal.show = false; this.modal.event = null; },
     async saveEvent() { try { const [h,m] = this.modal.form.time.split(':'); const s = new Date(this.modal.form.date); s.setHours(+h,+m,0,0); const dur = Math.max(+this.modal.form.duration||30,30), e = new Date(s.getTime()+dur*60000); const data = { title:this.modal.form.title, lesson_type:this.modal.form.type, student_id:this.modal.form.student_id||null, start_time:s.toISOString(), end_time:e.toISOString(), notes:this.modal.form.notes, color:this.modal.form.color, repeat:this.modal.form.repeat, repeat_count:this.modal.form.repeat_count }; if (this.modal.event) await axios.put(`/api/slots/${this.modal.event.id}`,data); else await axios.post('/api/slots',data); this.closeModal(); this.addToast?.('✅ Сохранено','success'); this.loadEvents(); } catch(e) { this.addToast?.('Ошибка','error'); } },
     async deleteEvent(ev) { if (!confirm('Удалить?')) return; try { await axios.delete(`/api/slots/${ev.id}`); this.loadEvents(); this.addToast?.('🗑 Удалено','info'); } catch(e) { this.addToast?.('Ошибка','error'); } },
-
-    // 🔥 ДРАГ БЕЗ ПОПОВЕРА
     startDrag(e, ev) { if(!this.isTutor)return; e.preventDefault(); this.wasDragged = false; this.dragEv=ev; this.dragSX=e.clientX; this.dragSY=e.clientY; this.dragOrig={...ev}; },
     startResize(e, ev) { if(!this.isTutor)return; e.preventDefault(); this.wasDragged = false; this.resizeEv=ev; this.dragSY=e.clientY; this.dragOrig={...ev}; },
     onDrag(e) {
       if(!this.dragEv&&!this.resizeEv)return;
       const g=this.$refs.weekGrid; if(!g)return;
       const r=g.getBoundingClientRect(), tm=15*60, gh=r.height-28, mp=gh/tm, dw=r.width/7;
-      if(this.dragEv){
-        const dy=e.clientY-this.dragSY, dx=e.clientX-this.dragSX, dm=Math.round(dy/mp/15)*15, dd=Math.round(dx/dw);
-        if (Math.abs(dx) > 2 || Math.abs(dy) > 2) this.wasDragged = true;
-        const os=new Date(this.dragOrig.start_time), dur=Math.max((new Date(this.dragOrig.end_time)-os)/60000,30);
-        let ns=new Date(os.getTime()+dm*60000); ns.setDate(ns.getDate()+dd);
-        this.dragEv.start_time=ns.toISOString(); this.dragEv.end_time=new Date(ns.getTime()+dur*60000).toISOString();
-        const el=document.querySelector(`[data-eid="${this.dragEv.id}"]`);
-        if(el){el.style.transform=`translate(${dx}px,${dy}px)`;el.style.zIndex='100';el.style.transition='none';el.style.opacity='0.85';}
-      }
-      if(this.resizeEv){ const dy=e.clientY-this.dragSY, dm=Math.round(dy/mp/15)*15; if (Math.abs(dy) > 2) this.wasDragged = true; const oe=new Date(this.dragOrig.end_time); let ne=new Date(oe.getTime()+dm*60000); if(ne-new Date(this.dragOrig.start_time)<30*60000)ne=new Date(new Date(this.dragOrig.start_time).getTime()+30*60000); this.resizeEv.end_time=ne.toISOString(); }
+      if(this.dragEv){const dy=e.clientY-this.dragSY, dx=e.clientX-this.dragSX, dm=Math.round(dy/mp/15)*15, dd=Math.round(dx/dw); if(Math.abs(dx)>2||Math.abs(dy)>2)this.wasDragged=true; const os=new Date(this.dragOrig.start_time), dur=Math.max((new Date(this.dragOrig.end_time)-os)/60000,30); let ns=new Date(os.getTime()+dm*60000); ns.setDate(ns.getDate()+dd); this.dragEv.start_time=ns.toISOString(); this.dragEv.end_time=new Date(ns.getTime()+dur*60000).toISOString(); const el=document.querySelector(`[data-eid="${this.dragEv.id}"]`); if(el){el.style.transform=`translate(${dx}px,${dy}px)`;el.style.zIndex='100';el.style.transition='none';el.style.opacity='0.85';}}
+      if(this.resizeEv){const dy=e.clientY-this.dragSY, dm=Math.round(dy/mp/15)*15; if(Math.abs(dy)>2)this.wasDragged=true; const oe=new Date(this.dragOrig.end_time); let ne=new Date(oe.getTime()+dm*60000); if(ne-new Date(this.dragOrig.start_time)<30*60000)ne=new Date(new Date(this.dragOrig.start_time).getTime()+30*60000); this.resizeEv.end_time=ne.toISOString();}
     },
     async onDrop() {
       const ev=this.dragEv||this.resizeEv; if(!ev)return;
