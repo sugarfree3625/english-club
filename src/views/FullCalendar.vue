@@ -54,21 +54,44 @@
       </div>
     </div>
 
+    <!-- СОЧНАЯ МОДАЛКА -->
     <Teleport to="body">
       <transition name="modal-fade">
         <div class="modal-overlay" v-if="showAddSlot || editingSlot" @click.self="closeModal">
           <div class="modal-card">
             <h3>{{ editingSlot ? '✏️ Редактировать' : '➕ Новое занятие' }}</h3>
+            
             <label>Тип</label>
             <div class="type-btns">
-              <button v-for="t in slotTypes" :key="t.value" class="type-btn" :class="{ active: slotForm.lesson_type === t.value }" @click="slotForm.lesson_type = t.value">{{ t.emoji }} {{ t.label }}</button>
+              <button v-for="t in slotTypes" :key="t.value" class="type-btn" :class="{ active: slotForm.lesson_type === t.value }" :style="{ borderColor: slotForm.lesson_type === t.value ? t.color : 'rgba(255,255,255,0.1)', boxShadow: slotForm.lesson_type === t.value ? `0 0 12px ${t.color}40` : 'none' }" @click="slotForm.lesson_type = t.value">{{ t.emoji }} {{ t.label }}</button>
             </div>
+
             <label v-if="!isGroupType">Ученик</label>
             <select v-if="!isGroupType" class="input" v-model="slotForm.student_id"><option value="">Выберите</option><option v-for="s in allStudents" :key="s.id" :value="s.id">{{ s.username }}</option></select>
-            <label>Название</label><input class="input" v-model="slotForm.title">
+
+            <label>Название</label><input class="input" v-model="slotForm.title" placeholder="Например: Speaking Practice">
+
             <div class="form-row"><div style="flex:1"><label>Дата</label><input class="input" type="date" v-model="slotForm.date"></div><div style="flex:1"><label>Время</label><input class="input" type="time" v-model="slotForm.time"></div></div>
+
             <label>Длительность (мин)</label><input class="input" type="number" v-model="slotForm.duration" placeholder="30">
-            <div class="modal-actions"><button class="btn btn-p btn-sm" @click="saveSlot">💾 Сохранить</button><button v-if="editingSlot" class="btn btn-o btn-sm" style="color:#ef4444" @click="deleteSlot(editingSlot.id)">🗑</button><button class="btn btn-o btn-sm" @click="closeModal">Отмена</button></div>
+
+            <label>Цвет</label>
+            <div class="color-picker">
+              <button v-for="c in slotColors" :key="c" class="color-dot" :style="{ background: c, boxShadow: slotForm.color === c ? `0 0 10px ${c}` : 'none' }" :class="{ active: slotForm.color === c }" @click="slotForm.color = c"></button>
+            </div>
+
+            <label>Повторять</label>
+            <select class="input" v-model="slotForm.repeat"><option value="none">Не повторять</option><option value="weekly">Каждую неделю</option><option value="biweekly">Каждые 2 недели</option><option value="monthly">Каждый месяц</option></select>
+            <div v-if="slotForm.repeat !== 'none'" class="form-row"><div style="flex:1"><label>Повторений</label><input class="input" type="number" v-model="slotForm.repeat_count" placeholder="4" min="1" max="52"></div></div>
+
+            <label>Заметки</label>
+            <textarea class="input note-area" v-model="slotForm.notes" rows="2" placeholder="Домашнее задание, материалы..."></textarea>
+
+            <div class="modal-actions">
+              <button class="btn btn-p btn-sm" @click="saveSlot">💾 Сохранить</button>
+              <button v-if="editingSlot" class="btn btn-o btn-sm" style="color:#ef4444;border-color:rgba(239,68,68,0.3)" @click="deleteSlot(editingSlot.id)">🗑 Удалить</button>
+              <button class="btn btn-o btn-sm" @click="closeModal">Отмена</button>
+            </div>
           </div>
         </div>
       </transition>
@@ -88,7 +111,7 @@ export default {
       viewMode: 'month', currentMonth: new Date().getMonth(), currentYear: new Date().getFullYear(), currentWeek: 0,
       hours: Array.from({ length: 14 }, (_, i) => i + 8), slots: [], allStudents: [],
       showAddSlot: false, editingSlot: null,
-      slotForm: { student_id:'', lesson_type:'online', title:'', date:'', time:'', duration:30, notes:'', group_students:[], color:'#6366f1' },
+      slotForm: { student_id:'', lesson_type:'online', title:'', date:'', time:'', duration:30, notes:'', group_students:[], color:'#6366f1', repeat:'none', repeat_count:4 },
       slotTypes: [
         { value:'online', emoji:'🟢', label:'Онлайн', color:'#10b981' },
         { value:'offline', emoji:'🔵', label:'Очно', color:'#6366f1' },
@@ -101,6 +124,7 @@ export default {
         { type:'group-online', label:'Группа', color:'#f59e0b' },
         { type:'group-offline', label:'Очно-группа', color:'#ef4444' }
       ],
+      slotColors: ['#6366f1','#10b981','#f59e0b','#ef4444','#ec4899','#8b5cf6','#06b6d4','#84cc16','#f97316','#14b8a6'],
       dragging: null, resizing: null, dragStartX: 0, dragStartY: 0, dragSlotOriginal: null
     };
   },
@@ -124,49 +148,20 @@ export default {
       return this.slots.filter(s=>{const sd=new Date(s.start_time).toISOString().split('T')[0];return sd>=ws&&sd<=we;}).sort((a,b)=>new Date(a.start_time)-new Date(b.start_time));
     },
     positionedWeekEvents() {
-      const events = this.weekSlots.map(s => ({
-        ...s, _key: 'slot_'+s.id, _time: this.formatTime(s.start_time),
-        _student: s.users?.username || '', color: s.color || this.getDefaultColor(s.lesson_type)
-      }));
+      const events = this.weekSlots.map(s => ({ ...s, _key:'slot_'+s.id, _time:this.formatTime(s.start_time), _student:s.users?.username||'', color:s.color||this.getDefaultColor(s.lesson_type) }));
       if (!events.length) return [];
-      
-      const byDay = {};
-      events.forEach(e => {
-        const day = new Date(e.start_time).toISOString().split('T')[0];
-        if (!byDay[day]) byDay[day] = [];
-        byDay[day].push(e);
-      });
-      
+      const byDay = {}; events.forEach(e => { const d=new Date(e.start_time).toISOString().split('T')[0]; if(!byDay[d])byDay[d]=[]; byDay[d].push(e); });
       const result = [];
       Object.values(byDay).forEach(dayEvents => {
-        dayEvents.sort((a,b) => new Date(a.start_time) - new Date(b.start_time));
-        const groups = [];
-        dayEvents.forEach(e => {
-          let placed = false;
-          for (const group of groups) {
-            if (new Date(e.start_time) < new Date(group[group.length-1].end_time)) {
-              group.push(e); placed = true; break;
-            }
-          }
-          if (!placed) groups.push([e]);
+        dayEvents.sort((a,b)=>new Date(a.start_time)-new Date(b.start_time));
+        const columns = [];
+        dayEvents.forEach(ev => {
+          let placed=false;
+          for(const col of columns) { if(new Date(ev.start_time)>=new Date(col[col.length-1].end_time)){col.push(ev);placed=true;break;} }
+          if(!placed) columns.push([ev]);
         });
-        groups.forEach(group => {
-          group.forEach((e, idx) => {
-            const sd = new Date(e.start_time), ed = new Date(e.end_time);
-            const dayIdx = this.weekDaysList.findIndex(d => d.date === sd.toISOString().split('T')[0]);
-            if (dayIdx === -1) return;
-            const sh = 8, tm = 14*60;
-            const top = ((sd.getHours()-sh)*60 + sd.getMinutes()) / tm * 100;
-            const h = Math.max((ed-sd)/60000, 30) / tm * 100;
-            e._style = {
-              top: top+'%', height: h+'%',
-              left: `calc(60px + ${dayIdx} * (100% - 60px) / 7 + ${idx} * (100% - 60px) / 7 / ${group.length} + 2px)`,
-              width: `calc((100% - 60px) / 7 / ${group.length} - 3px)`,
-              minHeight:'20px'
-            };
-            result.push(e);
-          });
-        });
+        const total=columns.length;
+        columns.forEach((col,ci)=>{col.forEach(ev=>{const sd=new Date(ev.start_time),ed=new Date(ev.end_time),di=this.weekDaysList.findIndex(d=>d.date===sd.toISOString().split('T')[0]);if(di===-1)return;const sh=8,tm=14*60;ev._style={top:((sd.getHours()-sh)*60+sd.getMinutes())/tm*100+'%',height:Math.max((ed-sd)/60000,30)/tm*100+'%',left:`calc(60px + ${di}*(100% - 60px)/7 + ${ci}*(100% - 60px)/7/${total} + 2px)`,width:`calc((100% - 60px)/7/${total} - 3px)`,minHeight:'20px'};result.push(ev);});});
       });
       return result;
     }
@@ -185,7 +180,7 @@ export default {
     startResize(e,slot) { if(!this.isTutor)return; e.preventDefault(); this.resizing=slot; this.dragStartY=e.clientY; this.dragSlotOriginal={...slot}; },
     onDragMove(e) {
       if(!this.dragging&&!this.resizing)return; const grid=this.$refs.weekGrid; if(!grid)return; const rect=grid.getBoundingClientRect(); const tm=14*60,gh=rect.height-44,mp=gh/tm,dw=(rect.width-60)/7;
-      if(this.dragging){const dy=e.clientY-this.dragStartY,dx=e.clientX-this.dragStartX,dm=Math.round(dy/mp/30)*30,dd=Math.round(dx/dw);const os=new Date(this.dragSlotOriginal.start_time),dur=Math.max((new Date(this.dragSlotOriginal.end_time)-os)/60000,30);let ns=new Date(os.getTime()+dm*60000);ns.setDate(ns.getDate()+dd);this.dragging.start_time=ns.toISOString();this.dragging.end_time=new Date(ns.getTime()+dur*60000).toISOString();this.dragging._time=this.formatTime(ns);}
+      if(this.dragging){const dy=e.clientY-this.dragStartY,dx=e.clientX-this.dragStartX,dm=Math.round(dy/mp/30)*30,dd=Math.round(dx/dw);const os=new Date(this.dragSlotOriginal.start_time),dur=Math.max((new Date(this.dragSlotOriginal.end_time)-os)/60000,30);let ns=new Date(os.getTime()+dm*60000);ns.setDate(ns.getDate()+dd);this.dragging.start_time=ns.toISOString();this.dragging.end_time=new Date(ns.getTime()+dur*60000).toISOString();}
       if(this.resizing){const dy=e.clientY-this.dragStartY,dm=Math.round(dy/mp/30)*30;const oe=new Date(this.dragSlotOriginal.end_time);let ne=new Date(oe.getTime()+dm*60000);if(ne-new Date(this.dragSlotOriginal.start_time)<30*60000)ne=new Date(new Date(this.dragSlotOriginal.start_time).getTime()+30*60000);this.resizing.end_time=ne.toISOString();}
     },
     async onDragEnd() {
@@ -196,11 +191,11 @@ export default {
     prevMonth() { this.currentMonth===0?(this.currentMonth=11,this.currentYear--):this.currentMonth--; },
     nextMonth() { this.currentMonth===11?(this.currentMonth=0,this.currentYear++):this.currentMonth++; },
     goToday() { this.currentWeek=0; this.currentMonth=new Date().getMonth(); this.currentYear=new Date().getFullYear(); },
-    openSlot(date,hour,min=0){if(!this.isTutor)return;this.slotForm={student_id:'',lesson_type:'online',title:'',date,time:`${String(hour).padStart(2,'0')}:${String(min).padStart(2,'0')}`,duration:30,notes:'',group_students:[],color:'#6366f1'};this.editingSlot=null;this.showAddSlot=true;},
-    openAddSlot(){this.editingSlot=null;this.slotForm={student_id:'',lesson_type:'online',title:'',date:'',time:'',duration:30,notes:'',group_students:[],color:'#6366f1'};this.showAddSlot=true;},
-    editSlot(slot){this.editingSlot=slot;const sd=new Date(slot.start_time);this.slotForm={student_id:slot.student_id||'',lesson_type:slot.lesson_type||'online',title:slot.title||'',date:sd.toISOString().split('T')[0],time:sd.toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}),duration:Math.round((new Date(slot.end_time)-sd)/60000)||30,notes:slot.notes||'',group_students:slot.group_students||[],color:slot.color||'#6366f1'};this.showAddSlot=true;},
+    openSlot(date,hour,min=0){if(!this.isTutor)return;this.slotForm={student_id:'',lesson_type:'online',title:'',date,time:`${String(hour).padStart(2,'0')}:${String(min).padStart(2,'0')}`,duration:30,notes:'',group_students:[],color:'#6366f1',repeat:'none',repeat_count:4};this.editingSlot=null;this.showAddSlot=true;},
+    openAddSlot(){this.editingSlot=null;this.slotForm={student_id:'',lesson_type:'online',title:'',date:'',time:'',duration:30,notes:'',group_students:[],color:'#6366f1',repeat:'none',repeat_count:4};this.showAddSlot=true;},
+    editSlot(slot){this.editingSlot=slot;const sd=new Date(slot.start_time);this.slotForm={student_id:slot.student_id||'',lesson_type:slot.lesson_type||'online',title:slot.title||'',date:sd.toISOString().split('T')[0],time:sd.toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}),duration:Math.round((new Date(slot.end_time)-sd)/60000)||30,notes:slot.notes||'',group_students:slot.group_students||[],color:slot.color||'#6366f1',repeat:slot.repeat||'none',repeat_count:slot.repeat_count||4};this.showAddSlot=true;},
     closeModal(){this.showAddSlot=false;this.editingSlot=null;},
-    async saveSlot(){try{const[h,m]=this.slotForm.time.split(':');const start=new Date(this.slotForm.date);start.setHours(+h,+m,0,0);const dur=Math.max(+this.slotForm.duration||30,30);const end=new Date(start.getTime()+dur*60000);const data={...this.slotForm,start_time:start.toISOString(),end_time:end.toISOString()};if(this.editingSlot)await axios.put(`/api/slots/${this.editingSlot.id}`,data);else await axios.post('/api/slots',data);this.closeModal();this.addToast('Сохранено!','success');this.loadSlots();}catch(e){this.addToast(e.response?.data?.error||'Ошибка','error');}},
+    async saveSlot(){try{const[h,m]=this.slotForm.time.split(':');const start=new Date(this.slotForm.date);start.setHours(+h,+m,0,0);const dur=Math.max(+this.slotForm.duration||30,30);const end=new Date(start.getTime()+dur*60000);const data={...this.slotForm,start_time:start.toISOString(),end_time:end.toISOString()};if(!this.isGroupType){data.group_students=[];}if(this.isGroupType)data.student_id=null;if(this.editingSlot)await axios.put(`/api/slots/${this.editingSlot.id}`,data);else await axios.post('/api/slots',data);this.closeModal();this.addToast('Сохранено!','success');this.loadSlots();}catch(e){this.addToast(e.response?.data?.error||'Ошибка','error');}},
     async deleteSlot(id){if(!confirm('Удалить?'))return;try{await axios.delete(`/api/slots/${id}`);this.closeModal();this.loadSlots();this.addToast('Удалено!','info');}catch(e){this.addToast('Ошибка','error');}},
     exportICS(){window.open('/api/slots/export','_blank');}
   }
@@ -251,17 +246,22 @@ export default {
 .resize-handle { position: absolute; bottom: 0; left: 0; right: 0; height: 5px; cursor: ns-resize; }
 .resize-handle:hover { background: rgba(255,255,255,0.2); }
 .modal-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; }
-.modal-card { background: rgba(15,15,30,0.97); border: 1px solid rgba(255,255,255,0.12); border-radius: 24px; padding: 28px; max-width: 500px; width: 90%; color: #e2e8f0; }
+.modal-card { background: rgba(15,15,30,0.97); backdrop-filter: blur(30px); border: 1px solid rgba(255,255,255,0.12); border-radius: 24px; padding: 28px; max-width: 520px; width: 90%; max-height: 85vh; overflow-y: auto; color: #e2e8f0; box-shadow: 0 25px 60px rgba(0,0,0,0.5); animation: modalPop 0.3s ease; }
+@keyframes modalPop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .modal-card h3 { font-family: 'Space Grotesk', sans-serif; font-weight: 700; margin: 0 0 16px; color: #fff; }
 .modal-card label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 4px; margin-top: 10px; }
 .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
 .form-row { display: flex; gap: 8px; }
 .type-btns { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
-.type-btn { padding: 8px 14px; border-radius: 12px; border: 2px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); cursor: pointer; font-weight: 600; font-size: 0.82rem; color: #cbd5e1; }
-.type-btn.active { border-color: #6366f1; background: rgba(99,102,241,0.1); color: #fff; }
+.type-btn { padding: 8px 14px; border-radius: 12px; border: 2px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); cursor: pointer; font-weight: 600; font-size: 0.82rem; color: #cbd5e1; transition: all 0.2s; font-family: inherit; }
+.type-btn.active { background: rgba(255,255,255,0.06); color: #fff; }
+.color-picker { display: flex; gap: 6px; }
+.color-dot { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: all 0.2s; }
+.color-dot.active { border-color: #fff; transform: scale(1.2); }
 .input { width: 100%; padding: 10px 14px; border: 2px solid rgba(255,255,255,0.1); border-radius: 12px; font-family: inherit; font-size: 0.9rem; background: rgba(255,255,255,0.04); color: #fff; outline: none; margin-bottom: 6px; }
 .input:focus { border-color: #6366f1; }
-.btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 20px; border-radius: 50px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border: none; font-family: inherit; }
+.note-area { resize: vertical; }
+.btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 20px; border-radius: 50px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border: none; font-family: inherit; transition: all 0.2s; }
 .btn-p { background: linear-gradient(135deg, #6366f1, #2dd4bf); color: #fff; }
 .btn-o { border: 2px solid rgba(255,255,255,0.1); color: #cbd5e1; background: transparent; }
 .btn-sm { padding: 6px 14px; font-size: 0.78rem; }
