@@ -1,174 +1,192 @@
 <template>
-  <div class="calendar-container">
-    <!-- ХЕДЕР -->
-    <div class="calendar-header">
-      <div class="calendar-nav">
-        <button class="btn btn-o btn-sm" @click="prevMonth">←</button>
-        <h2 class="calendar-title">{{ monthLabel }}</h2>
-        <button class="btn btn-o btn-sm" @click="nextMonth">→</button>
-        <button class="btn btn-today btn-sm" @click="goToday">● Сегодня</button>
+  <div class="calendar-app">
+    <!-- ХЕДЕР-ГОЛОГРАММА -->
+    <div class="cal-header">
+      <div class="cal-nav">
+        <button class="nav-btn" @click="prevMonth">
+          <span class="nav-arrow">◀</span>
+        </button>
+        <h1 class="cal-title">{{ monthLabel }}</h1>
+        <button class="nav-btn" @click="nextMonth">
+          <span class="nav-arrow">▶</span>
+        </button>
+        <button class="today-btn" @click="goToday">
+          <span class="today-dot"></span>
+          Сегодня
+        </button>
       </div>
-      <div class="calendar-actions">
-        <div class="legend">
-          <span v-for="l in legendItems" :key="l.type" class="legend-item">
-            <span class="legend-dot" :style="{ background: l.color }"></span>
-            {{ l.label }}
-          </span>
-        </div>
-        <div class="view-btns">
-          <button class="view-btn" :class="{ active: viewMode === 'month' }" @click="viewMode = 'month'">📅</button>
-          <button class="view-btn" :class="{ active: viewMode === 'week' }" @click="viewMode = 'week'">📆</button>
-        </div>
-        <button class="btn btn-o btn-sm" @click="exportICS">📤 ICS</button>
-        <button class="btn btn-p btn-sm" @click="openAddSlot" v-if="isTutor">+ Занятие</button>
-      </div>
-    </div>
 
-    <!-- МИНИ-ГРАФИК ЗАГРУЗКИ НЕДЕЛИ -->
-    <div class="week-load" v-if="viewMode === 'month'">
-      <div v-for="(day, i) in weekDays" :key="i" class="load-bar-col">
-        <div class="load-bar-wrap">
-          <div class="load-bar" :style="{ height: getLoadPercent(i) + '%' }"></div>
+      <div class="cal-toolbar">
+        <div class="legend-compact">
+          <span v-for="l in legendItems" :key="l.type" class="legend-dot" :style="{ background: l.color }" :title="l.label"></span>
         </div>
-        <span class="load-day">{{ day }}</span>
+        <div class="view-switcher">
+          <button class="view-btn" :class="{ active: viewMode === 'month' }" @click="viewMode = 'month'">Месяц</button>
+          <button class="view-btn" :class="{ active: viewMode === 'week' }" @click="viewMode = 'week'">Неделя</button>
+        </div>
+        <button class="action-btn" @click="exportICS" title="Экспорт">📤</button>
+        <button class="add-btn" @click="openQuickCreate" v-if="isTutor">
+          <span class="add-plus">+</span>
+        </button>
       </div>
     </div>
 
     <!-- МЕСЯЦ -->
-    <div v-if="viewMode === 'month'" class="month-grid">
-      <div class="day-header" v-for="day in weekDays" :key="day">{{ day }}</div>
-      <div 
-        class="day-cell" 
-        v-for="(day, idx) in monthDays" :key="idx" 
-        :class="{ today: day.isToday, otherMonth: day.isOtherMonth }"
-        @click="selectDay(day)"
-      >
-        <span class="day-number" :class="{ 'today-num': day.isToday }">{{ day.day }}</span>
-        
-        <div class="day-dots" v-if="getSlotsForDate(day.date).length">
-          <span v-for="(dot, di) in getDotsForDate(day.date)" :key="di" class="day-dot" :style="{ background: dot.color }"></span>
-          <span v-if="getSlotsForDate(day.date).length > 5" class="day-dot-more">+{{ getSlotsForDate(day.date).length - 5 }}</span>
-        </div>
-
-        <div class="day-bars" v-if="getSlotsForDate(day.date).length">
-          <div 
-            v-for="(slot, si) in getSlotsForDate(day.date).slice(0, 3)" :key="slot.id"
-            class="day-bar" 
-            :style="{ background: slot.color || getDefaultColor(slot.lesson_type), width: getBarWidth(day.date, si) }"
-            @click.stop="editSlot(slot)"
-            :title="`${slot.title} (${formatTime(slot.start_time)})`"
-          >
-            <span class="bar-dot" :style="{ background: slot.color || getDefaultColor(slot.lesson_type) }"></span>
+    <div v-if="viewMode === 'month'" class="month-view">
+      <div class="month-grid">
+        <div class="month-day-header" v-for="day in weekDays" :key="day">{{ day }}</div>
+        <div 
+          v-for="(day, idx) in monthDays" :key="idx"
+          class="month-day-cell"
+          :class="{ today: day.isToday, other: day.isOtherMonth, weekend: idx % 7 >= 5 }"
+          @click="handleDayClick(day)"
+        >
+          <div class="day-top">
+            <span class="day-num" :class="{ 'today-num': day.isToday }">{{ day.day }}</span>
+            <div class="day-dots-row" v-if="getEventsForDate(day.date).length">
+              <span v-for="(dot, di) in getEventsForDate(day.date).slice(0, 5)" :key="di" class="day-dot" :style="{ background: dot.color }"></span>
+            </div>
           </div>
-          <span v-if="getSlotsForDate(day.date).length > 3" class="day-bar-more" @click.stop="selectedDate = day.date">+{{ getSlotsForDate(day.date).length - 3 }}</span>
-        </div>
-
-        <div v-if="quickCreate.date === day.date" class="quick-create" @click.stop>
-          <select class="quick-select" v-model="quickCreate.student_id">
-            <option value="">Ученик</option>
-            <option v-for="s in allStudents" :key="s.id" :value="s.id">{{ s.username }}</option>
-          </select>
-          <div class="quick-types">
-            <button v-for="t in slotTypes" :key="t.value" class="quick-type-dot" :style="{ background: quickCreate.lesson_type === t.value ? t.color : 'rgba(255,255,255,0.1)', boxShadow: quickCreate.lesson_type === t.value ? `0 0 8px ${t.color}` : 'none' }" @click="quickCreate.lesson_type = t.value" :title="t.label"></button>
+          
+          <div class="day-events" v-if="getEventsForDate(day.date).length">
+            <div 
+              v-for="(ev, ei) in getEventsForDate(day.date).slice(0, 3)" :key="ev._key"
+              class="day-event-bar"
+              :style="{ background: ev.color, width: (100 / Math.min(getEventsForDate(day.date).length, 3)) + '%' }"
+              @click.stop="openEvent(ev)"
+              :title="`${ev.title} (${ev._time})`"
+            ></div>
+            <span v-if="getEventsForDate(day.date).length > 3" class="day-more" @click.stop="goToDay(day.date)">
+              +{{ getEventsForDate(day.date).length - 3 }}
+            </span>
           </div>
-          <input class="quick-input" v-model="quickCreate.title" placeholder="Название" @keydown.enter="saveQuickSlot" />
-          <div class="quick-actions">
-            <button class="btn btn-p btn-sm" @click="saveQuickSlot" :disabled="!quickCreate.title">✓</button>
-            <button class="btn btn-o btn-sm" @click="quickCreate.date = null">✕</button>
+
+          <!-- Быстрое создание -->
+          <div v-if="quickCreate.date === day.date" class="quick-popup" @click.stop>
+            <input class="quick-input" v-model="quickCreate.title" placeholder="Название встречи" ref="quickInput" @keydown.enter="saveQuickEvent" />
+            <div class="quick-row">
+              <select class="quick-select" v-model="quickCreate.type">
+                <option value="online">🟢 Онлайн</option>
+                <option value="offline">🔵 Очно</option>
+              </select>
+              <button class="quick-save" @click="saveQuickEvent">✓</button>
+              <button class="quick-cancel" @click="quickCreate.date = null">✕</button>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
     <!-- НЕДЕЛЯ -->
-    <div v-if="viewMode === 'week'" class="week-wrapper">
-      <div class="week-grid" ref="weekGrid">
-        <div class="week-header-cell">Время</div>
-        <div class="week-header-cell" v-for="day in weekDaysList" :key="day.date" :class="{ today: day.isToday }">{{ day.name }}<br>{{ day.dateStr }}</div>
-        <template v-for="hour in hours" :key="hour">
-          <div class="week-time-cell">{{ hour }}:00</div>
-          <div class="week-bg-cell" v-for="day in weekDaysList" :key="'bg'+day.date+hour+':00'" :class="{ today: day.isToday }" @click="openSlot(day.date, hour, 0)"></div>
-          <div class="week-time-cell week-time-half">:30</div>
-          <div class="week-bg-cell week-bg-half" v-for="day in weekDaysList" :key="'bg'+day.date+hour+':30'" :class="{ today: day.isToday }" @click="openSlot(day.date, hour, 30)"></div>
-        </template>
-        <div class="slots-layer">
-          <div 
-            v-for="slot in parallelWeekSlots" :key="slot.id" 
-            class="slot-block" 
-            :style="{ background: slot.color || getDefaultColor(slot.lesson_type), ...getSlotStyle(slot) }"
-            @mousedown="startDrag($event, slot)" 
-            @click.stop="editSlot(slot)"
-          >
-            <div class="slot-time-label">{{ formatTime(slot.start_time) }}</div>
-            <div class="slot-block-title">{{ slot.title }}</div>
-            <div class="slot-block-student">{{ slot.users?.username || (slot.group_students?.length ? '👥' : '') }}</div>
-            <a v-if="slot.meeting_link" :href="slot.meeting_link" target="_blank" class="slot-join-btn" @click.stop>📹</a>
-            <div class="resize-handle" @mousedown.stop="startResize($event, slot)"></div>
+    <div v-if="viewMode === 'week'" class="week-view">
+      <div class="week-scroll">
+        <div class="week-grid" ref="weekGrid">
+          <div class="week-corner">Время</div>
+          <div class="week-day-header" v-for="day in weekDaysList" :key="day.date" :class="{ today: day.isToday, weekend: day.dayIndex >= 5 }">
+            <span class="wd-name">{{ day.name }}</span>
+            <span class="wd-date">{{ day.dateStr }}</span>
+          </div>
+          
+          <template v-for="hour in hours" :key="hour">
+            <div class="week-time">{{ hour }}:00</div>
+            <div class="week-cell" v-for="day in weekDaysList" :key="'c'+day.date+hour" :class="{ today: day.isToday }" @click="openSlotAt(day.date, hour, 0)"></div>
+            <div class="week-time week-time-half">30</div>
+            <div class="week-cell week-cell-half" v-for="day in weekDaysList" :key="'ch'+day.date+hour" :class="{ today: day.isToday }" @click="openSlotAt(day.date, hour, 30)"></div>
+          </template>
+
+          <div class="events-layer">
+            <div 
+              v-for="ev in positionedWeekEvents" :key="ev._key"
+              class="week-event"
+              :style="{ ...ev._style, background: ev.color }"
+              @mousedown="startDrag($event, ev)"
+              @click.stop="openEvent(ev)"
+            >
+              <div class="we-time">{{ ev._time }}</div>
+              <div class="we-title">{{ ev.title }}</div>
+              <div class="we-student" v-if="ev._student">{{ ev._student }}</div>
+              <div class="we-resize" @mousedown.stop="startResize($event, ev)"></div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- МОДАЛКА -->
+    <!-- МОДАЛКА СОБЫТИЯ -->
     <Teleport to="body">
-      <transition name="modal-fade">
-        <div class="modal-overlay" v-if="showAddSlot || editingSlot" @click.self="closeModal">
-          <div class="modal-card">
-            <h3>{{ editingSlot ? '✏️ Редактировать' : '➕ Новое занятие' }}</h3>
+      <transition name="modal-pop">
+        <div v-if="showModal" class="modal-backdrop" @click.self="closeModal">
+          <div class="modal-glass">
+            <div class="modal-glow" :style="{ background: modalEvent?.color || '#6366f1' }"></div>
+            <button class="modal-close" @click="closeModal">✕</button>
             
-            <label>Тип</label>
-            <div class="type-btns">
-              <button v-for="t in slotTypes" :key="t.value" class="type-btn" :class="{ active: slotForm.lesson_type === t.value }" :style="{ borderColor: slotForm.lesson_type === t.value ? t.color : 'rgba(255,255,255,0.1)', boxShadow: slotForm.lesson_type === t.value ? `0 0 12px ${t.color}40` : 'none' }" @click="slotForm.lesson_type = t.value">{{ t.emoji }} {{ t.label }}</button>
+            <div class="modal-type-badge" :style="{ background: modalEvent?.color || '#6366f1' }">
+              {{ getTypeLabel(modalEvent?._type) }}
+            </div>
+            
+            <h2 class="modal-title">{{ modalEvent?.title }}</h2>
+            
+            <div class="modal-info-grid">
+              <div class="modal-info-item">
+                <span class="mi-icon">📅</span>
+                <span>{{ formatDate(modalEvent?.start_time || modalEvent?.date) }}</span>
+              </div>
+              <div class="modal-info-item" v-if="modalEvent?.start_time">
+                <span class="mi-icon">🕐</span>
+                <span>{{ formatTime(modalEvent.start_time) }} - {{ formatTime(modalEvent.end_time) }}</span>
+              </div>
+              <div class="modal-info-item" v-if="modalEvent?._student">
+                <span class="mi-icon">👤</span>
+                <span>{{ modalEvent._student }}</span>
+              </div>
+              <div class="modal-info-item" v-if="modalEvent?.notes">
+                <span class="mi-icon">📝</span>
+                <span>{{ modalEvent.notes }}</span>
+              </div>
             </div>
 
-            <label v-if="!isGroupType">Ученик</label>
-            <select v-if="!isGroupType" class="input" v-model="slotForm.student_id">
-              <option value="">Выберите</option>
-              <option v-for="s in allStudents" :key="s.id" :value="s.id">{{ s.username }}</option>
-            </select>
+            <div class="modal-actions">
+              <a v-if="modalEvent?.meeting_link" :href="modalEvent.meeting_link" target="_blank" class="modal-btn primary pulse">
+                📹 Войти в класс
+              </a>
+              <button v-if="isTutor" class="modal-btn secondary" @click="editEvent(modalEvent)">✏️</button>
+              <button v-if="isTutor" class="modal-btn danger" @click="deleteEvent(modalEvent)">🗑</button>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </Teleport>
 
-            <div v-if="isGroupType">
-              <label>Ученики</label>
-              <div v-for="s in allStudents" :key="s.id" class="student-checkbox" @click="toggleGroupStudent(s.id)"><input type="checkbox" :checked="slotForm.group_students.includes(s.id)" /><span>{{ s.username }}</span></div>
+    <!-- МОДАЛКА РЕДАКТИРОВАНИЯ -->
+    <Teleport to="body">
+      <transition name="modal-pop">
+        <div v-if="showEditModal" class="modal-backdrop" @click.self="closeEditModal">
+          <div class="modal-glass">
+            <h3>{{ editingEvent?._isNew ? '➕ Новая встреча' : '✏️ Редактировать' }}</h3>
+            
+            <label>Тип</label>
+            <div class="type-row">
+              <button v-for="t in eventTypes" :key="t.value" class="type-chip" :class="{ active: editForm.type === t.value }" :style="{ borderColor: editForm.type === t.value ? t.color : 'transparent', boxShadow: editForm.type === t.value ? `0 0 12px ${t.color}40` : 'none' }" @click="editForm.type = t.value; editForm.color = t.color">{{ t.emoji }} {{ t.label }}</button>
             </div>
 
             <label>Название</label>
-            <input class="input" v-model="slotForm.title" placeholder="Например: Speaking Practice">
+            <input class="glass-input" v-model="editForm.title" placeholder="Введите название" />
 
-            <div class="form-row">
-              <div style="flex:1"><label>Дата</label><input class="input" type="date" v-model="slotForm.date"></div>
-              <div style="flex:1"><label>Время</label><input class="input" type="time" v-model="slotForm.time"></div>
+            <div class="form-row-2">
+              <div><label>Дата</label><input class="glass-input" type="date" v-model="editForm.date" /></div>
+              <div><label>Время</label><input class="glass-input" type="time" v-model="editForm.time" /></div>
             </div>
 
             <label>Длительность (мин)</label>
-            <input class="input" type="number" v-model="slotForm.duration" placeholder="30">
-
-            <label>Цвет</label>
-            <div class="color-picker">
-              <button v-for="c in slotColors" :key="c" class="color-dot" :style="{ background: c, boxShadow: slotForm.color === c ? `0 0 10px ${c}` : 'none' }" :class="{ active: slotForm.color === c }" @click="slotForm.color = c"></button>
-            </div>
-
-            <label>Повторять</label>
-            <select class="input" v-model="slotForm.repeat">
-              <option value="none">Не повторять</option>
-              <option value="weekly">Каждую неделю</option>
-              <option value="biweekly">Каждые 2 недели</option>
-              <option value="monthly">Каждый месяц</option>
-            </select>
-
-            <div v-if="slotForm.repeat !== 'none'" class="form-row">
-              <div style="flex:1"><label>Повторений</label><input class="input" type="number" v-model="slotForm.repeat_count" placeholder="4" min="1" max="52"></div>
-            </div>
+            <input class="glass-input" type="number" v-model="editForm.duration" placeholder="30" />
 
             <label>Заметки</label>
-            <textarea class="input note-area" v-model="slotForm.notes" rows="2" placeholder="Домашнее задание, материалы..."></textarea>
+            <textarea class="glass-input" v-model="editForm.notes" rows="2" placeholder="Заметки..."></textarea>
 
             <div class="modal-actions">
-              <button class="btn btn-p btn-sm" @click="saveSlot">💾 Сохранить</button>
-              <button v-if="editingSlot" class="btn btn-o btn-sm" style="color:#ef4444;border-color:rgba(239,68,68,0.3)" @click="deleteSlot(editingSlot.id)">🗑 Удалить</button>
-              <button class="btn btn-o btn-sm" @click="closeModal">Отмена</button>
+              <button class="modal-btn primary" @click="saveEvent">💾 Сохранить</button>
+              <button class="modal-btn secondary" @click="closeEditModal">Отмена</button>
             </div>
-            <a v-if="editingSlot?.meeting_link" :href="editingSlot.meeting_link" target="_blank" class="btn btn-p btn-sm w-100 mt-2">📹 Подключиться</a>
           </div>
         </div>
       </transition>
@@ -185,243 +203,452 @@ export default {
   inject: ['addToast'],
   data() {
     return {
-      viewMode: 'month', currentMonth: new Date().getMonth(), currentYear: new Date().getFullYear(), currentWeek: 0,
-      selectedDate: new Date().toISOString().split('T')[0],
-      hours: Array.from({ length: 14 }, (_, i) => i + 8), slots: [], allStudents: [],
-      showAddSlot: false, editingSlot: null,
-      slotForm: { student_id:'', lesson_type:'online', title:'', date:'', time:'', duration:30, notes:'', group_students:[], color:'#6366f1', repeat:'none', repeat_count:4 },
-      slotTypes: [
+      viewMode: 'month',
+      currentMonth: new Date().getMonth(),
+      currentYear: new Date().getFullYear(),
+      currentWeek: 0,
+      hours: Array.from({ length: 15 }, (_, i) => i + 8),
+      slots: [],
+      sessions: [],
+      allStudents: [],
+      
+      showModal: false,
+      modalEvent: null,
+      showEditModal: false,
+      editingEvent: null,
+      editForm: { type:'online', color:'#10b981', title:'', date:'', time:'10:00', duration:30, notes:'' },
+      
+      quickCreate: { date: null, title: '', type: 'online' },
+      
+      eventTypes: [
         { value:'online', emoji:'🟢', label:'Онлайн', color:'#10b981' },
         { value:'offline', emoji:'🔵', label:'Очно', color:'#6366f1' },
-        { value:'group-online', emoji:'🟠', label:'Группа онлайн', color:'#f59e0b' },
-        { value:'group-offline', emoji:'🔴', label:'Группа очно', color:'#ef4444' }
+        { value:'group', emoji:'🟠', label:'Группа', color:'#f59e0b' },
+        { value:'workshop', emoji:'🟣', label:'Воркшоп', color:'#8b5cf6' }
       ],
       legendItems: [
-        { type:'online', label:'Онлайн', color:'#10b981' },
-        { type:'offline', label:'Очно', color:'#6366f1' },
-        { type:'group-online', label:'Группа', color:'#f59e0b' },
-        { type:'group-offline', label:'Очно-группа', color:'#ef4444' }
+        { type:'online', color:'#10b981' },
+        { type:'offline', color:'#6366f1' },
+        { type:'group', color:'#f59e0b' },
+        { type:'workshop', color:'#8b5cf6' }
       ],
-      slotColors: ['#6366f1','#10b981','#f59e0b','#ef4444','#ec4899','#8b5cf6','#06b6d4','#84cc16','#f97316','#14b8a6'],
-      quickCreate: { date: null, student_id: '', lesson_type: 'online', title: '' },
-      dragging: null, resizing: null, dragStartX: 0, dragStartY: 0, dragSlotOriginal: null
+      
+      dragging: null, resizing: null, dragStartY: 0, dragOriginal: null
     };
   },
   computed: {
     isTutor() { return this.user?.role === 'admin' || this.user?.role === 'host'; },
-    isGroupType() { return this.slotForm.lesson_type?.includes('group'); },
-    weekDays() { return ['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС']; },
-    monthLabel() { return new Date(this.currentYear, this.currentMonth).toLocaleDateString('ru', { month:'long', year:'numeric' }); },
+    weekDays() { return ['Пн','Вт','Ср','Чт','Пт','Сб','Вс']; },
+    monthLabel() { const d = new Date(this.currentYear, this.currentMonth); return d.toLocaleDateString('ru', { month:'long', year:'numeric' }); },
+    
     monthDays() {
-      const days = []; const fd = new Date(this.currentYear, this.currentMonth, 1); const ld = new Date(this.currentYear, this.currentMonth+1, 0); const sd = fd.getDay() || 7;
-      for (let i=1; i<sd; i++) { const d=new Date(this.currentYear, this.currentMonth, 1-(sd-i)); days.push({ day:d.getDate(), date:d.toISOString().split('T')[0], isOtherMonth:true, isToday:false }); }
-      for (let i=1; i<=ld.getDate(); i++) { const d=new Date(this.currentYear, this.currentMonth, i); days.push({ day:i, date:d.toISOString().split('T')[0], isOtherMonth:false, isToday:d.toDateString()===new Date().toDateString() }); }
+      const days = [];
+      const firstDay = new Date(this.currentYear, this.currentMonth, 1);
+      const lastDay = new Date(this.currentYear, this.currentMonth + 1, 0);
+      const startDow = firstDay.getDay() || 7;
+      
+      for (let i = 1; i < startDow; i++) {
+        const d = new Date(this.currentYear, this.currentMonth, 1 - (startDow - i));
+        days.push({ day: d.getDate(), date: d.toISOString().split('T')[0], isOtherMonth: true, isToday: false });
+      }
+      for (let i = 1; i <= lastDay.getDate(); i++) {
+        const d = new Date(this.currentYear, this.currentMonth, i);
+        days.push({ day: i, date: d.toISOString().split('T')[0], isOtherMonth: false, isToday: d.toDateString() === new Date().toDateString() });
+      }
       return days;
     },
+    
     weekDaysList() {
-      const today=new Date(); const monday=new Date(today); monday.setDate(today.getDate()-(today.getDay()||7)+1+this.currentWeek*7);
-      return Array.from({length:7},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()+i);return{date:d.toISOString().split('T')[0],name:this.weekDays[i],dateStr:d.toLocaleDateString('ru',{day:'numeric',month:'short'}),isToday:d.toDateString()===today.toDateString()};});
+      const today = new Date();
+      const monday = new Date(today);
+      monday.setDate(today.getDate() - (today.getDay() || 7) + 1 + this.currentWeek * 7);
+      return Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(monday); d.setDate(monday.getDate() + i);
+        return { date: d.toISOString().split('T')[0], name: this.weekDays[i], dateStr: d.getDate().toString(), dayIndex: i, isToday: d.toDateString() === today.toDateString() };
+      });
     },
-    weekLabel() { return this.weekDaysList.length?`${this.weekDaysList[0].dateStr} — ${this.weekDaysList[6].dateStr}`:''; },
-    weekSlots() { const ws=this.weekDaysList[0]?.date,we=this.weekDaysList[6]?.date; if(!ws||!we)return[]; return this.slots.filter(s=>{const sd=new Date(s.start_time).toISOString().split('T')[0];return sd>=ws&&sd<=we;}).sort((a,b)=>new Date(a.start_time)-new Date(b.start_time)); },
-    parallelWeekSlots() {
-      const grouped={};
-      this.weekSlots.forEach(s=>{const key=`${s.start_time}_${new Date(s.start_time).toISOString().split('T')[0]}`;if(!grouped[key])grouped[key]=[];grouped[key].push(s);});
-      const result=[];
-      Object.values(grouped).forEach(g=>{if(g.length>1)g.forEach((s,i)=>{s._parallelIndex=i;s._parallelTotal=g.length;result.push(s);});else result.push(g[0]);});
+
+    allEvents() {
+      const events = [];
+      
+      // Слоты (занятия)
+      this.slots.forEach(s => {
+        events.push({
+          _key: 'slot_' + s.id,
+          _type: s.lesson_type || 'online',
+          _time: this.formatTime(s.start_time),
+          _student: s.users?.username || '',
+          _source: 'slot',
+          ...s,
+          color: s.color || this.getDefaultColor(s.lesson_type)
+        });
+      });
+      
+      // Сессии (групповые встречи)
+      this.sessions.forEach(s => {
+        events.push({
+          _key: 'ses_' + s.id,
+          _type: 'workshop',
+          _time: this.formatTime(s.date),
+          _student: s.users?.username || 'Группа',
+          _source: 'session',
+          start_time: s.date,
+          end_time: new Date(new Date(s.date).getTime() + (s.duration || 60) * 60000).toISOString(),
+          ...s,
+          color: '#8b5cf6'
+        });
+      });
+      
+      return events.sort((a, b) => new Date(a.start_time || a.date) - new Date(b.start_time || b.date));
+    },
+
+    weekEvents() {
+      const ws = this.weekDaysList[0]?.date, we = this.weekDaysList[6]?.date;
+      if (!ws || !we) return [];
+      return this.allEvents.filter(e => {
+        const d = new Date(e.start_time || e.date).toISOString().split('T')[0];
+        return d >= ws && d <= we;
+      });
+    },
+
+    positionedWeekEvents() {
+      const grouped = {};
+      this.weekEvents.forEach(e => {
+        const key = `${e.start_time || e.date}_${new Date(e.start_time || e.date).toISOString().split('T')[0]}`;
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(e);
+      });
+      
+      const result = [];
+      Object.values(grouped).forEach(g => {
+        g.forEach((e, i) => {
+          const sd = new Date(e.start_time || e.date);
+          const ed = new Date(e.end_time || new Date(sd).getTime() + 3600000);
+          const dayIdx = this.weekDaysList.findIndex(d => d.date === sd.toISOString().split('T')[0]);
+          if (dayIdx === -1) return;
+          
+          const startHour = 8, totalMin = 15 * 60;
+          const top = ((sd.getHours() - startHour) * 60 + sd.getMinutes()) / totalMin * 100;
+          const h = Math.max(((ed - sd) / 60000), 30) / totalMin * 100;
+          const total = g.length;
+          
+          e._style = {
+            top: top + '%',
+            height: h + '%',
+            left: `calc(60px + ${dayIdx} * (100% - 60px) / 7 + ${i} * (100% - 60px) / 7 / ${total} + 2px)`,
+            width: `calc((100% - 60px) / 7 / ${total} - 3px)`
+          };
+          result.push(e);
+        });
+      });
       return result;
-    },
-    pastSlots() { return this.slots.filter(s=>new Date(s.start_time)<new Date()); }
+    }
   },
-  async mounted() { await Promise.all([this.loadSlots(),this.loadStudents()]); document.addEventListener('mousemove',this.onDragMove); document.addEventListener('mouseup',this.onDragEnd); },
-  beforeUnmount() { document.removeEventListener('mousemove',this.onDragMove); document.removeEventListener('mouseup',this.onDragEnd); },
+
+  async mounted() {
+    await Promise.all([this.loadSlots(), this.loadSessions(), this.loadStudents()]);
+    document.addEventListener('mousemove', this.onDragMove);
+    document.addEventListener('mouseup', this.onDragEnd);
+  },
+  beforeUnmount() {
+    document.removeEventListener('mousemove', this.onDragMove);
+    document.removeEventListener('mouseup', this.onDragEnd);
+  },
+
   methods: {
-    async loadSlots() { try { const r=await axios.get('/api/slots'); this.slots=r.data||[]; } catch(e) {} },
-    async loadStudents() { try { const r=await axios.get('/api/users'); this.allStudents=(r.data||[]).filter(u=>u.role!=='admin'&&u.role!=='parent'); } catch(e) {} },
+    async loadSlots() { try { const r = await axios.get('/api/slots'); this.slots = r.data || []; } catch(e) {} },
+    async loadSessions() { try { const r = await axios.get('/api/ses'); this.sessions = r.data || []; } catch(e) {} },
+    async loadStudents() { try { const r = await axios.get('/api/users'); this.allStudents = (r.data || []).filter(u => u.role !== 'admin' && u.role !== 'parent'); } catch(e) {} },
 
-    getSlotsForDate(d) { return this.slots.filter(s=>new Date(s.start_time).toISOString().split('T')[0]===d); },
-    getDefaultColor(t) { const c={online:'#10b981',offline:'#6366f1','group-online':'#f59e0b','group-offline':'#ef4444'}; return c[t]||'#6366f1'; },
-    formatDate(ts) { return ts?new Date(ts).toLocaleDateString('ru',{day:'numeric',month:'short'}):''; },
-    formatTime(ts) { return ts?new Date(ts).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):''; },
-
-    getDotsForDate(d) { return this.getSlotsForDate(d).slice(0,5).map(s=>({color:s.color||this.getDefaultColor(s.lesson_type)})); },
-    getBarWidth(d,i) { return (100/Math.min(this.getSlotsForDate(d).length,3))+'%'; },
-    getLoadPercent(dayIdx) {
-      const weekSlots=this.monthDays.filter(d=>{const dw=new Date(d.date).getDay()||7;return dw===dayIdx+1&&!d.isOtherMonth;});
-      const max=Math.max(...weekSlots.map(d=>this.getSlotsForDate(d.date).length),1);
-      const total=weekSlots.reduce((sum,d)=>sum+this.getSlotsForDate(d.date).length,0);
-      return Math.round((total/(max*weekSlots.length||1))*100);
+    getEventsForDate(d) {
+      return this.allEvents.filter(e => {
+        const ed = new Date(e.start_time || e.date).toISOString().split('T')[0];
+        return ed === d;
+      });
     },
 
-    selectDay(day) {
+    getDefaultColor(t) {
+      const c = { online:'#10b981', offline:'#6366f1', group:'#f59e0b', 'group-online':'#f59e0b', 'group-offline':'#ef4444' };
+      return c[t] || '#6366f1';
+    },
+    getTypeLabel(t) {
+      const l = { online:'Онлайн', offline:'Очно', group:'Группа', 'group-online':'Группа онлайн', 'group-offline':'Группа очно', workshop:'Воркшоп' };
+      return l[t] || t;
+    },
+    formatDate(ts) { return ts ? new Date(ts).toLocaleDateString('ru', { day:'numeric', month:'long', weekday:'short' }) : ''; },
+    formatTime(ts) { return ts ? new Date(ts).toLocaleTimeString('ru', { hour:'2-digit', minute:'2-digit' }) : ''; },
+
+    handleDayClick(day) {
       if (day.isOtherMonth) return;
-      this.selectedDate=day.date;
-      if (this.getSlotsForDate(day.date).length>0) this.viewMode='week';
-      else if (this.isTutor) this.quickCreate={date:day.date,student_id:'',lesson_type:'online',title:''};
+      if (this.getEventsForDate(day.date).length > 0) {
+        this.viewMode = 'week';
+        this.currentWeek = 0;
+        const today = new Date();
+        const clicked = new Date(day.date);
+        const diff = Math.floor((clicked - new Date(today.getFullYear(), today.getMonth(), today.getDate() - (today.getDay() || 7) + 1)) / (7 * 86400000));
+        this.currentWeek = diff;
+      } else if (this.isTutor) {
+        this.quickCreate = { date: day.date, title: '', type: 'online' };
+        this.$nextTick(() => this.$refs.quickInput?.focus());
+      }
     },
 
-    async saveQuickSlot() {
-      if (!this.quickCreate.title||!this.quickCreate.date) return;
+    async saveQuickEvent() {
+      if (!this.quickCreate.title) return;
       try {
-        const start=new Date(this.quickCreate.date+'T10:00:00');
-        await axios.post('/api/slots',{student_id:this.quickCreate.student_id||null,lesson_type:this.quickCreate.lesson_type,title:this.quickCreate.title,start_time:start.toISOString(),end_time:new Date(start.getTime()+30*60000).toISOString(),color:this.getDefaultColor(this.quickCreate.lesson_type),group_students:[]});
-        this.quickCreate.date=null; this.addToast('Создано! ✅','success'); this.loadSlots();
-      } catch(e) { this.addToast('Ошибка','error'); }
+        const start = new Date(this.quickCreate.date + 'T10:00:00');
+        await axios.post('/api/slots', {
+          title: this.quickCreate.title,
+          lesson_type: this.quickCreate.type,
+          start_time: start.toISOString(),
+          end_time: new Date(start.getTime() + 30*60000).toISOString(),
+          student_id: null,
+          color: this.getDefaultColor(this.quickCreate.type),
+          group_students: []
+        });
+        this.quickCreate.date = null;
+        this.addToast('✅ Создано!', 'success');
+        this.loadSlots();
+      } catch(e) { this.addToast('Ошибка', 'error'); }
     },
 
-    getSlotStyle(slot) {
-      const sd=new Date(slot.start_time),ed=new Date(slot.end_time); if(ed<=sd) return {display:'none'};
-      const di=this.weekDaysList.findIndex(d=>d.date===sd.toISOString().split('T')[0]); if(di===-1) return {display:'none'};
-      const sh=8,tm=14*60,ss=(sd.getHours()-sh)*60+sd.getMinutes(),se=(ed.getHours()-sh)*60+ed.getMinutes(),dur=Math.max(se-ss,30);
-      const pt=slot._parallelTotal||1,pi=slot._parallelIndex||0;
-      return {top:(ss/tm*100)+'%',height:(dur/tm*100)+'%',left:`calc(60px + ${di} * (100% - 60px) / 7 + ${pi} * (100% - 60px) / 7 / ${pt} + 1px)`,width:`calc((100% - 60px) / 7 / ${pt} - 2px)`,minHeight:'20px'};
+    openEvent(ev) { this.modalEvent = ev; this.showModal = true; },
+    closeModal() { this.showModal = false; this.modalEvent = null; },
+
+    editEvent(ev) {
+      this.closeModal();
+      const sd = new Date(ev.start_time || ev.date);
+      this.editingEvent = ev;
+      this.editForm = {
+        type: ev._type || ev.lesson_type || 'online',
+        color: ev.color || '#6366f1',
+        title: ev.title || '',
+        date: sd.toISOString().split('T')[0],
+        time: sd.toLocaleTimeString('ru', { hour:'2-digit', minute:'2-digit' }),
+        duration: Math.round(((new Date(ev.end_time || sd.getTime() + 3600000)) - sd) / 60000) || 30,
+        notes: ev.notes || ''
+      };
+      this.showEditModal = true;
     },
 
-    startDrag(e,slot) { if(!this.isTutor)return; e.preventDefault(); this.dragging=slot; this.dragStartX=e.clientX; this.dragStartY=e.clientY; this.dragSlotOriginal={...slot}; },
-    startResize(e,slot) { if(!this.isTutor)return; e.preventDefault(); this.resizing=slot; this.dragStartY=e.clientY; this.dragSlotOriginal={...slot}; },
+    openSlotAt(date, hour, min) {
+      if (!this.isTutor) return;
+      this.editingEvent = { _isNew: true };
+      this.editForm = {
+        type: 'online', color: '#10b981', title: '',
+        date, time: `${String(hour).padStart(2,'0')}:${String(min).padStart(2,'0')}`,
+        duration: 30, notes: ''
+      };
+      this.showEditModal = true;
+    },
+    openQuickCreate() {
+      this.editingEvent = { _isNew: true };
+      this.editForm = { type:'online', color:'#10b981', title:'', date: new Date().toISOString().split('T')[0], time:'10:00', duration:30, notes:'' };
+      this.showEditModal = true;
+    },
+
+    async saveEvent() {
+      try {
+        const [h, m] = this.editForm.time.split(':');
+        const start = new Date(this.editForm.date);
+        start.setHours(+h, +m, 0, 0);
+        const dur = Math.max(+this.editForm.duration || 30, 30);
+        const end = new Date(start.getTime() + dur * 60000);
+        
+        const data = {
+          title: this.editForm.title,
+          lesson_type: this.editForm.type,
+          start_time: start.toISOString(),
+          end_time: end.toISOString(),
+          color: this.editForm.color,
+          notes: this.editForm.notes,
+          group_students: []
+        };
+        
+        if (this.editingEvent?._source === 'slot' && this.editingEvent.id) {
+          await axios.put(`/api/slots/${this.editingEvent.id}`, data);
+        } else {
+          await axios.post('/api/slots', data);
+        }
+        
+        this.closeEditModal();
+        this.addToast('✅ Сохранено!', 'success');
+        this.loadSlots();
+      } catch(e) { this.addToast('Ошибка', 'error'); }
+    },
+
+    async deleteEvent(ev) {
+      if (!confirm('Удалить?')) return;
+      try {
+        if (ev._source === 'slot') await axios.delete(`/api/slots/${ev.id}`);
+        else await axios.delete(`/api/ses/${ev.id}`);
+        this.closeModal();
+        this.addToast('🗑 Удалено', 'info');
+        this.loadSlots();
+        this.loadSessions();
+      } catch(e) { this.addToast('Ошибка', 'error'); }
+    },
+
+    closeEditModal() { this.showEditModal = false; this.editingEvent = null; },
+    goToDay(date) { this.viewMode = 'week'; },
+
+    startDrag(e, ev) { if (!this.isTutor) return; e.preventDefault(); this.dragging = ev; this.dragStartY = e.clientY; this.dragOriginal = { start: ev.start_time, end: ev.end_time }; },
+    startResize(e, ev) { if (!this.isTutor) return; e.preventDefault(); this.resizing = ev; this.dragStartY = e.clientY; this.dragOriginal = { start: ev.start_time, end: ev.end_time }; },
     onDragMove(e) {
-      if(!this.dragging&&!this.resizing)return; const grid=this.$refs.weekGrid; if(!grid)return; const rect=grid.getBoundingClientRect(); const tm=14*60,gh=rect.height-44,mp=gh/tm,dw=(rect.width-60)/7;
-      if(this.dragging){const dy=e.clientY-this.dragStartY,dx=e.clientX-this.dragStartX,dm=Math.round(dy/mp/30)*30,dd=Math.round(dx/dw);const os=new Date(this.dragSlotOriginal.start_time),dur=Math.max((new Date(this.dragSlotOriginal.end_time)-os)/60000,30);let ns=new Date(os.getTime()+dm*60000);ns.setDate(ns.getDate()+dd);const nm=(ns.getHours()-8)*60+ns.getMinutes();if(nm<0)ns.setHours(8,0,0,0);if(nm+dur>tm){ns.setHours(8,0,0,0);ns.setMinutes(tm-dur);}this.dragging.start_time=ns.toISOString();this.dragging.end_time=new Date(ns.getTime()+dur*60000).toISOString();}
-      if(this.resizing){const dy=e.clientY-this.dragStartY,dm=Math.round(dy/mp/30)*30;const oe=new Date(this.dragSlotOriginal.end_time);let ne=new Date(oe.getTime()+dm*60000);const me=new Date(this.dragSlotOriginal.start_time).getTime()+30*60000;if(ne.getTime()<me)ne.setTime(me);this.resizing.end_time=ne.toISOString();}
+      if (!this.dragging && !this.resizing) return;
+      const grid = this.$refs.weekGrid; if (!grid) return;
+      const rect = grid.getBoundingClientRect();
+      const totalMin = 15 * 60;
+      const gridH = rect.height - 40;
+      const minPerPixel = totalMin / gridH;
+      const dy = e.clientY - this.dragStartY;
+      const deltaMin = Math.round(dy * minPerPixel / 15) * 15;
+      
+      if (this.dragging) {
+        const origStart = new Date(this.dragOriginal.start);
+        const dur = Math.max((new Date(this.dragOriginal.end) - origStart) / 60000, 30);
+        let ns = new Date(origStart.getTime() + deltaMin * 60000);
+        this.dragging.start_time = ns.toISOString();
+        this.dragging.end_time = new Date(ns.getTime() + dur * 60000).toISOString();
+        this.dragging._time = this.formatTime(ns);
+      }
+      if (this.resizing) {
+        const origEnd = new Date(this.dragOriginal.end);
+        let ne = new Date(origEnd.getTime() + deltaMin * 60000);
+        if (ne - new Date(this.dragOriginal.start) < 30 * 60000) ne = new Date(new Date(this.dragOriginal.start).getTime() + 30 * 60000);
+        this.resizing.end_time = ne.toISOString();
+      }
     },
     async onDragEnd() {
-      const slot=this.dragging||this.resizing; if(!slot)return;
-      try{if(this.dragging)await axios.put(`/api/slots/${slot.id}/move`,{start_time:slot.start_time,end_time:slot.end_time});else await axios.put(`/api/slots/${slot.id}`,{start_time:slot.start_time,end_time:slot.end_time,lesson_type:slot.lesson_type,title:slot.title,student_id:slot.student_id,notes:slot.notes,group_students:slot.group_students,color:slot.color});this.addToast('Сохранено!','success');}catch(e){this.addToast('Ошибка','error');}
-      this.dragging=null; this.resizing=null; this.dragSlotOriginal=null; this.loadSlots();
+      const ev = this.dragging || this.resizing;
+      if (!ev || ev._source !== 'slot') { this.dragging = null; this.resizing = null; return; }
+      try {
+        await axios.put(`/api/slots/${ev.id}/move`, { start_time: ev.start_time, end_time: ev.end_time });
+        this.addToast('✅ Перемещено', 'success');
+      } catch(e) { this.addToast('Ошибка', 'error'); }
+      this.dragging = null; this.resizing = null;
+      this.loadSlots();
     },
 
-    prevMonth() { this.currentMonth===0?(this.currentMonth=11,this.currentYear--):this.currentMonth--; },
-    nextMonth() { this.currentMonth===11?(this.currentMonth=0,this.currentYear++):this.currentMonth++; },
+    prevMonth() { this.currentMonth === 0 ? (this.currentMonth = 11, this.currentYear--) : this.currentMonth--; },
+    nextMonth() { this.currentMonth === 11 ? (this.currentMonth = 0, this.currentYear++) : this.currentMonth++; },
     prevWeek() { this.currentWeek--; },
     nextWeek() { this.currentWeek++; },
-    goToday() { this.currentWeek=0; this.currentMonth=new Date().getMonth(); this.currentYear=new Date().getFullYear(); },
-    openSlot(date,hour,min=0){if(!this.isTutor)return;this.slotForm={student_id:'',lesson_type:'online',title:'',date,time:`${String(hour).padStart(2,'0')}:${String(min).padStart(2,'0')}`,duration:30,notes:'',group_students:[],color:'#6366f1',repeat:'none',repeat_count:4};this.editingSlot=null;this.showAddSlot=true;},
-    openAddSlot(){this.editingSlot=null;this.slotForm={student_id:'',lesson_type:'online',title:'',date:'',time:'',duration:30,notes:'',group_students:[],color:'#6366f1',repeat:'none',repeat_count:4};this.showAddSlot=true;},
-    editSlot(slot){if(this.dragging||this.resizing)return;this.editingSlot=slot;if(!slot.meeting_link&&(slot.lesson_type==='online'||slot.lesson_type==='group-online'))slot.meeting_link='https://meet.jit.si/english-club-'+slot.id;const sd=new Date(slot.start_time);this.slotForm={student_id:slot.student_id||'',lesson_type:slot.lesson_type||'online',title:slot.title||'',date:sd.toISOString().split('T')[0],time:sd.toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}),duration:Math.round((new Date(slot.end_time)-sd)/60000)||30,notes:slot.notes||'',group_students:slot.group_students||[],color:slot.color||'#6366f1',repeat:slot.repeat||'none',repeat_count:slot.repeat_count||4};this.showAddSlot=true;},
-    closeModal(){this.showAddSlot=false;this.editingSlot=null;this.slotForm.group_students=[];},
-    toggleGroupStudent(id){const i=this.slotForm.group_students.indexOf(id);i===-1?this.slotForm.group_students.push(id):this.slotForm.group_students.splice(i,1);},
-    async saveSlot(){try{const[h,m]=this.slotForm.time.split(':');const start=new Date(this.slotForm.date);start.setHours(+h,+m,0,0);const dur=Math.max(+this.slotForm.duration||30,30);const end=new Date(start.getTime()+dur*60000);const data={...this.slotForm,start_time:start.toISOString(),end_time:end.toISOString()};if(!this.isGroupType){data.group_students=[];if(!data.student_id)return this.addToast('Выберите ученика','error');}if(this.isGroupType)data.student_id=null;if(this.editingSlot)await axios.put(`/api/slots/${this.editingSlot.id}`,data);else await axios.post('/api/slots',data);this.closeModal();this.addToast('Сохранено!','success');this.loadSlots();}catch(e){this.addToast(e.response?.data?.error||'Ошибка','error');}},
-    async deleteSlot(id){if(!confirm('Удалить занятие?'))return;try{await axios.delete(`/api/slots/${id}`);this.closeModal();this.loadSlots();this.addToast('Удалено!','info');}catch(e){this.addToast('Ошибка','error');}},
-    exportICS(){window.open('/api/slots/export','_blank');}
+    goToday() { this.currentMonth = new Date().getMonth(); this.currentYear = new Date().getFullYear(); this.currentWeek = 0; },
+    exportICS() { window.open('/api/slots/export', '_blank'); }
   }
 };
 </script>
 
 <style scoped>
-.calendar-container { max-width: 1280px; margin: 0 auto; padding: 24px; color: #e2e8f0; }
+.calendar-app { max-width: 1200px; margin: 0 auto; padding: 20px; color: #e2e8f0; font-family: 'Inter', sans-serif; }
 
 /* ХЕДЕР */
-.calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 12px; }
-.calendar-nav { display: flex; align-items: center; gap: 10px; }
-.calendar-title { font-family: 'Space Grotesk', sans-serif; font-weight: 800; font-size: 1.5rem; background: linear-gradient(135deg, #6366f1, #2dd4bf); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; }
-.calendar-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+.cal-nav { display: flex; align-items: center; gap: 12px; }
+.cal-title { font-family: 'Space Grotesk', sans-serif; font-size: 2rem; font-weight: 800; background: linear-gradient(135deg, #6366f1, #2dd4bf, #f59e0b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; animation: titleShine 3s ease-in-out infinite; }
+@keyframes titleShine { 0%,100%{ filter: brightness(1); } 50%{ filter: brightness(1.3); } }
+.nav-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; backdrop-filter: blur(10px); }
+.nav-btn:hover { background: rgba(99,102,241,0.2); border-color: rgba(99,102,241,0.4); transform: scale(1.1); }
+.today-btn { display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 20px; border: 1px solid rgba(99,102,241,0.3); background: rgba(99,102,241,0.1); color: #fff; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: all 0.2s; }
+.today-btn:hover { background: rgba(99,102,241,0.2); box-shadow: 0 0 15px rgba(99,102,241,0.3); }
+.today-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; animation: dotPulse 2s infinite; }
+@keyframes dotPulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
 
-/* Легенда */
-.legend { display: flex; gap: 14px; margin-right: 8px; }
-.legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.7rem; color: #94a3b8; }
-.legend-dot { width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 6px currentColor; }
+.cal-toolbar { display: flex; align-items: center; gap: 10px; }
+.legend-compact { display: flex; gap: 6px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 8px currentColor; }
+.view-switcher { display: flex; background: rgba(255,255,255,0.04); border-radius: 12px; padding: 3px; }
+.view-btn { padding: 7px 16px; border: none; background: transparent; color: #94a3b8; cursor: pointer; border-radius: 10px; font-weight: 600; font-size: 0.82rem; transition: all 0.2s; }
+.view-btn.active { background: linear-gradient(135deg, rgba(99,102,241,0.3), rgba(45,212,191,0.15)); color: #fff; box-shadow: 0 0 15px rgba(99,102,241,0.25); }
+.action-btn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); color: #fff; cursor: pointer; font-size: 1rem; }
+.add-btn { width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #2dd4bf); border: none; color: #fff; cursor: pointer; font-size: 1.3rem; font-weight: 700; transition: all 0.2s; box-shadow: 0 4px 15px rgba(99,102,241,0.4); }
+.add-btn:hover { transform: scale(1.1); box-shadow: 0 6px 25px rgba(99,102,241,0.6); }
 
-/* Кнопки вида */
-.view-btns { display: flex; gap: 4px; background: rgba(255,255,255,0.04); border-radius: 10px; padding: 3px; }
-.view-btn { padding: 7px 12px; border: none; background: transparent; color: #94a3b8; cursor: pointer; border-radius: 8px; font-size: 0.9rem; transition: all 0.2s; }
-.view-btn.active { background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(45,212,191,0.1)); color: #fff; box-shadow: 0 0 12px rgba(99,102,241,0.2); }
+/* МЕСЯЦ */
+.month-grid { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; overflow: hidden; background: rgba(255,255,255,0.02); backdrop-filter: blur(20px); }
+.month-day-header { text-align: center; padding: 12px 4px; font-weight: 700; font-size: 0.8rem; color: #94a3b8; background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.05); }
+.month-day-cell { min-height: 100px; padding: 6px; border-right: 1px solid rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.03); cursor: pointer; transition: all 0.25s; position: relative; }
+.month-day-cell:nth-child(7n+1) { border-right: none; }
+.month-day-cell:hover { background: rgba(99,102,241,0.06); transform: translateY(-2px); z-index: 1; box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+.month-day-cell.today { background: rgba(99,102,241,0.08); box-shadow: inset 0 0 40px rgba(99,102,241,0.06); }
+.month-day-cell.other { opacity: 0.3; }
+.month-day-cell.weekend { background: rgba(255,255,255,0.01); }
 
-/* Кнопка Сегодня */
-.btn-today { background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(45,212,191,0.08)); border: 1px solid rgba(99,102,241,0.3); color: #fff; animation: todayPulse 2s ease-in-out infinite; }
-@keyframes todayPulse { 0%,100%{box-shadow:0 0 0 0 rgba(99,102,241,0.3)} 50%{box-shadow:0 0 15px 3px rgba(99,102,241,0.15)} }
-
-/* Мини-график */
-.week-load { display: flex; gap: 4px; margin-bottom: 14px; align-items: flex-end; height: 40px; padding: 0 4px; }
-.load-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; }
-.load-bar-wrap { flex: 1; width: 100%; display: flex; align-items: flex-end; }
-.load-bar { width: 100%; background: linear-gradient(180deg, #6366f1, #2dd4bf); border-radius: 3px 3px 0 0; min-height: 2px; transition: height 0.5s ease; }
-.load-day { font-size: 0.6rem; color: #64748b; }
-
-/* Месяц */
-.month-grid { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; overflow: hidden; background: rgba(255,255,255,0.02); }
-.day-header { background: rgba(255,255,255,0.03); font-weight: 700; text-align: center; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.8rem; color: #94a3b8; }
-.day-cell { min-height: 95px; padding: 7px; border-right: 1px solid rgba(255,255,255,0.04); border-bottom: 1px solid rgba(255,255,255,0.04); cursor: pointer; transition: all 0.25s; position: relative; }
-.day-cell:nth-child(7n) { border-right: none; }
-.day-cell:hover { background: rgba(99,102,241,0.05); transform: translateY(-1px); }
-.day-cell.today { background: rgba(99,102,241,0.06); box-shadow: inset 0 0 30px rgba(99,102,241,0.05); }
-.day-cell.otherMonth { opacity: 0.3; }
-.day-number { font-weight: 600; font-size: 0.85rem; color: #cbd5e1; }
+.day-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.day-num { font-weight: 600; font-size: 0.85rem; color: #cbd5e1; }
 .today-num { background: linear-gradient(135deg, #6366f1, #2dd4bf); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800; font-size: 1rem; }
+.day-dots-row { display: flex; gap: 2px; }
+.day-dot { width: 4px; height: 4px; border-radius: 50%; }
 
-.day-dots { display: flex; gap: 3px; margin-top: 3px; }
-.day-dot { width: 5px; height: 5px; border-radius: 50%; animation: dotPulse 2s ease-in-out infinite; }
-@keyframes dotPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }
-.day-dot-more { font-size: 0.55rem; color: #94a3b8; margin-left: 2px; }
-
-.day-bars { display: flex; gap: 2px; margin-top: 5px; }
-.day-bar { height: 5px; border-radius: 3px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; padding-left: 2px; }
-.day-bar:hover { filter: brightness(1.3); transform: scaleY(1.6); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
-.bar-dot { width: 4px; height: 4px; border-radius: 50%; background: #fff; opacity: 0.8; }
-.day-bar-more { font-size: 0.6rem; color: #94a3b8; cursor: pointer; }
-.day-bar-more:hover { color: #fff; }
+.day-events { display: flex; gap: 2px; margin-top: 4px; align-items: center; }
+.day-event-bar { height: 5px; border-radius: 3px; cursor: pointer; transition: all 0.2s; }
+.day-event-bar:hover { filter: brightness(1.4); transform: scaleY(1.8); }
+.day-more { font-size: 0.6rem; color: #94a3b8; cursor: pointer; margin-left: 2px; }
+.day-more:hover { color: #fff; }
 
 /* Быстрое создание */
-.quick-create { position: absolute; bottom: 4px; left: 4px; right: 4px; background: rgba(15,15,30,0.97); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 7px; z-index: 10; display: flex; flex-direction: column; gap: 5px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-.quick-select { padding: 5px 7px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; background: rgba(255,255,255,0.05); color: #fff; font-size: 0.7rem; font-family: inherit; }
-.quick-input { padding: 5px 7px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; background: rgba(255,255,255,0.05); color: #fff; font-size: 0.7rem; font-family: inherit; }
-.quick-types { display: flex; gap: 5px; }
-.quick-type-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: all 0.2s; }
-.quick-type-dot:hover { transform: scale(1.2); }
-.quick-actions { display: flex; gap: 5px; }
+.quick-popup { position: absolute; bottom: 2px; left: 2px; right: 2px; background: rgba(10,10,30,0.97); backdrop-filter: blur(20px); border: 1px solid rgba(99,102,241,0.3); border-radius: 8px; padding: 6px; z-index: 10; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
+.quick-input { padding: 5px 7px; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; background: rgba(255,255,255,0.05); color: #fff; font-size: 0.7rem; font-family: inherit; }
+.quick-row { display: flex; gap: 4px; }
+.quick-select { flex:1; padding: 4px; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; background: rgba(255,255,255,0.05); color: #fff; font-size: 0.65rem; }
+.quick-save, .quick-cancel { padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.7rem; }
+.quick-save { background: #10b981; color: #fff; }
+.quick-cancel { background: rgba(239,68,68,0.3); color: #fff; }
 
-/* Неделя */
-.week-wrapper { overflow-x: auto; }
-.week-grid { display: grid; grid-template-columns: 60px repeat(7, 1fr); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; overflow: hidden; min-width: 750px; position: relative; user-select: none; }
-.week-header-cell { background: rgba(255,255,255,0.03); font-weight: 700; text-align: center; padding: 8px 4px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.75rem; color: #94a3b8; }
-.week-header-cell.today { background: rgba(99,102,241,0.06); color: #818cf8; }
-.week-time-cell { background: rgba(255,255,255,0.02); font-weight: 600; text-align: center; padding: 6px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.7rem; color: #64748b; }
-.week-time-half { font-size: 0.6rem; }
-.week-bg-cell { min-height: 42px; border-bottom: 1px solid rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.04); cursor: pointer; transition: background 0.2s; }
-.week-bg-half { border-bottom: 1px dashed rgba(255,255,255,0.03); }
-.week-bg-cell:hover { background: rgba(99,102,241,0.04); }
-.week-bg-cell.today { background: rgba(99,102,241,0.03); }
+/* НЕДЕЛЯ */
+.week-scroll { overflow-x: auto; }
+.week-grid { display: grid; grid-template-columns: 60px repeat(7, 1fr); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; overflow: hidden; min-width: 750px; position: relative; background: rgba(255,255,255,0.02); }
+.week-corner { background: rgba(255,255,255,0.03); padding: 8px; text-align: center; font-size: 0.7rem; color: #94a3b8; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.week-day-header { text-align: center; padding: 8px 4px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.75rem; }
+.week-day-header.today { background: rgba(99,102,241,0.08); }
+.wd-name { font-weight: 700; color: #94a3b8; display: block; }
+.wd-date { font-size: 0.7rem; color: #64748b; }
+.week-time { padding: 4px; text-align: center; font-size: 0.65rem; color: #64748b; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.week-time-half { font-size: 0.55rem; border-bottom: 1px dashed rgba(255,255,255,0.02); }
+.week-cell { min-height: 25px; border-bottom: 1px solid rgba(255,255,255,0.03); border-right: 1px solid rgba(255,255,255,0.03); cursor: pointer; transition: background 0.15s; }
+.week-cell:hover { background: rgba(99,102,241,0.05); }
+.week-cell.today { background: rgba(99,102,241,0.03); }
+.week-cell-half { border-bottom: 1px dashed rgba(255,255,255,0.02); }
 
-.slots-layer { position: absolute; top: 40px; left: 0; right: 0; bottom: 0; pointer-events: none; }
-.slot-block { position: absolute; padding: 5px 7px; border-radius: 7px; color: #fff; font-size: 0.7rem; cursor: grab; pointer-events: auto; overflow: hidden; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
-.slot-block:active { cursor: grabbing; }
-.slot-block:hover { box-shadow: 0 0 0 2px rgba(255,255,255,0.5), 0 8px 20px rgba(0,0,0,0.4); z-index: 10; transform: scale(1.02); }
-.slot-time-label { font-size: 0.6rem; opacity: 0.9; }
-.slot-block-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.slot-block-student { font-size: 0.6rem; opacity: 0.8; }
-.slot-join-btn { position: absolute; top: 3px; right: 3px; font-size: 0.7rem; text-decoration: none; opacity: 0.7; }
-.slot-join-btn:hover { opacity: 1; }
-.resize-handle { position: absolute; bottom: 0; left: 0; right: 0; height: 7px; cursor: ns-resize; }
-.resize-handle:hover { background: rgba(255,255,255,0.25); }
+.events-layer { position: absolute; top: 60px; left: 0; right: 0; bottom: 0; pointer-events: none; }
+.week-event { position: absolute; padding: 3px 5px; border-radius: 5px; color: #fff; font-size: 0.65rem; cursor: grab; pointer-events: auto; overflow: hidden; transition: box-shadow 0.2s; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+.week-event:hover { box-shadow: 0 0 0 2px rgba(255,255,255,0.6), 0 6px 16px rgba(0,0,0,0.5); z-index: 10; }
+.we-time { font-size: 0.55rem; opacity: 0.8; }
+.we-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.we-student { font-size: 0.55rem; opacity: 0.7; }
+.we-resize { position: absolute; bottom: 0; left: 0; right: 0; height: 5px; cursor: ns-resize; }
 
-/* Модалка */
-.modal-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; }
-.modal-card { background: rgba(15,15,30,0.97); backdrop-filter: blur(30px); border: 1px solid rgba(255,255,255,0.12); border-radius: 24px; padding: 28px; max-width: 520px; width: 90%; max-height: 85vh; overflow-y: auto; color: #e2e8f0; box-shadow: 0 25px 60px rgba(0,0,0,0.5); animation: modalPop 0.3s ease; }
-@keyframes modalPop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-.modal-card h3 { font-family: 'Space Grotesk', sans-serif; font-weight: 700; margin: 0 0 16px; color: #fff; }
-.modal-card label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 4px; margin-top: 10px; }
-.modal-actions { display: flex; gap: 8px; margin-top: 16px; }
-.form-row { display: flex; gap: 8px; }
-.type-btns { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
-.type-btn { padding: 8px 14px; border-radius: 12px; border: 2px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); cursor: pointer; font-weight: 600; font-size: 0.82rem; color: #cbd5e1; transition: all 0.2s; }
-.type-btn.active { background: rgba(255,255,255,0.05); color: #fff; }
-.color-picker { display: flex; gap: 6px; }
-.color-dot { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: all 0.2s; }
-.color-dot.active { border-color: #fff; transform: scale(1.2); }
-.student-checkbox { display: flex; align-items: center; gap: 8px; padding: 6px; cursor: pointer; border-radius: 6px; font-size: 0.85rem; }
-.student-checkbox:hover { background: rgba(99,102,241,0.05); }
-.input { width: 100%; padding: 10px 14px; border: 2px solid rgba(255,255,255,0.1); border-radius: 12px; font-family: inherit; font-size: 0.9rem; background: rgba(255,255,255,0.04); color: #fff; outline: none; margin-bottom: 6px; }
-.input:focus { border-color: #6366f1; }
-.note-area { resize: vertical; }
+/* МОДАЛКА */
+.modal-backdrop { position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: center; }
+.modal-glass { background: rgba(12,12,35,0.95); backdrop-filter: blur(30px); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 28px; max-width: 440px; width: 90%; position: relative; overflow: hidden; box-shadow: 0 30px 70px rgba(0,0,0,0.6); }
+.modal-glow { position: absolute; top: -40px; right: -40px; width: 120px; height: 120px; border-radius: 50%; opacity: 0.12; filter: blur(30px); }
+.modal-close { position: absolute; top: 14px; right: 14px; background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer; }
+.modal-close:hover { color: #fff; }
+.modal-type-badge { display: inline-block; padding: 4px 12px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; color: #fff; margin-bottom: 10px; }
+.modal-title { font-family: 'Space Grotesk', sans-serif; font-size: 1.4rem; font-weight: 700; color: #fff; margin: 0 0 16px; }
+.modal-info-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+.modal-info-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #cbd5e1; }
+.mi-icon { font-size: 1rem; }
+.modal-actions { display: flex; gap: 8px; }
+.modal-btn { padding: 10px 18px; border-radius: 12px; border: none; font-weight: 600; font-size: 0.85rem; cursor: pointer; color: #fff; transition: all 0.2s; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.modal-btn.primary { background: linear-gradient(135deg, #6366f1, #2dd4bf); }
+.modal-btn.primary:hover { box-shadow: 0 6px 20px rgba(99,102,241,0.4); }
+.modal-btn.secondary { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); }
+.modal-btn.danger { background: rgba(239,68,68,0.15); color: #ef4444; }
+.pulse { animation: btnPulse 2s infinite; }
+@keyframes btnPulse { 0%,100%{box-shadow:0 0 0 0 rgba(99,102,241,0.4)} 50%{box-shadow:0 0 20px 4px rgba(99,102,241,0.3)} }
 
-.btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 20px; border-radius: 50px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border: none; font-family: inherit; transition: all 0.2s; }
-.btn-p { background: linear-gradient(135deg, #6366f1, #2dd4bf); color: #fff; }
-.btn-p:hover { box-shadow: 0 6px 20px rgba(99,102,241,0.3); transform: translateY(-1px); }
-.btn-o { border: 2px solid rgba(255,255,255,0.1); color: #cbd5e1; background: transparent; }
-.btn-o:hover { background: rgba(255,255,255,0.05); }
-.btn-sm { padding: 6px 14px; font-size: 0.78rem; }
-.w-100 { width: 100%; justify-content: center; }
-.mt-2 { margin-top: 12px; }
+.type-row { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.type-chip { padding: 6px 12px; border-radius: 10px; border: 2px solid transparent; background: rgba(255,255,255,0.03); color: #cbd5e1; cursor: pointer; font-weight: 600; font-size: 0.78rem; transition: all 0.2s; }
+.type-chip.active { background: rgba(255,255,255,0.06); color: #fff; }
+.glass-input { width: 100%; padding: 10px 14px; border: 2px solid rgba(255,255,255,0.1); border-radius: 12px; background: rgba(255,255,255,0.04); color: #fff; font-size: 0.9rem; outline: none; margin-bottom: 8px; font-family: inherit; }
+.glass-input:focus { border-color: #6366f1; }
+.form-row-2 { display: flex; gap: 8px; }
+.form-row-2 > div { flex: 1; }
+label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 4px; margin-top: 8px; }
 
-.modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.3s ease; }
-.modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
+.modal-pop-enter-active, .modal-pop-leave-active { transition: all 0.3s ease; }
+.modal-pop-enter-from, .modal-pop-leave-to { opacity: 0; }
+.modal-pop-enter-from .modal-glass, .modal-pop-leave-to .modal-glass { transform: scale(0.85); }
 </style>
