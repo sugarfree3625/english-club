@@ -166,32 +166,76 @@ export default {
       return this.events.filter(e=>{const d=new Date(e.start_time).toISOString().split('T')[0];return d>=wd[0].date&&d<=wd[6].date;}).sort((a,b)=>new Date(a.start_time)-new Date(b.start_time));
     },
     positionedEvents() {
-      const evs=this.weekEvents; if(!evs.length)return[];
-      const res=[], sh=8, tm=15*60;
-      const byDay={}; evs.forEach(e=>{const d=new Date(e.start_time).toISOString().split('T')[0];if(!byDay[d])byDay[d]=[];byDay[d].push(e);});
-      Object.values(byDay).forEach(dayEvs=>{
-        dayEvs.sort((a,b)=>new Date(a.start_time)-new Date(b.start_time));
-        const cols=[];
-        dayEvs.forEach(ev=>{
-          const es=new Date(ev.start_time).getTime(), ee=new Date(ev.end_time).getTime();
-          let placed=false;
-          for(const col of cols){if(!col.some(ce=>{const cs=new Date(ce.start_time).getTime(),ce2=new Date(ce.end_time).getTime();return es<ce2&&ee>cs;})){col.push(ev);placed=true;break;}}
-          if(!placed)cols.push([ev]);
-        });
-        const total=cols.length;
-        cols.forEach((col,ci)=>{col.forEach(ev=>{
-          const sd=new Date(ev.start_time),ed=new Date(ev.end_time);
-          const di=this.weekDaysList.findIndex(d=>d.date===sd.toISOString().split('T')[0]);
-          if(di===-1)return;
-          const top=((sd.getHours()-sh)*60+sd.getMinutes())/tm*100;
-          const h=Math.max((ed-sd)/60000,30)/tm*100;
-          ev._style={top:top+'%',height:h+'%',left:(di*100/7+ci*100/7/total)+'%',width:(100/7/total)+'%',minHeight:'18px'};
-          res.push(ev);
-        });});
+  const evs = this.weekEvents;
+  if (!evs.length) return [];
+  
+  const res = [], sh = 8, tm = 15 * 60;
+  const byDay = {};
+  evs.forEach(e => {
+    const d = new Date(e.start_time).toISOString().split('T')[0];
+    if (!byDay[d]) byDay[d] = [];
+    byDay[d].push(e);
+  });
+  
+  Object.values(byDay).forEach(dayEvs => {
+    dayEvs.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+    const cols = [];
+    
+    dayEvs.forEach(ev => {
+      const es = new Date(ev.start_time).getTime();
+      const ee = new Date(ev.end_time).getTime();
+      let placed = false;
+      
+      for (const col of cols) {
+        if (!col.some(ce => {
+          const cs = new Date(ce.start_time).getTime();
+          const ce2 = new Date(ce.end_time).getTime();
+          return es < ce2 && ee > cs;
+        })) {
+          col.push(ev);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) cols.push([ev]);
+    });
+    
+    const total = cols.length;
+    
+    cols.forEach((col, ci) => {
+      col.forEach(ev => {
+        const sd = new Date(ev.start_time);
+        const ed = new Date(ev.end_time);
+        const di = this.weekDaysList.findIndex(d => d.date === sd.toISOString().split('T')[0]);
+        if (di === -1) return;
+        
+        // 🔥 ФИКС: ограничиваем top и height чтобы не выходить за сетку
+        const startMinutes = (sd.getHours() - sh) * 60 + sd.getMinutes();
+        const endMinutes = (ed.getHours() - sh) * 60 + ed.getMinutes();
+        
+        // Обрезаем по границам
+        const clampedStart = Math.max(0, startMinutes);
+        const clampedEnd = Math.min(tm, endMinutes);
+        const duration = Math.max(clampedEnd - clampedStart, 30);
+        
+        const top = (clampedStart / tm) * 100;
+        const h = (duration / tm) * 100;
+        
+        ev._style = {
+          top: top + '%',
+          height: h + '%',
+          left: (di * 100 / 7 + ci * 100 / 7 / total) + '%',
+          width: (100 / 7 / total) + '%',
+          minHeight: '18px',
+          overflow: 'hidden'
+        };
+        res.push(ev);
       });
-      return res;
-    }
-  },
+    });
+  });
+  
+  return res;
+},
   mounted() {
     this.loadEvents();
     this.loadStudents();
