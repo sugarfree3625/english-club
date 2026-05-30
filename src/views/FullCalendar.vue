@@ -1,6 +1,5 @@
 <template>
   <div class="calendar-app">
-    <!-- ХЕДЕР -->
     <div class="cal-header">
       <div class="cal-nav">
         <button class="nav-arrow" @click="prevMonth">‹</button>
@@ -21,7 +20,6 @@
       </div>
     </div>
 
-    <!-- МЕСЯЦ -->
     <div v-if="view==='month'" class="month-view">
       <div class="month-grid">
         <div class="mh" v-for="d in weekDays" :key="d">{{d}}</div>
@@ -35,7 +33,6 @@
       </div>
     </div>
 
-    <!-- НЕДЕЛЯ -->
     <div v-if="view==='week'" class="week-view">
       <div class="week-scroll">
         <div class="week-grid" ref="weekGrid">
@@ -59,7 +56,6 @@
       </div>
     </div>
 
-    <!-- МОДАЛКА -->
     <Teleport to="body">
       <transition name="modal">
         <div v-if="showModal" class="modal-back" @click.self="closeModal">
@@ -99,6 +95,7 @@ export default {
   data() {
     return {
       view: 'month', curMonth: new Date().getMonth(), curYear: new Date().getFullYear(), curWeek: 0,
+      HEADER_H: 30,
       hours: Array.from({length:15},(_,i)=>i+8), slots: [], allStudents: [],
       showModal: false, editingSlot: null,
       form: { student_id:'', type:'online', title:'', date:'', time:'10:00', duration:30, notes:'', color:'#10b981', repeat:'none', repeat_count:4 },
@@ -130,15 +127,11 @@ export default {
       const ws=this.weekDaysList[0]?.date, we=this.weekDaysList[6]?.date; if(!ws||!we)return[];
       return this.slots.filter(s=>{const d=new Date(s.start_time).toISOString().split('T')[0];return d>=ws&&d<=we;}).sort((a,b)=>new Date(a.start_time)-new Date(b.start_time));
     },
-    // 🔥 ИСПРАВЛЕННОЕ ПОЗИЦИОНИРОВАНИЕ
     positionedEvents() {
       const evs = this.weekSlots.map(s=>({...s,_key:'s'+s.id,_time:this.fmtTime(s.start_time),_student:s.users?.username||'',color:s.color||this.defColor(s.lesson_type)}));
       if(!evs.length)return[];
       const res=[], sh=8, tm=15*60;
-      const HEADER_H = 30; // высота заголовка дней в пикселях
-      
       const byDay={}; evs.forEach(e=>{const d=new Date(e.start_time).toISOString().split('T')[0];if(!byDay[d])byDay[d]=[];byDay[d].push(e);});
-      
       Object.values(byDay).forEach(dayEvs=>{
         dayEvs.sort((a,b)=>new Date(a.start_time)-new Date(b.start_time));
         const cols=[];
@@ -153,32 +146,18 @@ export default {
           if(!placed) cols.push([ev]);
         });
         const total=cols.length;
-        cols.forEach((col,ci)=>{
-          col.forEach(ev=>{
-            const sd=new Date(ev.start_time), ed=new Date(ev.end_time);
-            const di=this.weekDaysList.findIndex(d=>d.date===sd.toISOString().split('T')[0]);
-            if(di===-1)return;
-            
-            // Позиция с учётом заголовка
-            const gridEl = this.$refs.weekGrid;
-            let headerOffset = 0;
-            if (gridEl) {
-              const gridH = gridEl.clientHeight;
-              headerOffset = (HEADER_H / gridH) * 100;
-            }
-            
-            const top = ((sd.getHours()-sh)*60+sd.getMinutes())/tm*100 + (headerOffset || 1.5);
-            const h = Math.max((ed-sd)/60000,30)/tm*100;
-            ev._style = {
-              top: top+'%',
-              height: h+'%',
-              left: (di*100/7+ci*100/7/total)+'%',
-              width: (100/7/total)+'%',
-              minHeight:'18px'
-            };
-            res.push(ev);
-          });
-        });
+        cols.forEach((col,ci)=>{col.forEach(ev=>{
+          const sd=new Date(ev.start_time), ed=new Date(ev.end_time);
+          const di=this.weekDaysList.findIndex(d=>d.date===sd.toISOString().split('T')[0]);
+          if(di===-1)return;
+          const gridEl=this.$refs.weekGrid;
+          let headerOff=0;
+          if(gridEl){headerOff=(this.HEADER_H/gridEl.clientHeight)*100;}
+          const top=((sd.getHours()-sh)*60+sd.getMinutes())/tm*100+(headerOff||1.5);
+          const h=Math.max((ed-sd)/60000,30)/tm*100;
+          ev._style={top:top+'%',height:h+'%',left:(di*100/7+ci*100/7/total)+'%',width:(100/7/total)+'%',minHeight:'18px'};
+          res.push(ev);
+        });});
       });
       return res;
     }
@@ -191,32 +170,28 @@ export default {
     getDayEvents(d){return this.slots.filter(s=>new Date(s.start_time).toISOString().split('T')[0]===d);},
     defColor(t){const c={online:'#10b981',offline:'#6366f1',group:'#f59e0b'};return c[t]||'#6366f1';},
     fmtTime(ts){return ts?new Date(ts).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):'';},
-    
     onDayClick(day){if(day.isOtherMonth)return;if(this.getDayEvents(day.date).length){this.view='week';}else if(this.isTutor){this.form.date=day.date;this.openAddSlot();}},
     openEvent(ev){this.editingSlot=ev;const sd=new Date(ev.start_time);this.form={student_id:ev.student_id||'',type:ev.lesson_type||'online',title:ev.title||'',date:sd.toISOString().split('T')[0],time:this.fmtTime(sd),duration:Math.round((new Date(ev.end_time)-sd)/60000)||30,notes:ev.notes||'',color:ev.color||'#6366f1',repeat:ev.repeat||'none',repeat_count:ev.repeat_count||4};this.showModal=true;},
     createAt(date,h,m){if(!this.isTutor)return;this.editingSlot=null;this.form={student_id:'',type:'online',title:'',date,time:`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`,duration:30,notes:'',color:'#10b981',repeat:'none',repeat_count:4};this.showModal=true;},
     openAddSlot(){this.editingSlot=null;this.form={student_id:'',type:'online',title:'',date:new Date().toISOString().split('T')[0],time:'10:00',duration:30,notes:'',color:'#10b981',repeat:'none',repeat_count:4};this.showModal=true;},
     closeModal(){this.showModal=false;this.editingSlot=null;},
-    
     async saveSlot(){try{const[h,m]=this.form.time.split(':');const s=new Date(this.form.date);s.setHours(+h,+m,0,0);const d=Math.max(+this.form.duration||30,30);const e=new Date(s.getTime()+d*60000);const data={title:this.form.title,lesson_type:this.form.type,student_id:this.form.student_id||null,start_time:s.toISOString(),end_time:e.toISOString(),notes:this.form.notes,color:this.form.color};if(this.editingSlot)await axios.put(`/api/slots/${this.editingSlot.id}`,data);else await axios.post('/api/slots',data);this.closeModal();this.addToast('✅ Сохранено','success');this.loadSlots();}catch(e){this.addToast('Ошибка','error');}},
     async deleteSlot(id){if(!confirm('Удалить?'))return;try{await axios.delete(`/api/slots/${id}`);this.closeModal();this.loadSlots();}catch(e){}},
-    
-    // 🔥 ИСПРАВЛЕННЫЙ ДРАГ — НЕ ПЕРЕЗАГРУЖАЕТ СЛОТЫ
     startDrag(e,ev){if(!this.isTutor)return;e.preventDefault();this.dragging=ev;this.dsX=e.clientX;this.dsY=e.clientY;this.dsOrig={...ev};},
     startResize(e,ev){if(!this.isTutor)return;e.preventDefault();this.resizing=ev;this.dsY=e.clientY;this.dsOrig={...ev};},
     onDrag(e){
-      if(!this.dragging&&!this.resizing)return;const g=this.$refs.weekGrid;if(!g)return;const r=g.getBoundingClientRect(),tm=15*60,gh=r.height-HEADER_H,mp=gh/tm,dw=r.width/7;
+      if(!this.dragging&&!this.resizing)return;
+      const g=this.$refs.weekGrid;if(!g)return;
+      const r=g.getBoundingClientRect(),tm=15*60,gh=r.height-this.HEADER_H,mp=gh/tm,dw=r.width/7;
       if(this.dragging){const dy=e.clientY-this.dsY,dx=e.clientX-this.dsX,dm=Math.round(dy/mp/15)*15,dd=Math.round(dx/dw);const os=new Date(this.dsOrig.start_time),dur=Math.max((new Date(this.dsOrig.end_time)-os)/60000,30);let ns=new Date(os.getTime()+dm*60000);ns.setDate(ns.getDate()+dd);this.dragging.start_time=ns.toISOString();this.dragging.end_time=new Date(ns.getTime()+dur*60000).toISOString();const el=document.querySelector(`[data-key="${this.dragging._key}"]`);if(el){el.style.transform=`translate(${dx}px,${dy}px)`;el.style.zIndex='100';el.style.transition='none';el.style.opacity='0.85';}}
       if(this.resizing){const dy=e.clientY-this.dsY,dm=Math.round(dy/mp/15)*15;const oe=new Date(this.dsOrig.end_time);let ne=new Date(oe.getTime()+dm*60000);if(ne-new Date(this.dsOrig.start_time)<30*60000)ne=new Date(new Date(this.dsOrig.start_time).getTime()+30*60000);this.resizing.end_time=ne.toISOString();}
     },
     async onDrop(){
       const ev=this.dragging||this.resizing;if(!ev)return;
       const el=document.querySelector(`[data-key="${ev._key}"]`);if(el){el.style.transition='all 0.3s ease';el.style.transform='';el.style.zIndex='';el.style.opacity='';}
-      // 🔥 Сохраняем на сервер, но НЕ перезагружаем слоты
       try{if(this.dragging)await axios.put(`/api/slots/${ev.id}/move`,{start_time:ev.start_time,end_time:ev.end_time});else await axios.put(`/api/slots/${ev.id}`,{start_time:ev.start_time,end_time:ev.end_time});}catch(e){}
       this.dragging=null;this.resizing=null;this.dsOrig=null;
     },
-    
     prevMonth(){this.curMonth===0?(this.curMonth=11,this.curYear--):this.curMonth--;},
     nextMonth(){this.curMonth===11?(this.curMonth=0,this.curYear++):this.curMonth++;},
     goToday(){this.curMonth=new Date().getMonth();this.curYear=new Date().getFullYear();this.curWeek=0;},
@@ -242,7 +217,6 @@ export default {
 .tool-btn { width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); color: #fff; cursor: pointer; font-size: 0.9rem; }
 .add-btn { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #2dd4bf); border: none; color: #fff; cursor: pointer; font-size: 1.2rem; font-weight: 700; }
 
-/* МЕСЯЦ */
 .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; overflow: hidden; }
 .mh { text-align: center; padding: 8px; font-weight: 700; font-size: 0.75rem; color: #94a3b8; background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.05); }
 .mc { min-height: 85px; padding: 5px; border-right: 1px solid rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.03); cursor: pointer; transition: all 0.2s; }
@@ -257,7 +231,6 @@ export default {
 .mbar:hover { transform: scaleY(2); }
 .mmore { font-size: 0.55rem; color: #94a3b8; cursor: pointer; }
 
-/* НЕДЕЛЯ */
 .week-scroll { overflow-x: auto; }
 .week-grid { display: grid; grid-template-columns: 45px repeat(7, 1fr); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; overflow: hidden; min-width: 650px; position: relative; }
 .wcorner { background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.05); }
@@ -275,7 +248,6 @@ export default {
 .ev-student { font-size: 0.5rem; opacity: 0.7; }
 .ev-resize { position: absolute; bottom: 0; left: 0; right: 0; height: 4px; cursor: ns-resize; }
 
-/* МОДАЛКА */
 .modal-back { position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; }
 .modal-card { background: rgba(12,12,35,0.97); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 24px; max-width: 460px; width: 90%; max-height: 85vh; overflow-y: auto; position: relative; }
 .modal-x { position: absolute; top: 12px; right: 12px; background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer; }
