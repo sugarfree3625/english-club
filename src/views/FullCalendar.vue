@@ -130,12 +130,15 @@ export default {
       const ws=this.weekDaysList[0]?.date, we=this.weekDaysList[6]?.date; if(!ws||!we)return[];
       return this.slots.filter(s=>{const d=new Date(s.start_time).toISOString().split('T')[0];return d>=ws&&d<=we;}).sort((a,b)=>new Date(a.start_time)-new Date(b.start_time));
     },
-    // 🔥 ТОЧНОЕ ПОЗИЦИОНИРОВАНИЕ КАК В ЯНДЕКСЕ
+    // 🔥 ИСПРАВЛЕННОЕ ПОЗИЦИОНИРОВАНИЕ
     positionedEvents() {
       const evs = this.weekSlots.map(s=>({...s,_key:'s'+s.id,_time:this.fmtTime(s.start_time),_student:s.users?.username||'',color:s.color||this.defColor(s.lesson_type)}));
       if(!evs.length)return[];
       const res=[], sh=8, tm=15*60;
+      const HEADER_H = 30; // высота заголовка дней в пикселях
+      
       const byDay={}; evs.forEach(e=>{const d=new Date(e.start_time).toISOString().split('T')[0];if(!byDay[d])byDay[d]=[];byDay[d].push(e);});
+      
       Object.values(byDay).forEach(dayEvs=>{
         dayEvs.sort((a,b)=>new Date(a.start_time)-new Date(b.start_time));
         const cols=[];
@@ -155,9 +158,24 @@ export default {
             const sd=new Date(ev.start_time), ed=new Date(ev.end_time);
             const di=this.weekDaysList.findIndex(d=>d.date===sd.toISOString().split('T')[0]);
             if(di===-1)return;
-            const top=((sd.getHours()-sh)*60+sd.getMinutes())/tm*100;
-            const h=Math.max((ed-sd)/60000,30)/tm*100;
-            ev._style={top:top+'%',height:h+'%',left:(di*100/7+ci*100/7/total)+'%',width:(100/7/total)+'%',minHeight:'20px'};
+            
+            // Позиция с учётом заголовка
+            const gridEl = this.$refs.weekGrid;
+            let headerOffset = 0;
+            if (gridEl) {
+              const gridH = gridEl.clientHeight;
+              headerOffset = (HEADER_H / gridH) * 100;
+            }
+            
+            const top = ((sd.getHours()-sh)*60+sd.getMinutes())/tm*100 + (headerOffset || 1.5);
+            const h = Math.max((ed-sd)/60000,30)/tm*100;
+            ev._style = {
+              top: top+'%',
+              height: h+'%',
+              left: (di*100/7+ci*100/7/total)+'%',
+              width: (100/7/total)+'%',
+              minHeight:'18px'
+            };
             res.push(ev);
           });
         });
@@ -183,14 +201,21 @@ export default {
     async saveSlot(){try{const[h,m]=this.form.time.split(':');const s=new Date(this.form.date);s.setHours(+h,+m,0,0);const d=Math.max(+this.form.duration||30,30);const e=new Date(s.getTime()+d*60000);const data={title:this.form.title,lesson_type:this.form.type,student_id:this.form.student_id||null,start_time:s.toISOString(),end_time:e.toISOString(),notes:this.form.notes,color:this.form.color};if(this.editingSlot)await axios.put(`/api/slots/${this.editingSlot.id}`,data);else await axios.post('/api/slots',data);this.closeModal();this.addToast('✅ Сохранено','success');this.loadSlots();}catch(e){this.addToast('Ошибка','error');}},
     async deleteSlot(id){if(!confirm('Удалить?'))return;try{await axios.delete(`/api/slots/${id}`);this.closeModal();this.loadSlots();}catch(e){}},
     
+    // 🔥 ИСПРАВЛЕННЫЙ ДРАГ — НЕ ПЕРЕЗАГРУЖАЕТ СЛОТЫ
     startDrag(e,ev){if(!this.isTutor)return;e.preventDefault();this.dragging=ev;this.dsX=e.clientX;this.dsY=e.clientY;this.dsOrig={...ev};},
     startResize(e,ev){if(!this.isTutor)return;e.preventDefault();this.resizing=ev;this.dsY=e.clientY;this.dsOrig={...ev};},
     onDrag(e){
-      if(!this.dragging&&!this.resizing)return;const g=this.$refs.weekGrid;if(!g)return;const r=g.getBoundingClientRect(),tm=15*60,gh=r.height-30,mp=gh/tm,dw=r.width/7;
+      if(!this.dragging&&!this.resizing)return;const g=this.$refs.weekGrid;if(!g)return;const r=g.getBoundingClientRect(),tm=15*60,gh=r.height-HEADER_H,mp=gh/tm,dw=r.width/7;
       if(this.dragging){const dy=e.clientY-this.dsY,dx=e.clientX-this.dsX,dm=Math.round(dy/mp/15)*15,dd=Math.round(dx/dw);const os=new Date(this.dsOrig.start_time),dur=Math.max((new Date(this.dsOrig.end_time)-os)/60000,30);let ns=new Date(os.getTime()+dm*60000);ns.setDate(ns.getDate()+dd);this.dragging.start_time=ns.toISOString();this.dragging.end_time=new Date(ns.getTime()+dur*60000).toISOString();const el=document.querySelector(`[data-key="${this.dragging._key}"]`);if(el){el.style.transform=`translate(${dx}px,${dy}px)`;el.style.zIndex='100';el.style.transition='none';el.style.opacity='0.85';}}
       if(this.resizing){const dy=e.clientY-this.dsY,dm=Math.round(dy/mp/15)*15;const oe=new Date(this.dsOrig.end_time);let ne=new Date(oe.getTime()+dm*60000);if(ne-new Date(this.dsOrig.start_time)<30*60000)ne=new Date(new Date(this.dsOrig.start_time).getTime()+30*60000);this.resizing.end_time=ne.toISOString();}
     },
-    async onDrop(){const ev=this.dragging||this.resizing;if(!ev)return;const el=document.querySelector(`[data-key="${ev._key}"]`);if(el){el.style.transition='all 0.3s ease';el.style.transform='';el.style.zIndex='';el.style.opacity='';}try{if(this.dragging)await axios.put(`/api/slots/${ev.id}/move`,{start_time:ev.start_time,end_time:ev.end_time});else await axios.put(`/api/slots/${ev.id}`,{start_time:ev.start_time,end_time:ev.end_time});}catch(e){}this.dragging=null;this.resizing=null;this.dsOrig=null;setTimeout(()=>this.loadSlots(),300);},
+    async onDrop(){
+      const ev=this.dragging||this.resizing;if(!ev)return;
+      const el=document.querySelector(`[data-key="${ev._key}"]`);if(el){el.style.transition='all 0.3s ease';el.style.transform='';el.style.zIndex='';el.style.opacity='';}
+      // 🔥 Сохраняем на сервер, но НЕ перезагружаем слоты
+      try{if(this.dragging)await axios.put(`/api/slots/${ev.id}/move`,{start_time:ev.start_time,end_time:ev.end_time});else await axios.put(`/api/slots/${ev.id}`,{start_time:ev.start_time,end_time:ev.end_time});}catch(e){}
+      this.dragging=null;this.resizing=null;this.dsOrig=null;
+    },
     
     prevMonth(){this.curMonth===0?(this.curMonth=11,this.curYear--):this.curMonth--;},
     nextMonth(){this.curMonth===11?(this.curMonth=0,this.curYear++):this.curMonth++;},
@@ -242,7 +267,7 @@ export default {
 .whalf { font-size: 0.5rem; border-bottom: 1px dashed rgba(255,255,255,0.02); }
 .wcell { min-height: 28px; border-bottom: 1px solid rgba(255,255,255,0.03); border-right: 1px solid rgba(255,255,255,0.03); cursor: pointer; transition: background 0.15s; }
 .wcell:hover { background: rgba(99,102,241,0.04); }
-.events-canvas { position: absolute; top: 28px; left: 0; right: 0; bottom: 0; pointer-events: none; }
+.events-canvas { position: absolute; top: 30px; left: 0; right: 0; bottom: 0; pointer-events: none; }
 .event-chip { position: absolute; padding: 2px 4px; border-radius: 3px; color: #fff; font-size: 0.6rem; cursor: grab; pointer-events: auto; overflow: hidden; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.1); transition: all 0.3s ease; }
 .event-chip:hover { z-index: 10; box-shadow: 0 0 0 2px rgba(255,255,255,0.4); }
 .ev-time { font-size: 0.5rem; opacity: 0.8; display: block; }
