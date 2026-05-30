@@ -44,7 +44,7 @@
           <div class="week-bg-cell week-bg-half" v-for="day in weekDaysList" :key="'bg'+day.date+hour+':30'" :class="{ today: day.isToday }" @click="openSlot(day.date, hour, 30)"></div>
         </template>
         <div class="slots-layer">
-          <div v-for="ev in positionedWeekEvents" :key="ev._key" class="slot-block" :style="{ background: ev.color, ...ev._style }" @mousedown="startDrag($event, ev)" @click.stop="editSlot(ev)">
+          <div v-for="ev in positionedWeekEvents" :key="ev._key" class="slot-block" :data-key="ev._key" :style="{ background: ev.color, ...ev._style }" @mousedown="startDrag($event, ev)" @click.stop="editSlot(ev)">
             <div class="slot-time-label">{{ ev._time }}</div>
             <div class="slot-block-title">{{ ev.title }}</div>
             <div class="slot-block-student">{{ ev._student || '—' }}</div>
@@ -54,44 +54,29 @@
       </div>
     </div>
 
-    <!-- СОЧНАЯ МОДАЛКА -->
     <Teleport to="body">
       <transition name="modal-fade">
         <div class="modal-overlay" v-if="showAddSlot || editingSlot" @click.self="closeModal">
           <div class="modal-card">
             <h3>{{ editingSlot ? '✏️ Редактировать' : '➕ Новое занятие' }}</h3>
-            
             <label>Тип</label>
             <div class="type-btns">
               <button v-for="t in slotTypes" :key="t.value" class="type-btn" :class="{ active: slotForm.lesson_type === t.value }" :style="{ borderColor: slotForm.lesson_type === t.value ? t.color : 'rgba(255,255,255,0.1)', boxShadow: slotForm.lesson_type === t.value ? `0 0 12px ${t.color}40` : 'none' }" @click="slotForm.lesson_type = t.value">{{ t.emoji }} {{ t.label }}</button>
             </div>
-
             <label v-if="!isGroupType">Ученик</label>
             <select v-if="!isGroupType" class="input" v-model="slotForm.student_id"><option value="">Выберите</option><option v-for="s in allStudents" :key="s.id" :value="s.id">{{ s.username }}</option></select>
-
             <label>Название</label><input class="input" v-model="slotForm.title" placeholder="Например: Speaking Practice">
-
             <div class="form-row"><div style="flex:1"><label>Дата</label><input class="input" type="date" v-model="slotForm.date"></div><div style="flex:1"><label>Время</label><input class="input" type="time" v-model="slotForm.time"></div></div>
-
             <label>Длительность (мин)</label><input class="input" type="number" v-model="slotForm.duration" placeholder="30">
-
             <label>Цвет</label>
             <div class="color-picker">
               <button v-for="c in slotColors" :key="c" class="color-dot" :style="{ background: c, boxShadow: slotForm.color === c ? `0 0 10px ${c}` : 'none' }" :class="{ active: slotForm.color === c }" @click="slotForm.color = c"></button>
             </div>
-
             <label>Повторять</label>
             <select class="input" v-model="slotForm.repeat"><option value="none">Не повторять</option><option value="weekly">Каждую неделю</option><option value="biweekly">Каждые 2 недели</option><option value="monthly">Каждый месяц</option></select>
             <div v-if="slotForm.repeat !== 'none'" class="form-row"><div style="flex:1"><label>Повторений</label><input class="input" type="number" v-model="slotForm.repeat_count" placeholder="4" min="1" max="52"></div></div>
-
-            <label>Заметки</label>
-            <textarea class="input note-area" v-model="slotForm.notes" rows="2" placeholder="Домашнее задание, материалы..."></textarea>
-
-            <div class="modal-actions">
-              <button class="btn btn-p btn-sm" @click="saveSlot">💾 Сохранить</button>
-              <button v-if="editingSlot" class="btn btn-o btn-sm" style="color:#ef4444;border-color:rgba(239,68,68,0.3)" @click="deleteSlot(editingSlot.id)">🗑 Удалить</button>
-              <button class="btn btn-o btn-sm" @click="closeModal">Отмена</button>
-            </div>
+            <label>Заметки</label><textarea class="input note-area" v-model="slotForm.notes" rows="2" placeholder="Заметки..."></textarea>
+            <div class="modal-actions"><button class="btn btn-p btn-sm" @click="saveSlot">💾 Сохранить</button><button v-if="editingSlot" class="btn btn-o btn-sm" style="color:#ef4444;border-color:rgba(239,68,68,0.3)" @click="deleteSlot(editingSlot.id)">🗑</button><button class="btn btn-o btn-sm" @click="closeModal">Отмена</button></div>
           </div>
         </div>
       </transition>
@@ -176,18 +161,40 @@ export default {
     formatDate(ts) { return ts?new Date(ts).toLocaleDateString('ru',{day:'numeric',month:'short'}):''; },
     formatTime(ts) { return ts?new Date(ts).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}):''; },
     selectDay(day) { if (!day.isOtherMonth && this.isTutor) { this.slotForm.date = day.date; this.openAddSlot(); } },
-    startDrag(e,slot) { if(!this.isTutor)return; e.preventDefault(); this.dragging=slot; this.dragStartX=e.clientX; this.dragStartY=e.clientY; this.dragSlotOriginal={...slot}; },
-    startResize(e,slot) { if(!this.isTutor)return; e.preventDefault(); this.resizing=slot; this.dragStartY=e.clientY; this.dragSlotOriginal={...slot}; },
+
+    // 🔥 ПЛАВНЫЙ ДРАГ
+    startDrag(e, slot) { if(!this.isTutor)return; e.preventDefault(); this.dragging=slot; this.dragStartX=e.clientX; this.dragStartY=e.clientY; this.dragSlotOriginal={...slot}; },
+    startResize(e, slot) { if(!this.isTutor)return; e.preventDefault(); this.resizing=slot; this.dragStartY=e.clientY; this.dragSlotOriginal={...slot}; },
     onDragMove(e) {
-      if(!this.dragging&&!this.resizing)return; const grid=this.$refs.weekGrid; if(!grid)return; const rect=grid.getBoundingClientRect(); const tm=14*60,gh=rect.height-44,mp=gh/tm,dw=(rect.width-60)/7;
-      if(this.dragging){const dy=e.clientY-this.dragStartY,dx=e.clientX-this.dragStartX,dm=Math.round(dy/mp/30)*30,dd=Math.round(dx/dw);const os=new Date(this.dragSlotOriginal.start_time),dur=Math.max((new Date(this.dragSlotOriginal.end_time)-os)/60000,30);let ns=new Date(os.getTime()+dm*60000);ns.setDate(ns.getDate()+dd);this.dragging.start_time=ns.toISOString();this.dragging.end_time=new Date(ns.getTime()+dur*60000).toISOString();}
-      if(this.resizing){const dy=e.clientY-this.dragStartY,dm=Math.round(dy/mp/30)*30;const oe=new Date(this.dragSlotOriginal.end_time);let ne=new Date(oe.getTime()+dm*60000);if(ne-new Date(this.dragSlotOriginal.start_time)<30*60000)ne=new Date(new Date(this.dragSlotOriginal.start_time).getTime()+30*60000);this.resizing.end_time=ne.toISOString();}
+      if(!this.dragging&&!this.resizing)return;
+      const grid=this.$refs.weekGrid; if(!grid)return;
+      const rect=grid.getBoundingClientRect();
+      const totalMin=14*60, gridH=rect.height-44, minPerPixel=totalMin/gridH, dayWidth=(rect.width-60)/7;
+      if(this.dragging){
+        const dy=e.clientY-this.dragStartY, dx=e.clientX-this.dragStartX;
+        const deltaMin=Math.round(dy*minPerPixel/15)*15, deltaDays=Math.round(dx/dayWidth);
+        const origStart=new Date(this.dragSlotOriginal.start_time), dur=Math.max((new Date(this.dragSlotOriginal.end_time)-origStart)/60000,30);
+        let ns=new Date(origStart.getTime()+deltaMin*60000); ns.setDate(ns.getDate()+deltaDays);
+        this.dragging.start_time=ns.toISOString(); this.dragging.end_time=new Date(ns.getTime()+dur*60000).toISOString();
+        const el=document.querySelector(`.slot-block[data-key="${this.dragging._key}"]`);
+        if(el){el.style.transform=`translate(${dx}px, ${dy}px)`;el.style.zIndex='100';el.style.transition='none';el.style.opacity='0.85';el.style.boxShadow='0 8px 25px rgba(0,0,0,0.5)';}
+      }
+      if(this.resizing){
+        const dy=e.clientY-this.dragStartY, deltaMin=Math.round(dy*minPerPixel/15)*15;
+        const origEnd=new Date(this.dragSlotOriginal.end_time); let ne=new Date(origEnd.getTime()+deltaMin*60000);
+        const minEnd=new Date(this.dragSlotOriginal.start_time).getTime()+30*60000; if(ne.getTime()<minEnd)ne.setTime(minEnd);
+        this.resizing.end_time=ne.toISOString();
+      }
     },
     async onDragEnd() {
-      const ev=this.dragging||this.resizing; if(!ev){this.dragging=null;this.resizing=null;return;}
-      try{if(this.dragging)await axios.put(`/api/slots/${ev.id}/move`,{start_time:ev.start_time,end_time:ev.end_time});else await axios.put(`/api/slots/${ev.id}`,{start_time:ev.start_time,end_time:ev.end_time});this.addToast('✅','success');}catch(e){this.addToast('Ошибка','error');}
-      this.dragging=null; this.resizing=null; this.loadSlots();
+      const ev=this.dragging||this.resizing; if(!ev)return;
+      const el=document.querySelector(`.slot-block[data-key="${ev._key}"]`);
+      if(el){el.style.transition='all 0.3s cubic-bezier(0.4,0,0.2,1)';el.style.transform='translate(0,0)';el.style.zIndex='10';el.style.opacity='1';el.style.boxShadow='';}
+      try{if(this.dragging)await axios.put(`/api/slots/${ev.id}/move`,{start_time:ev.start_time,end_time:ev.end_time});else await axios.put(`/api/slots/${ev.id}`,{start_time:ev.start_time,end_time:ev.end_time});}catch(e){}
+      this.dragging=null; this.resizing=null; this.dragSlotOriginal=null;
+      setTimeout(()=>this.loadSlots(),300);
     },
+
     prevMonth() { this.currentMonth===0?(this.currentMonth=11,this.currentYear--):this.currentMonth--; },
     nextMonth() { this.currentMonth===11?(this.currentMonth=0,this.currentYear++):this.currentMonth++; },
     goToday() { this.currentWeek=0; this.currentMonth=new Date().getMonth(); this.currentYear=new Date().getFullYear(); },
@@ -238,7 +245,11 @@ export default {
 .week-bg-half { border-bottom: 1px dashed rgba(255,255,255,0.03); }
 .week-bg-cell:hover { background: rgba(99,102,241,0.04); }
 .slots-layer { position: absolute; top: 40px; left: 0; right: 0; bottom: 0; pointer-events: none; }
-.slot-block { position: absolute; padding: 4px 6px; border-radius: 5px; color: #fff; font-size: 0.65rem; cursor: grab; pointer-events: auto; overflow: hidden; transition: box-shadow 0.2s; }
+.slot-block {
+  position: absolute; padding: 4px 6px; border-radius: 5px; color: #fff; font-size: 0.65rem;
+  cursor: grab; pointer-events: auto; overflow: hidden;
+  transition: left 0.3s cubic-bezier(0.4,0,0.2,1), width 0.3s cubic-bezier(0.4,0,0.2,1), top 0.3s cubic-bezier(0.4,0,0.2,1), height 0.3s cubic-bezier(0.4,0,0.2,1);
+}
 .slot-block:hover { box-shadow: 0 0 0 2px rgba(255,255,255,0.5); z-index: 10; }
 .slot-time-label { font-size: 0.55rem; opacity: 0.9; }
 .slot-block-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
