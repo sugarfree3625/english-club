@@ -31,19 +31,29 @@ module.exports = (app, supabase) => {
         return res.status(403).json({ error: 'Нет прав' });
       }
       
-      const { data: slot, error } = await supabase.from('schedule_slots').insert({
-        ...req.body,
+      // Только поля которые есть в таблице
+      const insertData = {
+        title: req.body.title || '',
+        lesson_type: req.body.lesson_type || 'online',
+        student_id: req.body.student_id || null,
+        start_time: req.body.start_time,
+        end_time: req.body.end_time,
+        notes: req.body.notes || '',
+        color: req.body.color || '#6366f1',
+        group_students: req.body.group_students || [],
         tutor_id: req.session.userId,
-        color: req.body.color || '#6366f1'
-      }).select('id').single();
+        meeting_link: req.body.meeting_link || null
+      };
+      
+      const { data: slot, error } = await supabase.from('schedule_slots')
+        .insert(insertData).select('id').single();
       
       if (error) throw error;
 
-      // 🔄 Создаём повторяющиеся слоты
+      // Повторяющиеся слоты
       if (req.body.repeat && req.body.repeat !== 'none') {
         const startDate = new Date(req.body.start_time);
         const endDate = new Date(req.body.end_time);
-        const duration = endDate - startDate;
         const repeatCount = req.body.repeat_count || 4;
         
         for (let i = 1; i < repeatCount; i++) {
@@ -62,21 +72,16 @@ module.exports = (app, supabase) => {
           }
           
           await supabase.from('schedule_slots').insert({
-            ...req.body,
-            tutor_id: req.session.userId,
+            ...insertData,
             start_time: newStart.toISOString(),
             end_time: newEnd.toISOString(),
-            parent_id: slot.id,
-            color: req.body.color || '#6366f1'
+            parent_id: slot.id
           });
         }
       }
 
-      // 🔔 Уведомление
       if (req.body.student_id) {
-        try {
-          notifyUser(supabase, req.body.student_id, `📅 Новое занятие: ${req.body.title || 'Занятие'} — ${new Date(req.body.start_time).toLocaleDateString('ru')}`);
-        } catch(e) {}
+        try { notifyUser(supabase, req.body.student_id, `📅 Новое занятие: ${req.body.title || 'Занятие'}`); } catch(e) {}
       }
       
       res.status(201).json({ success: true, id: slot.id });
@@ -102,46 +107,37 @@ module.exports = (app, supabase) => {
     }
   });
 
-  // ==================== ОБНОВИТЬ СЛОТ ====================
-app.put('/api/slots/:id', auth, async (req, res) => {
-  try {
-    if (req.session.role !== 'admin' && req.session.role !== 'host') {
-      return res.status(403).json({ error: 'Нет прав' });
-    }
-    
-    // Фильтруем только разрешённые поля
-    const allowedFields = [
-      'title', 'lesson_type', 'student_id', 'start_time', 'end_time',
-      'duration', 'notes', 'color', 'group_students', 'meeting_link',
-      'repeat', 'repeat_count'
-    ];
-    
-    const updates = {};
-    allowedFields.forEach(field => {
-      if (req.body[field] !== undefined) {
-        updates[field] = req.body[field];
+  // ==================== ОБНОВИТЬ СЛОТ (ИСПРАВЛЕНО) ====================
+  app.put('/api/slots/:id', auth, async (req, res) => {
+    try {
+      if (req.session.role !== 'admin' && req.session.role !== 'host') {
+        return res.status(403).json({ error: 'Нет прав' });
       }
-    });
-    
-    // Убираем поля, которых нет в таблице
-    delete updates.repeat_count; // если нет колонки
-    
-    const { error } = await supabase
-      .from('schedule_slots')
-      .update(updates)
-      .eq('id', req.params.id);
-    
-    if (error) {
-      console.error('PUT /api/slots error:', error);
-      throw error;
+      
+      // ТОЛЬКО поля которые есть в таблице schedule_slots
+      const updates = {};
+      
+      if (req.body.title !== undefined) updates.title = req.body.title;
+      if (req.body.lesson_type !== undefined) updates.lesson_type = req.body.lesson_type;
+      if (req.body.student_id !== undefined) updates.student_id = req.body.student_id || null;
+      if (req.body.start_time !== undefined) updates.start_time = req.body.start_time;
+      if (req.body.end_time !== undefined) updates.end_time = req.body.end_time;
+      if (req.body.notes !== undefined) updates.notes = req.body.notes;
+      if (req.body.color !== undefined) updates.color = req.body.color;
+      if (req.body.group_students !== undefined) updates.group_students = req.body.group_students;
+      if (req.body.meeting_link !== undefined) updates.meeting_link = req.body.meeting_link;
+      
+      const { error } = await supabase.from('schedule_slots')
+        .update(updates)
+        .eq('id', req.params.id);
+      
+      if (error) throw error;
+      res.json({ success: true });
+    } catch(err) {
+      console.error('PUT /api/slots error:', err);
+      res.status(500).json({ error: 'Не удалось обновить' });
     }
-    
-    res.json({ success: true });
-  } catch(err) {
-    console.error('PUT /api/slots error:', err);
-    res.status(500).json({ error: 'Не удалось обновить: ' + (err.message || '') });
-  }
-});
+  });
 
   // ==================== УДАЛИТЬ СЛОТ ====================
   app.delete('/api/slots/:id', auth, async (req, res) => {
@@ -150,7 +146,6 @@ app.put('/api/slots/:id', auth, async (req, res) => {
         return res.status(403).json({ error: 'Нет прав' });
       }
       
-      // Удаляем и дочерние слоты (повторения)
       const { error } = await supabase.from('schedule_slots')
         .delete()
         .or(`id.eq.${req.params.id},parent_id.eq.${req.params.id}`);
