@@ -41,6 +41,7 @@
       </div>
     </div>
 
+    <!-- ПОПОВЕР — прямо у курсора -->
     <div v-if="popover.event" class="popover" :style="{top:popover.y+'px',left:popover.x+'px'}" @click.stop>
       <div class="pop-time">{{fmtTime(popover.event.start_time)}} - {{fmtTime(popover.event.end_time)}}</div>
       <div class="pop-title">{{popover.event.title}}</div>
@@ -147,7 +148,7 @@ export default {
       const wd=this.weekDaysList; if(!wd.length)return[];
       return this.events.filter(e=>{const d=new Date(e.start_time).toISOString().split('T')[0];return d>=wd[0].date&&d<=wd[6].date;}).sort((a,b)=>new Date(a.start_time)-new Date(b.start_time));
     },
-    // 🔥 ИСПРАВЛЕННОЕ ПОЗИЦИОНИРОВАНИЕ — без наложений
+    // 🔥 ИСПРАВЛЕНО: без наложений, не выходят за границы
     positionedEvents() {
       const evs = this.weekEvents; if (!evs.length) return [];
       const res = [], sh = 8, tm = 15 * 60, byDay = {};
@@ -167,9 +168,9 @@ export default {
           if (di === -1) return;
           const startMin = (sd.getHours() - sh) * 60 + sd.getMinutes(), endMin = (ed.getHours() - sh) * 60 + ed.getMinutes();
           const cs = Math.max(0, startMin), ce = Math.min(tm, endMin), dur = Math.max(ce - cs, 30);
-          const slotWidth = (col.length === 1 && total === 1) ? (cellWidth - 0.5) : (cellWidth / total - 0.5);
-          const slotLeft = di * cellWidth + ci * (cellWidth / total);
-          ev._style = { top: (cs / tm * 100) + '%', height: (dur / tm * 100) + '%', left: slotLeft + '%', width: slotWidth + '%', minHeight: '18px', overflow: 'hidden' };
+          const slotWidth = Math.min((col.length === 1 && total === 1) ? (cellWidth - 1) : (cellWidth / total - 1), cellWidth - 1);
+          const slotLeft = Math.min(di * cellWidth + ci * (cellWidth / total), 100 - slotWidth);
+          ev._style = { top: (cs / tm * 100) + '%', height: (dur / tm * 100) + '%', left: slotLeft + '%', width: slotWidth + '%', minHeight: '18px', overflow: 'hidden', maxWidth: (cellWidth - 1) + '%', zIndex: 1 };
           res.push(ev);
         });});
       });
@@ -188,8 +189,16 @@ export default {
     monthName(date) { return new Date(date).toLocaleDateString('ru',{month:'long'}); },
     onDayClick(day) { if (day.isOtherMonth) return; this.popover.event = null; if (this.getDayEvents(day.date).length === 0 && this.isTutor) { this.quickForm = { date: day.date, title: '' }; } },
     async saveQuick() { if (!this.quickForm.title) return; const start = new Date(this.quickForm.date+'T10:00:00'), end = new Date(start.getTime()+30*60000); try { await axios.post('/api/slots',{title:this.quickForm.title,lesson_type:'online',start_time:start.toISOString(),end_time:end.toISOString(),color:'#10b981',notes:'',student_id:null}); this.quickForm.date = null; this.addToast?.('✅ Создано','success'); this.loadEvents(); } catch(e) { this.addToast?.('Ошибка','error'); } },
-    openPopover(e, ev) { if (this.wasDragged) { this.wasDragged = false; return; } this.popover = { event: ev, x: Math.min(e.clientX-10, window.innerWidth-200), y: Math.min(e.clientY-10, window.innerHeight-150) }; },
+
+    // 🔥 ПОПОВЕР ПРЯМО У КУРСОРА
+    openPopover(e, ev) {
+      if (this.wasDragged) { this.wasDragged = false; return; }
+      const x = Math.min(e.clientX + 10, window.innerWidth - 200);
+      const y = Math.min(e.clientY + 10, window.innerHeight - 150);
+      this.popover = { event: ev, x, y };
+    },
     onClickOutside() { if (this.popover.event) this.popover.event = null; },
+
     createAt(date, h, m) { if (!this.isTutor) return; this.modal = { show: true, event: null, form: { student_id:'',type:'online',title:'',date,time:`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`,duration:30,notes:'',color:'#10b981',repeat:'none',repeat_count:4 } }; },
     openModal(ev) { if (ev) { const sd = new Date(ev.start_time); this.modal = { show: true, event: ev, form: { student_id:ev.student_id||'',type:ev.lesson_type||'online',title:ev.title||'',date:sd.toISOString().split('T')[0],time:this.fmtTime(ev.start_time),duration:Math.round((new Date(ev.end_time)-sd)/60000)||30,notes:ev.notes||'',color:ev.color||'#6366f1',repeat:ev.repeat||'none',repeat_count:ev.repeat_count||4 } }; } else { this.modal = { show: true, event: null, form: { student_id:'',type:'online',title:'',date:new Date().toISOString().split('T')[0],time:'10:00',duration:30,notes:'',color:'#10b981',repeat:'none',repeat_count:4 } }; } },
     closeModal() { this.modal.show = false; this.modal.event = null; },
@@ -272,7 +281,7 @@ export default {
 .wcell { min-height: 28px; border-bottom: 1px solid rgba(255,255,255,0.03); border-right: 1px solid rgba(255,255,255,0.03); cursor: pointer; }
 .wcell:hover { background: rgba(99,102,241,0.04); }
 .events-layer { position: absolute; top: 28px; left: 45px; right: 0; bottom: 0; pointer-events: none; }
-.event-chip { position: absolute; padding: 2px 4px; border-radius: 3px; color: #fff; font-size: 0.6rem; cursor: grab; pointer-events: auto; overflow: hidden; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.1); transition: all 0.3s ease; }
+.event-chip { position: absolute; padding: 2px 4px; border-radius: 3px; color: #fff; font-size: 0.6rem; cursor: grab; pointer-events: auto; overflow: hidden; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.1); transition: all 0.3s ease; max-width: calc(100% - 2px); z-index: 1; }
 .event-chip:hover { z-index: 10; box-shadow: 0 0 0 2px rgba(255,255,255,0.4); }
 .ev-time { font-size: 0.5rem; opacity: 0.8; display: block; }
 .ev-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
