@@ -150,33 +150,75 @@ export default {
     },
     // 🔥 ИСПРАВЛЕНО: без наложений, не выходят за границы
     positionedEvents() {
-      const evs = this.weekEvents; if (!evs.length) return [];
-      const res = [], sh = 8, tm = 15 * 60, byDay = {};
-      evs.forEach(e => { const d = new Date(e.start_time).toISOString().split('T')[0]; if (!byDay[d]) byDay[d] = []; byDay[d].push(e); });
-      Object.values(byDay).forEach(dayEvs => {
-        dayEvs.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
-        const cols = [];
-        dayEvs.forEach(ev => {
-          const es = new Date(ev.start_time).getTime(), ee = new Date(ev.end_time).getTime(); let placed = false;
-          for (const col of cols) { if (!col.some(ce => { const cs = new Date(ce.start_time).getTime(), ce2 = new Date(ce.end_time).getTime(); return es < ce2 && ee > cs; })) { col.push(ev); placed = true; break; } }
-          if (!placed) cols.push([ev]);
-        });
-        const total = cols.length;
-        const cellWidth = 100 / 7;
-        cols.forEach((col, ci) => { col.forEach(ev => {
-          const sd = new Date(ev.start_time), ed = new Date(ev.end_time), di = this.weekDaysList.findIndex(d => d.date === sd.toISOString().split('T')[0]);
-          if (di === -1) return;
-          const startMin = (sd.getHours() - sh) * 60 + sd.getMinutes(), endMin = (ed.getHours() - sh) * 60 + ed.getMinutes();
-          const cs = Math.max(0, startMin), ce = Math.min(tm, endMin), dur = Math.max(ce - cs, 30);
-          const slotWidth = Math.min((col.length === 1 && total === 1) ? (cellWidth - 1) : (cellWidth / total - 1), cellWidth - 1);
-          const slotLeft = Math.min(di * cellWidth + ci * (cellWidth / total), 100 - slotWidth);
-          ev._style = { top: (cs / tm * 100) + '%', height: (dur / tm * 100) + '%', left: slotLeft + '%', width: slotWidth + '%', minHeight: '18px', overflow: 'hidden', maxWidth: (cellWidth - 1) + '%', zIndex: 1 };
-          res.push(ev);
-        });});
+  const evs = this.weekEvents;
+  if (!evs.length) return [];
+  
+  const res = [], sh = 8, tm = 15 * 60;
+  
+  // Группируем по дням
+  const byDay = {};
+  evs.forEach(e => {
+    const d = new Date(e.start_time).toISOString().split('T')[0];
+    if (!byDay[d]) byDay[d] = [];
+    byDay[d].push(e);
+  });
+  
+  Object.values(byDay).forEach(dayEvs => {
+    dayEvs.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+    
+    // Для каждого события находим все пересекающиеся с ним
+    dayEvs.forEach(ev => {
+      const evStart = new Date(ev.start_time).getTime();
+      const evEnd = new Date(ev.end_time).getTime();
+      
+      // Считаем сколько событий пересекаются с этим
+      let overlapping = 1; // само с собой
+      let position = 0;    // позиция среди пересекающихся
+      
+      dayEvs.forEach(other => {
+        if (other === ev) return;
+        const oStart = new Date(other.start_time).getTime();
+        const oEnd = new Date(other.end_time).getTime();
+        
+        // Пересекаются?
+        if (evStart < oEnd && oStart < evEnd) {
+          overlapping++;
+          // Если другое событие начинается раньше — сдвигаем позицию
+          if (oStart < evStart || (oStart === evStart && other.id < ev.id)) {
+            position++;
+          }
+        }
       });
-      return res;
-    }
-  },
+      
+      const sd = new Date(ev.start_time);
+      const ed = new Date(ev.end_time);
+      const di = this.weekDaysList.findIndex(d => d.date === sd.toISOString().split('T')[0]);
+      if (di === -1) return;
+      
+      const startMin = (sd.getHours() - sh) * 60 + sd.getMinutes();
+      const endMin = (ed.getHours() - sh) * 60 + ed.getMinutes();
+      const cs = Math.max(0, startMin);
+      const ce = Math.min(tm, endMin);
+      const dur = Math.max(ce - cs, 30);
+      
+      const cellWidth = 100 / 7;
+      const slotWidth = (cellWidth / overlapping) - 0.5;
+      const slotLeft = di * cellWidth + position * (cellWidth / overlapping);
+      
+      ev._style = {
+        top: (cs / tm * 100) + '%',
+        height: (dur / tm * 100) + '%',
+        left: slotLeft + '%',
+        width: slotWidth + '%',
+        minHeight: '18px',
+        overflow: 'hidden'
+      };
+      res.push(ev);
+    });
+  });
+  
+  return res;
+},
   mounted() { this.loadEvents(); this.loadStudents(); document.addEventListener('mousemove',this.onDrag); document.addEventListener('mouseup',this.onDrop); document.addEventListener('click',this.onClickOutside); },
   beforeUnmount() { document.removeEventListener('mousemove',this.onDrag); document.removeEventListener('mouseup',this.onDrop); document.removeEventListener('click',this.onClickOutside); },
   methods: {
