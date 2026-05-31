@@ -41,7 +41,6 @@
       </div>
     </div>
 
-    <!-- ПОПОВЕР — прямо у курсора -->
     <div v-if="popover.event" class="popover" :style="{top:popover.y+'px',left:popover.x+'px'}" @click.stop>
       <div class="pop-time">{{fmtTime(popover.event.start_time)}} - {{fmtTime(popover.event.end_time)}}</div>
       <div class="pop-title">{{popover.event.title}}</div>
@@ -148,77 +147,36 @@ export default {
       const wd=this.weekDaysList; if(!wd.length)return[];
       return this.events.filter(e=>{const d=new Date(e.start_time).toISOString().split('T')[0];return d>=wd[0].date&&d<=wd[6].date;}).sort((a,b)=>new Date(a.start_time)-new Date(b.start_time));
     },
-    // 🔥 ИСПРАВЛЕНО: без наложений, не выходят за границы
     positionedEvents() {
-  const evs = this.weekEvents;
-  if (!evs.length) return [];
-  
-  const res = [], sh = 8, tm = 15 * 60;
-  
-  // Группируем по дням
-  const byDay = {};
-  evs.forEach(e => {
-    const d = new Date(e.start_time).toISOString().split('T')[0];
-    if (!byDay[d]) byDay[d] = [];
-    byDay[d].push(e);
-  });
-  
-  Object.values(byDay).forEach(dayEvs => {
-    dayEvs.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
-    
-    // Для каждого события находим все пересекающиеся с ним
-    dayEvs.forEach(ev => {
-      const evStart = new Date(ev.start_time).getTime();
-      const evEnd = new Date(ev.end_time).getTime();
-      
-      // Считаем сколько событий пересекаются с этим
-      let overlapping = 1; // само с собой
-      let position = 0;    // позиция среди пересекающихся
-      
-      dayEvs.forEach(other => {
-        if (other === ev) return;
-        const oStart = new Date(other.start_time).getTime();
-        const oEnd = new Date(other.end_time).getTime();
-        
-        // Пересекаются?
-        if (evStart < oEnd && oStart < evEnd) {
-          overlapping++;
-          // Если другое событие начинается раньше — сдвигаем позицию
-          if (oStart < evStart || (oStart === evStart && other.id < ev.id)) {
-            position++;
-          }
-        }
+      const evs = this.weekEvents; if (!evs.length) return [];
+      const res = [], sh = 8, tm = 15 * 60;
+      const byDay = {};
+      evs.forEach(e => { const d = new Date(e.start_time).toISOString().split('T')[0]; if (!byDay[d]) byDay[d] = []; byDay[d].push(e); });
+      Object.values(byDay).forEach(dayEvs => {
+        dayEvs.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+        dayEvs.forEach(ev => {
+          const evStart = new Date(ev.start_time).getTime(), evEnd = new Date(ev.end_time).getTime();
+          let overlapping = 1, position = 0;
+          dayEvs.forEach(other => {
+            if (other === ev) return;
+            const oStart = new Date(other.start_time).getTime(), oEnd = new Date(other.end_time).getTime();
+            if (evStart < oEnd && oStart < evEnd) {
+              overlapping++;
+              if (oStart < evStart || (oStart === evStart && other.id < ev.id)) position++;
+            }
+          });
+          const sd = new Date(ev.start_time), ed = new Date(ev.end_time), di = this.weekDaysList.findIndex(d => d.date === sd.toISOString().split('T')[0]);
+          if (di === -1) return;
+          const startMin = (sd.getHours() - sh) * 60 + sd.getMinutes(), endMin = (ed.getHours() - sh) * 60 + ed.getMinutes();
+          const cs = Math.max(0, startMin), ce = Math.min(tm, endMin), dur = Math.max(ce - cs, 30);
+          const cellWidth = 100 / 7, slotWidth = (cellWidth / overlapping) - 0.5, slotLeft = di * cellWidth + position * (cellWidth / overlapping);
+          ev._style = { top: (cs / tm * 100) + '%', height: (dur / tm * 100) + '%', left: slotLeft + '%', width: slotWidth + '%', minHeight: '18px', overflow: 'hidden' };
+          res.push(ev);
+        });
       });
-      
-      const sd = new Date(ev.start_time);
-      const ed = new Date(ev.end_time);
-      const di = this.weekDaysList.findIndex(d => d.date === sd.toISOString().split('T')[0]);
-      if (di === -1) return;
-      
-      const startMin = (sd.getHours() - sh) * 60 + sd.getMinutes();
-      const endMin = (ed.getHours() - sh) * 60 + ed.getMinutes();
-      const cs = Math.max(0, startMin);
-      const ce = Math.min(tm, endMin);
-      const dur = Math.max(ce - cs, 30);
-      
-      const cellWidth = 100 / 7;
-      const slotWidth = (cellWidth / overlapping) - 0.5;
-      const slotLeft = di * cellWidth + position * (cellWidth / overlapping);
-      
-      ev._style = {
-        top: (cs / tm * 100) + '%',
-        height: (dur / tm * 100) + '%',
-        left: slotLeft + '%',
-        width: slotWidth + '%',
-        minHeight: '18px',
-        overflow: 'hidden'
-      };
-      res.push(ev);
-    });
-  });
-  
-  return res;
-},
+      return res;
+    }
+  },
   mounted() { this.loadEvents(); this.loadStudents(); document.addEventListener('mousemove',this.onDrag); document.addEventListener('mouseup',this.onDrop); document.addEventListener('click',this.onClickOutside); },
   beforeUnmount() { document.removeEventListener('mousemove',this.onDrag); document.removeEventListener('mouseup',this.onDrop); document.removeEventListener('click',this.onClickOutside); },
   methods: {
@@ -231,16 +189,8 @@ export default {
     monthName(date) { return new Date(date).toLocaleDateString('ru',{month:'long'}); },
     onDayClick(day) { if (day.isOtherMonth) return; this.popover.event = null; if (this.getDayEvents(day.date).length === 0 && this.isTutor) { this.quickForm = { date: day.date, title: '' }; } },
     async saveQuick() { if (!this.quickForm.title) return; const start = new Date(this.quickForm.date+'T10:00:00'), end = new Date(start.getTime()+30*60000); try { await axios.post('/api/slots',{title:this.quickForm.title,lesson_type:'online',start_time:start.toISOString(),end_time:end.toISOString(),color:'#10b981',notes:'',student_id:null}); this.quickForm.date = null; this.addToast?.('✅ Создано','success'); this.loadEvents(); } catch(e) { this.addToast?.('Ошибка','error'); } },
-
-    // 🔥 ПОПОВЕР ПРЯМО У КУРСОРА
-    openPopover(e, ev) {
-      if (this.wasDragged) { this.wasDragged = false; return; }
-      const x = Math.min(e.clientX + 10, window.innerWidth - 200);
-      const y = Math.min(e.clientY + 10, window.innerHeight - 150);
-      this.popover = { event: ev, x, y };
-    },
+    openPopover(e, ev) { if (this.wasDragged) { this.wasDragged = false; return; } const x = Math.min(e.clientX + 10, window.innerWidth - 200); const y = Math.min(e.clientY + 10, window.innerHeight - 150); this.popover = { event: ev, x, y }; },
     onClickOutside() { if (this.popover.event) this.popover.event = null; },
-
     createAt(date, h, m) { if (!this.isTutor) return; this.modal = { show: true, event: null, form: { student_id:'',type:'online',title:'',date,time:`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`,duration:30,notes:'',color:'#10b981',repeat:'none',repeat_count:4 } }; },
     openModal(ev) { if (ev) { const sd = new Date(ev.start_time); this.modal = { show: true, event: ev, form: { student_id:ev.student_id||'',type:ev.lesson_type||'online',title:ev.title||'',date:sd.toISOString().split('T')[0],time:this.fmtTime(ev.start_time),duration:Math.round((new Date(ev.end_time)-sd)/60000)||30,notes:ev.notes||'',color:ev.color||'#6366f1',repeat:ev.repeat||'none',repeat_count:ev.repeat_count||4 } }; } else { this.modal = { show: true, event: null, form: { student_id:'',type:'online',title:'',date:new Date().toISOString().split('T')[0],time:'10:00',duration:30,notes:'',color:'#10b981',repeat:'none',repeat_count:4 } }; } },
     closeModal() { this.modal.show = false; this.modal.event = null; },
