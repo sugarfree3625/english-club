@@ -8,25 +8,23 @@
       </div>
     </div>
     <div v-show="open" class="cm-card-body">
-      <draggable v-model="services" handle=".drag-handle" @end="$emit('change')">
-        <div class="service-item" v-for="(s, i) in services" :key="i">
-          <div class="drag-handle" title="Перетащить">⋮⋮</div>
-          <div class="service-fields">
-            <input class="input" v-model="s.title" placeholder="Название услуги" @input="$emit('change')">
-            <input class="input" v-model="s.desc" placeholder="Описание" @input="$emit('change')">
-            <div class="row-fields">
-              <input class="input" v-model="s.price" placeholder="Цена" @input="$emit('change')">
-              <input class="input" v-model="s.duration" placeholder="Длительность" @input="$emit('change')">
-              <input class="input" v-model="s.icon" placeholder="Иконка" style="max-width:80px" @input="$emit('change')">
-            </div>
-            <label class="checkbox-label">
-              <input type="checkbox" v-model="s.popular" @change="$emit('change')">
-              <span>Популярный выбор</span>
-            </label>
+      <div class="service-item" v-for="(s, i) in services" :key="i">
+        <div class="drag-handle" title="Перетащить">⋮⋮</div>
+        <div class="service-fields">
+          <input class="input" :value="s.title" @input="updateService(i, 'title', $event.target.value)" placeholder="Название услуги">
+          <input class="input" :value="s.desc" @input="updateService(i, 'desc', $event.target.value)" placeholder="Описание">
+          <div class="row-fields">
+            <input class="input" :value="s.price" @input="updateService(i, 'price', $event.target.value)" placeholder="Цена">
+            <input class="input" :value="s.duration" @input="updateService(i, 'duration', $event.target.value)" placeholder="Длительность">
+            <input class="input" :value="s.icon" @input="updateService(i, 'icon', $event.target.value)" placeholder="Иконка" style="max-width:80px">
           </div>
-          <button class="btn btn-o btn-sm" style="color:#ef4444" @click="removeService(i)">🗑</button>
+          <label class="checkbox-label">
+            <input type="checkbox" :checked="s.popular" @change="togglePopular(i, $event.target.checked)">
+            <span>Популярный выбор</span>
+          </label>
         </div>
-      </draggable>
+        <button class="btn btn-o btn-sm" style="color:#ef4444" @click="removeService(i)">🗑</button>
+      </div>
       <button class="btn btn-p btn-sm w-100" @click="addService">+ Добавить услугу</button>
     </div>
   </div>
@@ -36,9 +34,19 @@
 import { ref } from 'vue';
 
 const props = defineProps({ services: Array });
-const emit = defineEmits(['change', 'add', 'remove']);
+const emit = defineEmits(['change']);
 
 const open = ref(true);
+
+const updateService = (i, field, value) => {
+  props.services[i][field] = value;
+  emit('change');
+};
+
+const togglePopular = (i, val) => {
+  props.services[i].popular = val;
+  emit('change');
+};
 
 const addService = () => {
   props.services.push({ title: '', desc: '', price: '', duration: '60 минут', icon: '📦', popular: false });
