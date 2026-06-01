@@ -27,25 +27,10 @@
       </div>
       <div v-show="openStats" class="cm-card-body">
         <div class="stats-grid">
-          <div class="stat-card">
-            <span class="stat-icon">👥</span>
-            <span class="stat-value">{{ stats.users }}</span>
-            <span class="stat-label">Пользователей</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-icon">📅</span>
-            <span class="stat-value">{{ stats.sessions }}</span>
-            <span class="stat-label">Занятий</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-icon">💬</span>
-            <span class="stat-value">{{ stats.messages }}</span>
-            <span class="stat-label">Сообщений</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-icon">👁️</span>
-            <span class="stat-value">{{ stats.views }}</span>
-            <span class="stat-label">Просмотров</span>
+          <div class="stat-card" v-for="s in statsList" :key="s.label">
+            <span class="stat-icon">{{ s.icon }}</span>
+            <span class="stat-value">{{ s.value }}</span>
+            <span class="stat-label">{{ s.label }}</span>
           </div>
         </div>
       </div>
@@ -54,20 +39,25 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 
-defineProps({ form: Object, stats: Object });
+const props = defineProps({ form: Object, stats: Object });
 const emit = defineEmits(['change']);
 
 const openBrand = ref(true);
 const openStats = ref(true);
 
+const statsList = computed(() => [
+  { icon: '👥', value: props.stats?.users || '-', label: 'Пользователей' },
+  { icon: '📅', value: props.stats?.sessions || '-', label: 'Занятий' },
+  { icon: '💬', value: props.stats?.messages || '-', label: 'Сообщений' },
+  { icon: '👁️', value: props.stats?.views || 0, label: 'Просмотров' }
+]);
+
 const update = (key, value) => {
   props.form[key] = value;
   emit('change');
 };
-
-const props = defineProps({ form: Object, stats: Object });
 </script>
 
 <style scoped>
