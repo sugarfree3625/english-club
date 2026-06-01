@@ -10,12 +10,20 @@
             <i class="fas fa-search"></i>
             <span class="search-shortcut">Ctrl+K</span>
           </button>
+          
+          <!-- Кнопка языка -->
+          <button class="btn btn-o btn-sm lang-btn" @click="toggleLocale" :title="locale === 'ru' ? 'Switch to English' : 'Переключить на русский'">
+            <span class="lang-flag">{{ locale === 'ru' ? '🇷🇺' : '🇬🇧' }}</span>
+          </button>
+          
+          <!-- Кнопка темы -->
           <button class="btn btn-o btn-sm theme-btn" @click="toggleTheme" :title="isDark ? 'Светлая тема' : 'Тёмная тема'">
             <span class="theme-icon-wrapper" :class="{ rotating: themeAnimating }">
               <span class="theme-icon">{{ isDark ? '☀️' : '🌙' }}</span>
             </span>
           </button>
-          <div v-if="!user"><button class="btn btn-p btn-sm ripple" @click="showLogin = true">Войти</button></div>
+          
+          <div v-if="!user"><button class="btn btn-p btn-sm ripple" @click="showLogin = true">{{ t('login') }}</button></div>
           <div v-else style="position:relative">
             <button class="btn btn-o btn-sm user-btn" @click="menuOpen = !menuOpen">
               <img :src="user.avatar_url || 'https://ui-avatars.com/api/?name='+user.username" class="user-avatar">
@@ -23,13 +31,13 @@
             </button>
             <transition name="dropdown-fade">
               <div v-if="menuOpen" class="dropdown">
-                <a @click="$router.push('/calendar');menuOpen=false"><i class="fas fa-calendar"></i> Календарь</a>
-                <a @click="$router.push('/messages');menuOpen=false"><i class="fas fa-comments"></i> Сообщения</a>
-                <a @click="$router.push('/dashboard');menuOpen=false"><i class="fas fa-chart-line"></i> Главная</a>
-                <a @click="$router.push('/profile');menuOpen=false"><i class="fas fa-user"></i> Профиль</a>
+                <a @click="$router.push('/calendar');menuOpen=false"><i class="fas fa-calendar"></i> {{ t('calendar') }}</a>
+                <a @click="$router.push('/messages');menuOpen=false"><i class="fas fa-comments"></i> {{ t('messages') }}</a>
+                <a @click="$router.push('/dashboard');menuOpen=false"><i class="fas fa-chart-line"></i> {{ t('dashboard') }}</a>
+                <a @click="$router.push('/profile');menuOpen=false"><i class="fas fa-user"></i> {{ t('profile') }}</a>
                 <a @click="showPricing = true; menuOpen=false" v-if="user?.role === 'admin'"><i class="fas fa-crown"></i> Тарифы</a>
-                <a @click="$router.push('/admin');menuOpen=false" v-if="user?.role === 'admin'"><i class="fas fa-sliders-h"></i> Управление сайтом</a>
-                <a @click="logout();menuOpen=false"><i class="fas fa-sign-out-alt"></i> Выйти</a>
+                <a @click="$router.push('/admin');menuOpen=false" v-if="user?.role === 'admin'"><i class="fas fa-sliders-h"></i> {{ t('admin') }}</a>
+                <a @click="logout();menuOpen=false"><i class="fas fa-sign-out-alt"></i> {{ t('logout') }}</a>
               </div>
             </transition>
           </div>
@@ -68,9 +76,9 @@
       </transition-group>
     </div>
 
-    <div class="modal-overlay" v-if="showLogin" @click.self="showLogin = false"><div class="modal"><h3>👋 Войти</h3><input class="input" v-model="loginEmail" placeholder="Email"><input class="input" v-model="loginPassword" placeholder="Пароль" type="password"><button class="btn btn-p w-100 ripple" @click="login">Войти</button><p style="margin-top:14px;text-align:center;font-size:0.85rem;color:var(--t2)">Нет аккаунта? <a href="#" @click.prevent="showLogin=false;showReg=true" style="color:var(--p);font-weight:600">Регистрация</a></p><button class="btn btn-o w-100 mt-2" @click="showLogin=false">Закрыть</button></div></div>
+    <div class="modal-overlay" v-if="showLogin" @click.self="showLogin = false"><div class="modal"><h3>👋 {{ t('login') }}</h3><input class="input" v-model="loginEmail" placeholder="Email"><input class="input" v-model="loginPassword" placeholder="Пароль" type="password"><button class="btn btn-p w-100 ripple" @click="login">{{ t('login') }}</button><p style="margin-top:14px;text-align:center;font-size:0.85rem;color:var(--t2)">Нет аккаунта? <a href="#" @click.prevent="showLogin=false;showReg=true" style="color:var(--p);font-weight:600">{{ t('register') }}</a></p><button class="btn btn-o w-100 mt-2" @click="showLogin=false">Закрыть</button></div></div>
 
-    <div class="modal-overlay" v-if="showReg" @click.self="showReg = false"><div class="modal"><h3>✨ Регистрация</h3><input class="input" v-model="regUsername" placeholder="Имя"><input class="input" v-model="regEmail" placeholder="Email"><input class="input" v-model="regPassword" placeholder="Пароль" type="password"><select class="input" v-model="regLevel"><option value="A1">🟢 Beginner</option><option value="B1" selected>🔵 Intermediate</option><option value="C1">🟣 Advanced</option></select><button class="btn btn-p w-100 ripple" @click="register">Зарегистрироваться</button><p style="margin-top:14px;text-align:center;font-size:0.85rem;color:var(--t2)">Есть аккаунт? <a href="#" @click.prevent="showReg=false;showLogin=true" style="color:var(--p);font-weight:600">Войти</a></p><button class="btn btn-o w-100 mt-2" @click="showReg=false">Закрыть</button></div></div>
+    <div class="modal-overlay" v-if="showReg" @click.self="showReg = false"><div class="modal"><h3>✨ {{ t('register') }}</h3><input class="input" v-model="regUsername" placeholder="Имя"><input class="input" v-model="regEmail" placeholder="Email"><input class="input" v-model="regPassword" placeholder="Пароль" type="password"><select class="input" v-model="regLevel"><option value="A1">🟢 Beginner</option><option value="B1" selected>🔵 Intermediate</option><option value="C1">🟣 Advanced</option></select><button class="btn btn-p w-100 ripple" @click="register">{{ t('register') }}</button><p style="margin-top:14px;text-align:center;font-size:0.85rem;color:var(--t2)">Есть аккаунт? <a href="#" @click.prevent="showReg=false;showLogin=true" style="color:var(--p);font-weight:600">{{ t('login') }}</a></p><button class="btn btn-o w-100 mt-2" @click="showReg=false">Закрыть</button></div></div>
   </div>
 </template>
 
@@ -79,10 +87,16 @@ import axios from 'axios';
 import ScrollToTop from './components/ScrollToTop.vue';
 import WelcomeModal from './components/WelcomeModal.vue';
 import PricingModal from './components/PricingModal.vue';
+import { useI18n } from './composables/useI18n';
+import { playClick, playSuccess, playError } from './composables/useSound';
 
 export default {
   name: 'App',
   components: { ScrollToTop, WelcomeModal, PricingModal },
+  setup() {
+    const { locale, t, toggleLocale } = useI18n();
+    return { locale, t, toggleLocale };
+  },
   data() { 
     return { 
       user: null, settings: {}, isDark: false, themeAnimating: false, menuOpen: false, showPricing: false,
@@ -101,8 +115,15 @@ export default {
     }; 
   },
   methods: {
-    addToast(m, t='info', d=3000) { const id=++this.toastId; this.toasts.push({id,message:m,type:t}); setTimeout(()=>this.removeToast(id),d); },
-    removeToast(id) { this.toasts=this.toasts.filter(t=>t.id!==id); },
+    addToast(m, type='info', d=3000) {
+      const id = ++this.toastId;
+      this.toasts.push({ id, message: m, type });
+      if (type === 'success') playSuccess();
+      else if (type === 'error') playError();
+      else playClick();
+      setTimeout(() => this.removeToast(id), d);
+    },
+    removeToast(id) { this.toasts = this.toasts.filter(t => t.id !== id); },
     goHome() {
       if (this.user) this.$router.push('/dashboard');
       else this.$router.push('/');
@@ -113,22 +134,7 @@ export default {
       document.body.classList.toggle('dark', this.isDark);
       document.body.classList.toggle('light', !this.isDark);
       localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
-      
-      // Звук переключения
-      try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.connect(g);
-        g.connect(ctx.destination);
-        o.frequency.value = this.isDark ? 600 : 800;
-        o.type = 'sine';
-        g.gain.setValueAtTime(0.05, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-        o.start(ctx.currentTime);
-        o.stop(ctx.currentTime + 0.15);
-      } catch(e) {}
-      
+      playClick();
       setTimeout(() => { this.themeAnimating = false; }, 500);
     },
     async globalSearch() { if(this.globalSearchQuery.length<2){this.globalResults={posts:[],sessions:[]};return;} try{const r=await axios.get(`/api/search?q=${this.globalSearchQuery}`);this.globalResults=r.data;}catch(e){this.globalResults={posts:[],sessions:[]};} },
@@ -217,6 +223,22 @@ body {
 
 * {
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* КНОПКА ЯЗЫКА */
+.lang-btn {
+  position: relative;
+  overflow: hidden;
+  font-size: 1.1rem;
+  padding: 6px 10px !important;
+}
+
+.lang-flag {
+  transition: transform 0.3s ease;
+}
+
+.lang-btn:hover .lang-flag {
+  transform: scale(1.2);
 }
 
 /* АНИМАЦИЯ КНОПКИ ТЕМЫ */
