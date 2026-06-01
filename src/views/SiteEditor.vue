@@ -23,17 +23,29 @@
 
     <!-- Вкладки -->
     <div class="se-tabs">
-      <button v-for="t in tabs" :key="t.id" class="se-tab" :class="{ active: tab === t.id }" @click="tab = t.id">
+      <button 
+        v-for="t in tabs" 
+        :key="t.id" 
+        class="se-tab" 
+        :class="{ active: tab === t.id }" 
+        @click="tab = t.id"
+      >
         <span>{{ t.icon }}</span>
         <span>{{ t.label }}</span>
+        <span v-if="t.count !== undefined && t.id === 'services'" class="tab-count">{{ form.services.length }}</span>
+        <span v-if="t.count !== undefined && t.id === 'reviews'" class="tab-count">{{ form.reviews.length }}</span>
+        <span v-if="t.count !== undefined && t.id === 'faq'" class="tab-count">{{ form.faqs.length }}</span>
       </button>
     </div>
 
-    <!-- КОНТЕНТ -->
+    <!-- ==================== ГЛАВНАЯ (HERO) ==================== -->
     <div v-if="tab === 'hero'" class="se-panel">
       <div class="cm-card">
-        <div class="cm-card-header"><h3>🏠 Главный экран (Hero)</h3></div>
-        <div class="cm-card-body">
+        <div class="cm-card-header" @click="sections.hero = !sections.hero">
+          <h3>🏠 Главный экран (Hero)</h3>
+          <i :class="sections.hero ? 'fas fa-chevron-up' : 'fas fa-chevron-down'"></i>
+        </div>
+        <div v-show="sections.hero" class="cm-card-body">
           <div class="field-group">
             <label>Заголовок</label>
             <input class="input" v-model="form.hero_title" placeholder="Анна Петрова" @input="markChanged">
@@ -44,13 +56,22 @@
           </div>
           <div class="field-group">
             <label>Фото репетитора</label>
-            <div class="photo-upload">
+            <div 
+              class="photo-upload drop-zone"
+              :class="{ 'drop-active': dragOver }"
+              @dragover.prevent="dragOver = true"
+              @dragleave="dragOver = false"
+              @drop.prevent="onDropPhoto"
+            >
               <img v-if="form.tutor_photo" :src="form.tutor_photo" class="photo-preview">
-              <div v-else class="photo-placeholder">📷</div>
+              <div v-else class="photo-placeholder">
+                <span v-if="dragOver">📥 Отпустите файл</span>
+                <span v-else>📷</span>
+              </div>
               <div class="photo-actions">
                 <input class="input" v-model="form.tutor_photo" placeholder="URL фото" @input="markChanged">
                 <button class="btn btn-o btn-sm" @click="$refs.photoInput.click()">
-                  <i class="fas fa-upload"></i> Загрузить
+                  <i class="fas fa-upload"></i> Загрузить с компьютера
                 </button>
                 <input type="file" ref="photoInput" @change="uploadPhoto" hidden accept="image/*">
               </div>
@@ -68,14 +89,17 @@
       </div>
     </div>
 
-    <!-- УСЛУГИ -->
+    <!-- ==================== УСЛУГИ ==================== -->
     <div v-if="tab === 'services'" class="se-panel">
       <div class="cm-card">
-        <div class="cm-card-header">
+        <div class="cm-card-header" @click="sections.services = !sections.services">
           <h3>📦 Услуги</h3>
-          <span class="tab-count">{{ form.services.length }}</span>
+          <div class="cm-card-header-right">
+            <span class="tab-count">{{ form.services.length }}</span>
+            <i :class="sections.services ? 'fas fa-chevron-up' : 'fas fa-chevron-down'"></i>
+          </div>
         </div>
-        <div class="cm-card-body">
+        <div v-show="sections.services" class="cm-card-body">
           <draggable v-model="form.services" handle=".drag-handle" @end="markChanged">
             <div class="service-item" v-for="(s, i) in form.services" :key="i">
               <div class="drag-handle" title="Перетащить">⋮⋮</div>
@@ -85,6 +109,7 @@
                 <div class="row-fields">
                   <input class="input" v-model="s.price" placeholder="Цена (например: 1 500 ₽)" @input="markChanged">
                   <input class="input" v-model="s.duration" placeholder="Длительность (например: 60 минут)" @input="markChanged">
+                  <input class="input" v-model="s.icon" placeholder="Иконка" style="max-width:80px" @input="markChanged">
                 </div>
                 <label class="checkbox-label">
                   <input type="checkbox" v-model="s.popular" @change="markChanged">
@@ -103,14 +128,17 @@
       </div>
     </div>
 
-    <!-- ОТЗЫВЫ -->
+    <!-- ==================== ОТЗЫВЫ ==================== -->
     <div v-if="tab === 'reviews'" class="se-panel">
       <div class="cm-card">
-        <div class="cm-card-header">
+        <div class="cm-card-header" @click="sections.reviews = !sections.reviews">
           <h3>⭐ Отзывы</h3>
-          <span class="tab-count">{{ form.reviews.length }}</span>
+          <div class="cm-card-header-right">
+            <span class="tab-count">{{ form.reviews.length }}</span>
+            <i :class="sections.reviews ? 'fas fa-chevron-up' : 'fas fa-chevron-down'"></i>
+          </div>
         </div>
-        <div class="cm-card-body">
+        <div v-show="sections.reviews" class="cm-card-body">
           <div class="service-item" v-for="(r, i) in form.reviews" :key="i">
             <div class="service-fields">
               <input class="input" v-model="r.name" placeholder="Имя ученика" @input="markChanged">
@@ -120,6 +148,7 @@
                   <option v-for="s in 5" :key="s" :value="s">{{ '⭐'.repeat(s) }}</option>
                 </select>
                 <input class="input" v-model="r.role" placeholder="Роль (например: Senior Developer)" @input="markChanged">
+                <input class="input" v-model="r.avatar" placeholder="URL аватара" @input="markChanged" style="max-width:200px">
               </div>
             </div>
             <button class="btn btn-o btn-sm" style="color:#ef4444" @click="form.reviews.splice(i, 1); markChanged()">
@@ -133,14 +162,17 @@
       </div>
     </div>
 
-    <!-- FAQ -->
+    <!-- ==================== FAQ ==================== -->
     <div v-if="tab === 'faq'" class="se-panel">
       <div class="cm-card">
-        <div class="cm-card-header">
+        <div class="cm-card-header" @click="sections.faq = !sections.faq">
           <h3>❓ Частые вопросы</h3>
-          <span class="tab-count">{{ form.faqs.length }}</span>
+          <div class="cm-card-header-right">
+            <span class="tab-count">{{ form.faqs.length }}</span>
+            <i :class="sections.faq ? 'fas fa-chevron-up' : 'fas fa-chevron-down'"></i>
+          </div>
         </div>
-        <div class="cm-card-body">
+        <div v-show="sections.faq" class="cm-card-body">
           <div class="service-item" v-for="(f, i) in form.faqs" :key="i">
             <div class="service-fields">
               <input class="input" v-model="f.q" placeholder="Вопрос" @input="markChanged">
@@ -157,11 +189,14 @@
       </div>
     </div>
 
-    <!-- КОНТАКТЫ -->
+    <!-- ==================== КОНТАКТЫ ==================== -->
     <div v-if="tab === 'contacts'" class="se-panel">
       <div class="cm-card">
-        <div class="cm-card-header"><h3>📞 Контакты</h3></div>
-        <div class="cm-card-body">
+        <div class="cm-card-header" @click="sections.contacts = !sections.contacts">
+          <h3>📞 Контакты</h3>
+          <i :class="sections.contacts ? 'fas fa-chevron-up' : 'fas fa-chevron-down'"></i>
+        </div>
+        <div v-show="sections.contacts" class="cm-card-body">
           <div class="field-group">
             <label><i class="fab fa-telegram"></i> Telegram</label>
             <input class="input" v-model="form.tg" placeholder="https://t.me/username" @input="markChanged">
@@ -182,11 +217,14 @@
       </div>
     </div>
 
-    <!-- БРЕНД -->
+    <!-- ==================== БРЕНД + СТАТИСТИКА ==================== -->
     <div v-if="tab === 'brand'" class="se-panel">
       <div class="cm-card">
-        <div class="cm-card-header"><h3>🎨 Бренд</h3></div>
-        <div class="cm-card-body">
+        <div class="cm-card-header" @click="sections.brand = !sections.brand">
+          <h3>🎨 Бренд</h3>
+          <i :class="sections.brand ? 'fas fa-chevron-up' : 'fas fa-chevron-down'"></i>
+        </div>
+        <div v-show="sections.brand" class="cm-card-body">
           <div class="field-group">
             <label>Название клуба</label>
             <input class="input" v-model="form.club_name" placeholder="English Club" @input="markChanged">
@@ -196,6 +234,38 @@
             <div class="color-picker-row">
               <input class="input" v-model="form.primary_color" type="color" style="width:60px;height:40px;padding:2px" @input="markChanged">
               <input class="input" v-model="form.primary_color" placeholder="#6366f1" @input="markChanged">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- СТАТИСТИКА -->
+      <div class="cm-card">
+        <div class="cm-card-header" @click="sections.stats = !sections.stats">
+          <h3>📊 Статистика сайта</h3>
+          <i :class="sections.stats ? 'fas fa-chevron-up' : 'fas fa-chevron-down'"></i>
+        </div>
+        <div v-show="sections.stats" class="cm-card-body">
+          <div class="stats-grid">
+            <div class="stat-card">
+              <span class="stat-icon">👥</span>
+              <span class="stat-value">{{ stats.users }}</span>
+              <span class="stat-label">Пользователей</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-icon">📅</span>
+              <span class="stat-value">{{ stats.sessions }}</span>
+              <span class="stat-label">Занятий</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-icon">💬</span>
+              <span class="stat-value">{{ stats.messages }}</span>
+              <span class="stat-label">Сообщений</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-icon">👁️</span>
+              <span class="stat-value">{{ stats.views }}</span>
+              <span class="stat-label">Просмотров</span>
             </div>
           </div>
         </div>
@@ -221,6 +291,16 @@ export default {
       saving: false,
       saved: false,
       changed: false,
+      dragOver: false,
+      sections: {
+        hero: true,
+        services: true,
+        reviews: false,
+        faq: false,
+        contacts: true,
+        brand: true,
+        stats: true
+      },
       tabs: [
         { id: 'hero', icon: '🏠', label: 'Главная' },
         { id: 'services', icon: '📦', label: 'Услуги' },
@@ -244,6 +324,12 @@ export default {
         services: [],
         reviews: [],
         faqs: []
+      },
+      stats: {
+        users: 0,
+        sessions: 0,
+        messages: 0,
+        views: 0
       }
     };
   },
@@ -259,6 +345,8 @@ export default {
   },
   async mounted() {
     await this.loadSettings();
+    await this.loadStats();
+    this.incrementViews();
   },
   methods: {
     async loadSettings() {
@@ -277,7 +365,32 @@ export default {
         }
       } catch(e) {
         console.error('Ошибка загрузки:', e);
-        this.addToast?.('Ошибка загрузки настроек', 'error');
+      }
+    },
+
+    async loadStats() {
+      try {
+        const [users, sessions, messages] = await Promise.all([
+          axios.get('/api/users/count').catch(() => ({ data: { count: 0 } })),
+          axios.get('/api/slots/count').catch(() => ({ data: { count: 0 } })),
+          axios.get('/api/messages/count').catch(() => ({ data: { count: 0 } }))
+        ]);
+        this.stats.users = users.data?.count || 0;
+        this.stats.sessions = sessions.data?.count || 0;
+        this.stats.messages = messages.data?.count || 0;
+        this.stats.views = parseInt(localStorage.getItem('site_views') || '0');
+      } catch(e) {}
+    },
+
+    incrementViews() {
+      let views = parseInt(localStorage.getItem('site_views') || '0');
+      const today = localStorage.getItem('view_date');
+      const now = new Date().toDateString();
+      if (today !== now) {
+        views++;
+        localStorage.setItem('site_views', views);
+        localStorage.setItem('view_date', now);
+        this.stats.views = views;
       }
     },
 
@@ -298,14 +411,13 @@ export default {
       
       try {
         const payload = { ...this.form };
-        // Убираем лишние поля из услуг
         payload.services = this.form.services.map(s => ({
           title: s.title,
           desc: s.desc,
           price: s.price,
           duration: s.duration,
-          popular: s.popular || false,
-          icon: s.icon || '📦'
+          icon: s.icon || '📦',
+          popular: s.popular || false
         }));
         
         await axios.put('/api/site-settings', payload);
@@ -327,9 +439,21 @@ export default {
       }
     },
 
-    async uploadPhoto(e) {
+    onDropPhoto(e) {
+      this.dragOver = false;
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) {
+        this.uploadPhotoFile(file);
+      }
+    },
+
+    uploadPhoto(e) {
       const file = e.target.files[0];
-      if (!file || file.size > 5 * 1024 * 1024) {
+      if (file) this.uploadPhotoFile(file);
+    },
+
+    async uploadPhotoFile(file) {
+      if (file.size > 5 * 1024 * 1024) {
         this.addToast?.('Файл больше 5MB', 'error');
         return;
       }
@@ -366,7 +490,8 @@ export default {
         name: '',
         text: '',
         stars: 5,
-        role: 'Ученик'
+        role: 'Ученик',
+        avatar: ''
       });
       this.markChanged();
     },
@@ -426,8 +551,14 @@ export default {
   color: #94a3b8;
 }
 
-.se-status.saving { color: #fbbf24; animation: pulse 1s infinite; }
-.se-status.saved { color: #10b981; }
+.se-status.saving {
+  color: #fbbf24;
+  animation: pulse 1s infinite;
+}
+
+.se-status.saved {
+  color: #10b981;
+}
 
 .se-header-right {
   display: flex;
@@ -461,8 +592,15 @@ export default {
   white-space: nowrap;
 }
 
-.se-tab:hover { color: #fff; background: rgba(255,255,255,0.04); }
-.se-tab.active { background: rgba(99,102,241,0.15); color: #fff; }
+.se-tab:hover {
+  color: #fff;
+  background: rgba(255,255,255,0.04);
+}
+
+.se-tab.active {
+  background: rgba(99,102,241,0.15);
+  color: #fff;
+}
 
 .cm-card {
   background: rgba(255,255,255,0.04);
@@ -478,12 +616,30 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+  cursor: pointer;
+  transition: background 0.2s;
 }
 
-.cm-card-header h3 { margin: 0; font-size: 1rem; font-weight: 700; color: #fff; }
+.cm-card-header:hover {
+  background: rgba(255,255,255,0.02);
+}
 
-.cm-card-body { padding: 24px; }
+.cm-card-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.cm-card-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cm-card-body {
+  padding: 24px;
+}
 
 .tab-count {
   padding: 2px 10px;
@@ -494,7 +650,9 @@ export default {
   color: #818cf8;
 }
 
-.field-group { margin-bottom: 18px; }
+.field-group {
+  margin-bottom: 18px;
+}
 
 .field-group label {
   display: block;
@@ -506,10 +664,27 @@ export default {
   letter-spacing: 0.5px;
 }
 
-.photo-upload { display: flex; gap: 16px; align-items: center; }
+.drop-zone {
+  border: 2px dashed rgba(255,255,255,0.1);
+  border-radius: 16px;
+  padding: 16px;
+  transition: all 0.3s;
+}
+
+.drop-zone.drop-active {
+  border-color: #6366f1;
+  background: rgba(99,102,241,0.05);
+}
+
+.photo-upload {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
 
 .photo-preview {
-  width: 80px; height: 80px;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
   object-fit: cover;
   border: 3px solid rgba(99,102,241,0.3);
@@ -517,18 +692,24 @@ export default {
 }
 
 .photo-placeholder {
-  width: 80px; height: 80px;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
   background: rgba(255,255,255,0.04);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
-  border: 3px dashed rgba(255,255,255,0.1);
+  font-size: 1.5rem;
   flex-shrink: 0;
+  border: 3px dashed rgba(255,255,255,0.1);
 }
 
-.photo-actions { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.photo-actions {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 
 .service-item {
   display: flex;
@@ -548,9 +729,21 @@ export default {
   margin-top: 6px;
 }
 
-.service-fields { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.drag-handle:active {
+  cursor: grabbing;
+}
 
-.row-fields { display: flex; gap: 8px; }
+.service-fields {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row-fields {
+  display: flex;
+  gap: 8px;
+}
 
 .checkbox-label {
   display: flex;
@@ -562,11 +755,53 @@ export default {
 }
 
 .checkbox-label input[type="checkbox"] {
-  width: 18px; height: 18px;
+  width: 18px;
+  height: 18px;
   accent-color: #6366f1;
 }
 
-.color-picker-row { display: flex; gap: 12px; align-items: center; }
+.color-picker-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.stat-card {
+  text-align: center;
+  padding: 24px 16px;
+  background: rgba(255,255,255,0.02);
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.stat-icon {
+  font-size: 2rem;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #6366f1, #2dd4bf);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: block;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-top: 4px;
+  display: block;
+}
 
 .btn {
   display: inline-flex;
@@ -582,14 +817,40 @@ export default {
   transition: all 0.2s;
 }
 
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
-.btn-p { background: linear-gradient(135deg, #6366f1, #2dd4bf); color: #fff; }
-.btn-p:hover:not(:disabled) { box-shadow: 0 4px 15px rgba(99,102,241,0.3); transform: translateY(-1px); }
-.btn-o { border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; background: rgba(255,255,255,0.03); }
-.btn-o:hover { background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3); }
-.btn-sm { padding: 7px 16px; font-size: 0.8rem; }
-.w-100 { width: 100%; }
+.btn-p {
+  background: linear-gradient(135deg, #6366f1, #2dd4bf);
+  color: #fff;
+}
+
+.btn-p:hover:not(:disabled) {
+  box-shadow: 0 4px 15px rgba(99,102,241,0.3);
+  transform: translateY(-1px);
+}
+
+.btn-o {
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #cbd5e1;
+  background: rgba(255,255,255,0.03);
+}
+
+.btn-o:hover {
+  background: rgba(99,102,241,0.1);
+  border-color: rgba(99,102,241,0.3);
+}
+
+.btn-sm {
+  padding: 7px 16px;
+  font-size: 0.8rem;
+}
+
+.w-100 {
+  width: 100%;
+}
 
 .input {
   width: 100%;
@@ -604,14 +865,42 @@ export default {
   transition: border-color 0.2s;
 }
 
-.input:focus { border-color: #6366f1; }
-.note-area { resize: vertical; min-height: 60px; }
+.input:focus {
+  border-color: #6366f1;
+}
 
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.note-area {
+  resize: vertical;
+  min-height: 60px;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
 
 @media (max-width: 768px) {
-  .se-header { flex-direction: column; align-items: flex-start; }
-  .se-header-right { width: 100%; flex-wrap: wrap; }
-  .row-fields { flex-direction: column; }
+  .se-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .se-header-right {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  
+  .row-fields {
+    flex-direction: column;
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .photo-upload {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>
