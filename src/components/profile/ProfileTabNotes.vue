@@ -90,7 +90,7 @@
         </button>
       </div>
 
-      <!-- 🔥 QUILL РЕДАКТОР (вместо textarea) -->
+      <!-- 🔥 QUILL РЕДАКТОР -->
       <div ref="quillEditor" class="quill-editor-wrapper"></div>
 
       <div class="editor-footer">
@@ -112,7 +112,6 @@
 <script>
 import axios from 'axios';
 
-// 🔥 Quill из CDN (уже в index.html)
 const Quill = window.Quill;
 
 export default {
@@ -232,6 +231,7 @@ export default {
         });
 
         this.setupQuillDragDrop();
+        this.setupImageControls(); // 🔥 НОВАЯ ФУНКЦИЯ
       });
     },
 
@@ -267,6 +267,138 @@ export default {
       });
     },
 
+    // 🔥🔥🔥 УПРАВЛЕНИЕ КАРТИНКАМИ (УДАЛЕНИЕ + РЕСАЙЗ)
+    setupImageControls() {
+      if (!this.quillInstance) return;
+
+      this.quillInstance.root.addEventListener('click', (e) => {
+        if (e.target.tagName === 'IMG') {
+          // Убираем выделение с других
+          this.quillInstance.root.querySelectorAll('img.selected').forEach(img => {
+            if (img !== e.target) {
+              img.classList.remove('selected');
+              this.removeDeleteBtn(img);
+              this.removeResize(img);
+            }
+          });
+
+          // Выделяем текущую
+          e.target.classList.add('selected');
+          this.addDeleteBtn(e.target);
+          this.makeResizable(e.target);
+          e.stopPropagation();
+        } else {
+          // Клик мимо — убираем все
+          this.quillInstance.root.querySelectorAll('img.selected').forEach(img => {
+            img.classList.remove('selected');
+            this.removeDeleteBtn(img);
+            this.removeResize(img);
+          });
+        }
+      });
+
+      // Изначально применяем ресайз ко всем картинкам
+      this.quillInstance.root.querySelectorAll('img').forEach(img => {
+        this.makeResizable(img);
+      });
+    },
+
+    addDeleteBtn(img) {
+      this.removeDeleteBtn(img);
+      const parent = img.parentNode;
+      if (!parent) return;
+
+      const btn = document.createElement('button');
+      btn.innerHTML = '×';
+      btn.className = 'img-delete-btn';
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        img.remove();
+        this.currentNote.content = this.quillInstance.root.innerHTML;
+        this.autoSave();
+      };
+
+      // Если img в wrapper'е — вешаем на wrapper
+      const wrapper = parent.closest('.img-resize-wrapper') || parent;
+      wrapper.style.position = 'relative';
+      wrapper.appendChild(btn);
+    },
+
+    removeDeleteBtn(img) {
+      const parent = img.parentNode;
+      if (!parent) return;
+      const wrapper = parent.closest('.img-resize-wrapper') || parent;
+      const btn = wrapper.querySelector('.img-delete-btn');
+      if (btn) btn.remove();
+    },
+
+    makeResizable(img) {
+      this.removeResize(img);
+
+      // Создаём обёртку
+      const wrapper = document.createElement('div');
+      wrapper.className = 'img-resize-wrapper';
+      img.parentNode.insertBefore(wrapper, img);
+      wrapper.appendChild(img);
+
+      // Ручка ресайза
+      const handle = document.createElement('div');
+      handle.className = 'img-resize-handle';
+      handle.innerHTML = '◢';
+      wrapper.appendChild(handle);
+
+      let startX, startY, startWidth, startHeight;
+
+      const onMouseDown = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        startX = e.clientX;
+        startY = e.clientY;
+        startWidth = img.offsetWidth;
+        startHeight = img.offsetHeight;
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      };
+
+      const onMouseMove = (e) => {
+        const dx = e.clientX - startX;
+        const ratio = startWidth / startHeight;
+        let newWidth = startWidth + dx;
+        let newHeight = newWidth / ratio;
+
+        if (newWidth < 50) newWidth = 50;
+        if (newHeight < 50) newHeight = 50;
+        const maxWidth = this.quillInstance.root.offsetWidth - 40;
+        if (newWidth > maxWidth) newWidth = maxWidth;
+
+        img.style.width = newWidth + 'px';
+        img.style.height = 'auto';
+      };
+
+      const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        this.currentNote.content = this.quillInstance.root.innerHTML;
+        this.autoSave();
+      };
+
+      handle.addEventListener('mousedown', onMouseDown);
+      img._resizeHandler = { handle, onMouseDown, onMouseUp, onMouseMove, wrapper };
+    },
+
+    removeResize(img) {
+      if (img._resizeHandler) {
+        const { handle, wrapper, onMouseDown } = img._resizeHandler;
+        handle.removeEventListener('mousedown', onMouseDown);
+        if (wrapper && wrapper.parentNode) {
+          wrapper.parentNode.insertBefore(img, wrapper);
+          wrapper.remove();
+        }
+        delete img._resizeHandler;
+      }
+    },
+
     async uploadFileToNote(file) {
       if (file.size > 10 * 1024 * 1024) { alert('Файл больше 10MB'); return; }
       this.uploading = true;
@@ -283,6 +415,12 @@ export default {
         if (data.type.startsWith('image/')) {
           const range = this.quillInstance.getSelection(true);
           this.quillInstance.insertEmbed(range.index, 'image', data.url);
+          // 🔥 Применяем ресайз к новой картинке
+          this.$nextTick(() => {
+            const imgs = this.quillInstance.root.querySelectorAll('img');
+            const lastImg = imgs[imgs.length - 1];
+            if (lastImg) this.makeResizable(lastImg);
+          });
         }
 
         const idx = this.notes.findIndex(n => n.id === this.currentNote.id);
@@ -301,6 +439,11 @@ export default {
     async saveAndClose() {
       this.saving = true;
       if (this.quillInstance) {
+        // Убираем выделение со всех картинок перед сохранением
+        this.quillInstance.root.querySelectorAll('img.selected').forEach(img => {
+          img.classList.remove('selected');
+          this.removeDeleteBtn(img);
+        });
         this.currentNote.content = this.quillInstance.root.innerHTML;
       }
       const idx = this.notes.findIndex(n => n.id === this.currentNote.id);
@@ -372,6 +515,11 @@ export default {
   beforeUnmount() {
     if (this._saveTimer) clearTimeout(this._saveTimer);
     if (this.quillInstance) {
+      // Очищаем все обработчики
+      this.quillInstance.root.querySelectorAll('img').forEach(img => {
+        this.removeDeleteBtn(img);
+        this.removeResize(img);
+      });
       this.quillInstance.off('text-change');
     }
   }
@@ -483,6 +631,76 @@ export default {
 .quill-editor-wrapper :deep(.ql-editor.ql-blank::before) {
   color: #64748b;
   font-style: normal;
+}
+
+/* 🔥 КНОПКА УДАЛЕНИЯ КАРТИНКИ */
+:deep(.img-delete-btn) {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #fff;
+  border: 2px solid #1e1e1e;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  transition: all 0.2s;
+  line-height: 1;
+  padding: 0;
+}
+:deep(.img-delete-btn:hover) {
+  background: #dc2626;
+  transform: scale(1.15);
+}
+
+/* 🔥 РЕСАЙЗ КАРТИНКИ */
+:deep(.img-resize-wrapper) {
+  display: inline-block;
+  position: relative;
+  max-width: 100%;
+}
+:deep(.img-resize-wrapper img) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  cursor: pointer;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  transition: border-color 0.2s;
+}
+:deep(.img-resize-wrapper img.selected) {
+  border-color: #6366f1;
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.3);
+}
+
+:deep(.img-resize-handle) {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  background: #6366f1;
+  color: #fff;
+  font-size: 10px;
+  border-radius: 4px;
+  cursor: nwse-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 50;
+}
+:deep(.img-resize-wrapper:hover .img-resize-handle),
+:deep(.img-resize-wrapper img.selected ~ .img-resize-handle) {
+  opacity: 1;
 }
 
 .editor-footer { display: flex; justify-content: space-between; align-items: center; }
