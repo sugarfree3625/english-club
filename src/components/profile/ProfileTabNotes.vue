@@ -68,7 +68,6 @@
         <span v-for="tag in currentNote.tags" :key="tag" class="tag-badge">#{{ tag }} <button class="tag-remove" @click="removeTag(tag)">×</button></span>
       </div>
 
-      <!-- 🔥 ПРИКРЕПЛЁННЫЕ ФАЙЛЫ -->
       <div class="attachments-section" v-if="currentNote.attachments?.length">
         <div class="attachments-label">📎 Прикреплённые файлы ({{ currentNote.attachments.length }})</div>
         <div class="attachments-grid">
@@ -84,7 +83,6 @@
         </div>
       </div>
 
-      <!-- 🔥 ЗАГРУЗКА ФАЙЛА -->
       <div class="upload-section">
         <input type="file" ref="fileInput" @change="uploadFile" class="file-input-hidden" accept="image/*,.pdf,.doc,.docx,.mp3,.mp4,.zip" multiple />
         <button class="upload-btn" @click="$refs.fileInput.click()" :disabled="uploading">
@@ -92,7 +90,7 @@
         </button>
       </div>
 
-      <!-- 🔥🔥🔥 QUILL РЕДАКТОР 🔥🔥🔥 -->
+      <!-- 🔥 QUILL РЕДАКТОР (вместо textarea) -->
       <div ref="quillEditor" class="quill-editor-wrapper"></div>
 
       <div class="editor-footer">
@@ -102,7 +100,6 @@
       </div>
     </div>
 
-    <!-- Полноэкранный просмотр -->
     <Teleport to="body">
       <div v-if="fullscreenImage" class="fullscreen-overlay" @click="fullscreenImage = null">
         <img :src="fullscreenImage" class="fullscreen-image" />
@@ -114,8 +111,9 @@
 
 <script>
 import axios from 'axios';
-import Quill from 'quill';
-import 'quill/dist/quill.snow.css';
+
+// 🔥 Quill из CDN (уже в index.html)
+const Quill = window.Quill;
 
 export default {
   name: 'ProfileTabNotes',
@@ -197,7 +195,7 @@ export default {
       this.$nextTick(() => { this.initQuill(); });
     },
 
-    // 🔥 ИНИЦИАЛИЗАЦИЯ QUILL
+    // 🔥 QUILL
     initQuill() {
       if (this.quillInstance) {
         this.quillInstance.off('text-change');
@@ -233,12 +231,10 @@ export default {
           this.autoSave();
         });
 
-        // Drag & Drop в редактор
         this.setupQuillDragDrop();
       });
     },
 
-    // 🔥 DRAG & DROP В QUILL
     setupQuillDragDrop() {
       if (!this.quillInstance) return;
       const editorElement = this.quillInstance.root;
@@ -259,7 +255,6 @@ export default {
         }
       });
 
-      // Вставка из буфера (Ctrl+V)
       editorElement.addEventListener('paste', async (e) => {
         const items = Array.from(e.clipboardData?.items || []);
         for (const item of items) {
@@ -272,7 +267,6 @@ export default {
       });
     },
 
-    // 🔥 ЗАГРУЗКА ФАЙЛА В ЗАМЕТКУ
     async uploadFileToNote(file) {
       if (file.size > 10 * 1024 * 1024) { alert('Файл больше 10MB'); return; }
       this.uploading = true;
@@ -297,7 +291,6 @@ export default {
       finally { this.uploading = false; }
     },
 
-    // 🔥 ЗАГРУЗКА ЧЕРЕЗ КНОПКУ
     async uploadFile(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -463,7 +456,7 @@ export default {
 .upload-btn:hover { border-color: #6366f1; color: #fff; background: rgba(99,102,241,0.08); }
 .upload-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* 🔥 QUILL EDITOR */
+/* 🔥 QUILL */
 .quill-editor-wrapper {
   border-radius: 14px;
   overflow: hidden;
