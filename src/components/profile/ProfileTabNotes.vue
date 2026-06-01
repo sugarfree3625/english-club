@@ -5,6 +5,7 @@
       <div class="nb-stats">
         <span class="nb-stat"><i class="fas fa-file-alt"></i> {{ notes.length }} заметок</span>
         <span class="nb-stat"><i class="fas fa-folder"></i> {{ folders.length }} папок</span>
+        <span class="nb-stat"><i class="fas fa-paperclip"></i> {{ totalFiles }} файлов</span>
         <span class="nb-stat" v-if="lastSaved"><i class="fas fa-check-circle"></i> Сохранено {{ lastSaved }}</span>
       </div>
     </div>
@@ -19,46 +20,31 @@
       <button class="tool-btn" @click="exportNotes" title="Экспорт"><i class="fas fa-download"></i></button>
     </div>
 
-    <!-- Панель папок (зоны для дропа) -->
     <div class="folders-panel" v-if="showFolders">
-      <button 
-        v-for="folder in folders" :key="folder"
-        class="folder-btn" :class="{ active: activeFolder === folder, 'drag-over': dragOverFolder === folder }"
-        @click="activeFolder = activeFolder === folder ? null : folder"
-        @dragover.prevent="dragOverFolder = folder"
-        @dragleave="dragOverFolder = null"
-        @drop="dropToFolder(folder)"
-      >
-        <i class="fas fa-folder" :style="{ color: folderColors[folder] || '#94a3b8' }"></i>
-        {{ folder }}
+      <button v-for="folder in folders" :key="folder" class="folder-btn" :class="{ active: activeFolder === folder, 'drag-over': dragOverFolder === folder }" @click="activeFolder = activeFolder === folder ? null : folder" @dragover.prevent="dragOverFolder = folder" @dragleave="dragOverFolder = null" @drop="dropToFolder(folder)">
+        <i class="fas fa-folder" :style="{ color: folderColors[folder] || '#94a3b8' }"></i> {{ folder }}
         <span class="folder-count">{{ getFolderCount(folder) }}</span>
         <span class="folder-delete" @click.stop="deleteFolder(folder)" title="Удалить папку"><i class="fas fa-times"></i></span>
       </button>
       <button class="folder-btn add-folder" @click="addFolder"><i class="fas fa-plus"></i> Новая папка</button>
     </div>
 
-    <!-- Сетка заметок -->
     <div class="notes-grid" v-if="!editingNote">
-      <div v-for="note in filteredNotes" :key="note.id" 
-        class="note-card" :style="{ borderLeftColor: note.color || '#6366f1' }"
-        :draggable="true"
-        @dragstart="dragNote = note"
-        @dragend="dragNote = null; dragOverFolder = null"
-        @click="editNote(note)">
+      <div v-for="note in filteredNotes" :key="note.id" class="note-card" :style="{ borderLeftColor: note.color || '#6366f1' }" :draggable="true" @dragstart="dragNote = note" @dragend="dragNote = null; dragOverFolder = null" @click="editNote(note)">
         <div class="note-card-header">
           <h4>{{ note.title || 'Без названия' }}</h4>
           <span class="note-date">{{ formatDate(note.updated_at || note.created_at) }}</span>
         </div>
         <p class="note-preview">{{ getPreview(note.content) }}</p>
         <div class="note-card-footer">
-          <div class="note-tags">
-            <span v-for="tag in note.tags" :key="tag" class="note-tag">#{{ tag }}</span>
+          <div class="note-tags"><span v-for="tag in note.tags" :key="tag" class="note-tag">#{{ tag }}</span></div>
+          <div class="note-meta-right">
+            <span class="note-attachments" v-if="note.attachments?.length"><i class="fas fa-paperclip"></i> {{ note.attachments.length }}</span>
+            <span class="note-folder" v-if="note.folder"><i class="fas fa-folder"></i> {{ note.folder }}</span>
           </div>
-          <span class="note-folder" v-if="note.folder"><i class="fas fa-folder"></i> {{ note.folder }}</span>
         </div>
         <button class="note-delete" @click.stop="deleteNote(note.id)" title="Удалить"><i class="fas fa-trash"></i></button>
       </div>
-
       <div v-if="!filteredNotes.length" class="empty-notes">
         <div class="empty-icon">📝</div>
         <p>{{ searchQuery ? 'Ничего не найдено' : 'Нет заметок. Создайте первую!' }}</p>
@@ -66,18 +52,12 @@
       </div>
     </div>
 
-    <!-- Редактор -->
     <div class="note-editor" v-else>
       <div class="editor-header">
         <button class="back-btn" @click="saveAndClose"><i class="fas fa-arrow-left"></i> Назад</button>
         <div class="editor-actions">
-          <select class="folder-select" v-model="currentNote.folder">
-            <option value="">Без папки</option>
-            <option v-for="f in folders" :key="f" :value="f">{{ f }}</option>
-          </select>
-          <div class="color-picker">
-            <button v-for="c in colors" :key="c" class="color-dot" :style="{ background: c }" :class="{ active: currentNote.color === c }" @click="currentNote.color = c"></button>
-          </div>
+          <select class="folder-select" v-model="currentNote.folder"><option value="">Без папки</option><option v-for="f in folders" :key="f" :value="f">{{ f }}</option></select>
+          <div class="color-picker"><button v-for="c in colors" :key="c" class="color-dot" :style="{ background: c }" :class="{ active: currentNote.color === c }" @click="currentNote.color = c"></button></div>
           <button class="tool-btn" @click="saveAndClose"><i class="fas fa-save"></i> Сохранить</button>
         </div>
       </div>
@@ -87,6 +67,31 @@
         <input class="tags-input" v-model="tagInput" @keydown.enter="addTag" placeholder="Добавить тег (Enter)..." />
         <span v-for="tag in currentNote.tags" :key="tag" class="tag-badge">#{{ tag }} <button class="tag-remove" @click="removeTag(tag)">×</button></span>
       </div>
+
+      <!-- 🔥 ПРИКРЕПЛЁННЫЕ ФАЙЛЫ -->
+      <div class="attachments-section" v-if="currentNote.attachments?.length">
+        <div class="attachments-label">📎 Прикреплённые файлы ({{ currentNote.attachments.length }})</div>
+        <div class="attachments-grid">
+          <div v-for="(file, fi) in currentNote.attachments" :key="fi" class="attachment-item">
+            <img v-if="isImage(file.url)" :src="file.url" class="attachment-image" @click="openFullscreen(file.url)" />
+            <div v-else class="attachment-file">
+              <span class="file-icon">{{ getFileIcon(file.type) }}</span>
+              <span class="file-name" :title="file.name">{{ file.name }}</span>
+              <a :href="file.url" target="_blank" class="file-download"><i class="fas fa-download"></i></a>
+            </div>
+            <button class="attachment-remove" @click="removeAttachment(fi)">×</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 🔥 ЗАГРУЗКА ФАЙЛА -->
+      <div class="upload-section">
+        <input type="file" ref="fileInput" @change="uploadFile" class="file-input-hidden" accept="image/*,.pdf,.doc,.docx,.mp3,.mp4,.zip" multiple />
+        <button class="upload-btn" @click="$refs.fileInput.click()" :disabled="uploading">
+          <i class="fas fa-cloud-upload-alt"></i> {{ uploading ? 'Загрузка...' : 'Прикрепить файл' }}
+        </button>
+      </div>
+
       <textarea class="editor-textarea" v-model="currentNote.content" placeholder="Пишите здесь..." rows="15" @keydown.tab="insertTab"></textarea>
       <div class="editor-footer">
         <span class="auto-save" v-if="saving">💾 Сохраняю...</span>
@@ -94,10 +99,20 @@
         <span class="word-count">{{ wordCount }} слов</span>
       </div>
     </div>
+
+    <!-- Полноэкранный просмотр -->
+    <Teleport to="body">
+      <div v-if="fullscreenImage" class="fullscreen-overlay" @click="fullscreenImage = null">
+        <img :src="fullscreenImage" class="fullscreen-image" />
+        <button class="fullscreen-close">✕</button>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
   name: 'ProfileTabNotes',
   props: { note: { type: String, default: '' } },
@@ -105,35 +120,25 @@ export default {
   data() {
     return {
       notes: [], editingNote: false,
-      currentNote: { id: null, title: '', content: '', tags: [], folder: '', color: '#6366f1' },
+      currentNote: { id: null, title: '', content: '', tags: [], folder: '', color: '#6366f1', attachments: [] },
       tagInput: '', searchQuery: '', activeFolder: null, showFolders: true,
-      saving: false, lastSaved: null,
+      saving: false, lastSaved: null, uploading: false,
       colors: ['#6366f1','#10b981','#f59e0b','#ef4444','#ec4899','#8b5cf6','#06b6d4','#84cc16'],
-      folderColors: {},
-      dragNote: null, dragOverFolder: null
+      folderColors: {}, dragNote: null, dragOverFolder: null, fullscreenImage: null
     };
   },
   computed: {
     folders() { return Object.keys(this.folderColors).sort(); },
+    totalFiles() { return this.notes.reduce((sum, n) => sum + (n.attachments?.length || 0), 0); },
     filteredNotes() {
       let list = this.notes;
-      if (this.activeFolder) {
-  list = list.filter(n => n.folder === this.activeFolder);
-} else {
-  list = list.filter(n => !n.folder); // ← Только без папки!
-}
-      if (this.searchQuery) {
-        const q = this.searchQuery.toLowerCase();
-        list = list.filter(n => (n.title||'').toLowerCase().includes(q) || (n.content||'').toLowerCase().includes(q) || (n.tags||[]).some(t => t.toLowerCase().includes(q)));
-      }
+      if (this.activeFolder) { list = list.filter(n => n.folder === this.activeFolder); } else { list = list.filter(n => !n.folder); }
+      if (this.searchQuery) { const q = this.searchQuery.toLowerCase(); list = list.filter(n => (n.title||'').toLowerCase().includes(q) || (n.content||'').toLowerCase().includes(q) || (n.tags||[]).some(t => t.toLowerCase().includes(q))); }
       return list.sort((a,b) => new Date(b.updated_at||b.created_at) - new Date(a.updated_at||a.created_at));
     },
     wordCount() { return this.currentNote.content ? this.currentNote.content.trim().split(/\s+/).filter(w=>w).length : 0; }
   },
-  watch: {
-    'currentNote.content': function() { this.autoSave(); },
-    'currentNote.title': function() { this.autoSave(); }
-  },
+  watch: { 'currentNote.content': function() { this.autoSave(); }, 'currentNote.title': function() { this.autoSave(); } },
   mounted() { this.loadNotes(); if (this.note) this.currentNote.content = this.note; },
   methods: {
     loadNotes() {
@@ -143,19 +148,18 @@ export default {
       if (colors) { try { this.folderColors = JSON.parse(colors); } catch(e) {} }
     },
     saveNotes() { localStorage.setItem('notebook_notes', JSON.stringify(this.notes)); localStorage.setItem('notebook_colors', JSON.stringify(this.folderColors)); },
-
     addNote() {
-      const note = { id: Date.now(), title: 'Новая заметка', content: '', tags: [], folder: this.activeFolder || '', color: this.colors[Math.floor(Math.random()*this.colors.length)], created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+      const note = { id: Date.now(), title: 'Новая заметка', content: '', tags: [], folder: this.activeFolder || '', color: this.colors[Math.floor(Math.random()*this.colors.length)], attachments: [], created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
       this.notes.push(note); this.saveNotes(); this.editNote(note);
     },
-    editNote(note) { this.currentNote = { ...note, tags: [...note.tags] }; this.editingNote = true; },
+    editNote(note) { this.currentNote = { ...note, tags: [...note.tags], attachments: [...(note.attachments||[])] }; this.editingNote = true; },
 
     async saveAndClose() {
       this.saving = true;
       const idx = this.notes.findIndex(n => n.id === this.currentNote.id);
       if (idx >= 0) { this.currentNote.updated_at = new Date().toISOString(); this.notes[idx] = { ...this.currentNote }; }
       this.saveNotes();
-      try { const axios = (await import('axios')).default; await axios.put('/api/notes', { note: this.currentNote.content }); } catch(e) {}
+      try { await axios.put('/api/notes', { note: this.currentNote.content, attachments: this.currentNote.attachments }); } catch(e) {}
       this.lastSaved = `в ${new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}`;
       this.editingNote = false; this.saving = false;
     },
@@ -164,36 +168,44 @@ export default {
       this._saveTimer = setTimeout(async () => {
         const idx = this.notes.findIndex(n => n.id === this.currentNote.id);
         if (idx >= 0) { this.currentNote.updated_at = new Date().toISOString(); this.notes[idx] = { ...this.currentNote }; this.saveNotes(); }
-        try { const axios = (await import('axios')).default; await axios.put('/api/notes', { note: this.currentNote.content }); } catch(e) {}
+        try { await axios.put('/api/notes', { note: this.currentNote.content, attachments: this.currentNote.attachments }); } catch(e) {}
       }, 2000);
+    },
+
+    // 🔥 ЗАГРУЗКА ФАЙЛА
+    async uploadFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 10 * 1024 * 1024) { alert('Файл больше 10MB'); return; }
+      
+      this.uploading = true;
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const { data } = await axios.post('/api/notes/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        
+        if (!this.currentNote.attachments) this.currentNote.attachments = [];
+        this.currentNote.attachments.push({ url: data.url, name: data.name, type: data.type, size: data.size });
+        
+        // Сохраняем сразу
+        const idx = this.notes.findIndex(n => n.id === this.currentNote.id);
+        if (idx >= 0) { this.currentNote.updated_at = new Date().toISOString(); this.notes[idx] = { ...this.currentNote }; this.saveNotes(); }
+      } catch(e) { console.error('Ошибка загрузки:', e); }
+      finally { this.uploading = false; e.target.value = ''; }
+    },
+    
+    removeAttachment(index) {
+      this.currentNote.attachments.splice(index, 1);
+      const idx = this.notes.findIndex(n => n.id === this.currentNote.id);
+      if (idx >= 0) { this.currentNote.updated_at = new Date().toISOString(); this.notes[idx] = { ...this.currentNote }; this.saveNotes(); }
     },
 
     deleteNote(id) { if (!confirm('Удалить заметку?')) return; this.notes = this.notes.filter(n => n.id !== id); this.saveNotes(); },
     addTag() { const tag = this.tagInput.trim().toLowerCase().replace(/\s+/g,'_'); if (tag && !this.currentNote.tags.includes(tag)) this.currentNote.tags.push(tag); this.tagInput = ''; },
     removeTag(tag) { this.currentNote.tags = this.currentNote.tags.filter(t => t !== tag); },
-
-    addFolder() {
-      const name = prompt('Название папки:');
-      if (name && name.trim()) { this.folderColors[name.trim()] = this.colors[Math.floor(Math.random()*this.colors.length)]; this.saveNotes(); this.$forceUpdate(); }
-    },
-    deleteFolder(folder) {
-      if (!confirm(`Удалить папку "${folder}"?`)) return;
-      this.notes.forEach(n => { if (n.folder === folder) n.folder = ''; });
-      delete this.folderColors[folder];
-      if (this.activeFolder === folder) this.activeFolder = null;
-      this.saveNotes();
-    },
-
-    // 🔥 DRAG & DROP
-    dropToFolder(folder) {
-      if (this.dragNote) {
-        this.dragNote.folder = folder;
-        this.saveNotes();
-      }
-      this.dragNote = null;
-      this.dragOverFolder = null;
-    },
-
+    addFolder() { const name = prompt('Название папки:'); if (name && name.trim()) { this.folderColors[name.trim()] = this.colors[Math.floor(Math.random()*this.colors.length)]; this.saveNotes(); this.$forceUpdate(); } },
+    deleteFolder(folder) { if (!confirm(`Удалить папку "${folder}"?`)) return; this.notes.forEach(n => { if (n.folder === folder) n.folder = ''; }); delete this.folderColors[folder]; if (this.activeFolder === folder) this.activeFolder = null; this.saveNotes(); },
+    dropToFolder(folder) { if (this.dragNote) { this.dragNote.folder = folder; this.saveNotes(); } this.dragNote = null; this.dragOverFolder = null; },
     getFolderCount(folder) { return this.notes.filter(n => n.folder === folder).length; },
     getPreview(c) { return c ? c.substring(0,100) + (c.length>100?'...':'') : 'Пустая заметка'; },
     insertTab(e) { e.preventDefault(); const s=e.target.selectionStart, en=e.target.selectionEnd; this.currentNote.content = this.currentNote.content.substring(0,s) + '  ' + this.currentNote.content.substring(en); this.$nextTick(()=>{ e.target.selectionStart = e.target.selectionEnd = s+2; }); },
@@ -201,7 +213,11 @@ export default {
       const text = this.notes.map(n => `# ${n.title}\n${n.folder?`📁 ${n.folder}\n`:''}${n.tags.length?n.tags.map(t=>'#'+t).join(' ')+'\n':''}\n${n.content}\n---`).join('\n\n');
       const b = new Blob([text],{type:'text/plain'}); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href=u; a.download='заметки.txt'; a.click(); URL.revokeObjectURL(u);
     },
-    formatDate(ts) { return ts ? new Date(ts).toLocaleDateString('ru',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : ''; }
+    formatDate(ts) { return ts ? new Date(ts).toLocaleDateString('ru',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : ''; },
+    
+    isImage(url) { return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url); },
+    getFileIcon(type) { if (/image/.test(type)) return '🖼️'; if (/video/.test(type)) return '🎬'; if (/audio/.test(type)) return '🎵'; if (/pdf/.test(type)) return '📄'; if (/zip/.test(type)) return '📦'; return '📎'; },
+    openFullscreen(url) { this.fullscreenImage = url; }
   },
   beforeUnmount() { if (this._saveTimer) clearTimeout(this._saveTimer); }
 };
@@ -241,6 +257,8 @@ export default {
 .note-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
 .note-tags { display: flex; gap: 4px; flex-wrap: wrap; }
 .note-tag { font-size: 0.65rem; color: #818cf8; background: rgba(99,102,241,0.1); padding: 2px 6px; border-radius: 4px; }
+.note-meta-right { display: flex; gap: 8px; align-items: center; }
+.note-attachments { font-size: 0.65rem; color: #94a3b8; }
 .note-folder { font-size: 0.7rem; color: #64748b; display: flex; align-items: center; gap: 4px; }
 .note-delete { position: absolute; top: 10px; right: 10px; background: none; border: none; color: #ef4444; cursor: pointer; opacity: 0; transition: opacity 0.2s; font-size: 0.8rem; }
 .note-card:hover .note-delete { opacity: 0.7; }
@@ -264,12 +282,40 @@ export default {
 .tags-input { flex: 1; min-width: 120px; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; background: rgba(255,255,255,0.03); color: #fff; font-size: 0.8rem; outline: none; font-family: inherit; }
 .tag-badge { display: flex; align-items: center; gap: 4px; padding: 3px 8px; background: rgba(99,102,241,0.15); color: #818cf8; border-radius: 6px; font-size: 0.75rem; }
 .tag-remove { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1rem; padding: 0; }
+
+/* 🔥 ВЛОЖЕНИЯ */
+.attachments-section { margin-bottom: 4px; }
+.attachments-label { font-size: 0.75rem; color: #94a3b8; margin-bottom: 6px; font-weight: 600; }
+.attachments-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.attachment-item { position: relative; display: inline-flex; }
+.attachment-image { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: all 0.2s; }
+.attachment-image:hover { border-color: #6366f1; transform: scale(1.05); }
+.attachment-file { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; font-size: 0.75rem; max-width: 250px; }
+.file-icon { font-size: 1.2rem; }
+.file-name { color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+.file-download { color: #818cf8; text-decoration: none; }
+.file-download:hover { color: #a5b4fc; }
+.attachment-remove { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: #fff; border: none; cursor: pointer; font-size: 0.6rem; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; }
+.attachment-item:hover .attachment-remove { opacity: 1; }
+
+.upload-section { }
+.file-input-hidden { display: none; }
+.upload-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1px dashed rgba(255,255,255,0.2); border-radius: 10px; background: rgba(255,255,255,0.03); color: #94a3b8; cursor: pointer; font-size: 0.8rem; font-weight: 500; transition: all 0.2s; font-family: inherit; width: 100%; justify-content: center; }
+.upload-btn:hover { border-color: #6366f1; color: #fff; background: rgba(99,102,241,0.08); }
+.upload-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .editor-textarea { width: 100%; padding: 14px; border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; background: rgba(255,255,255,0.04); color: #fff; font-size: 0.9rem; line-height: 1.7; outline: none; resize: vertical; min-height: 200px; font-family: 'Inter', sans-serif; }
 .editor-textarea:focus { border-color: #6366f1; }
 .editor-footer { display: flex; justify-content: space-between; align-items: center; }
 .auto-save { font-size: 0.75rem; color: #94a3b8; }
 .auto-save.saved { color: #10b981; }
 .word-count { font-size: 0.75rem; color: #64748b; }
+
+/* Полноэкранный просмотр */
+.fullscreen-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.95); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.fullscreen-image { max-width: 95%; max-height: 95%; border-radius: 12px; }
+.fullscreen-close { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.1); border: none; color: #fff; font-size: 2rem; cursor: pointer; padding: 10px 16px; border-radius: 50%; }
+
 .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border-radius: 50px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border: none; font-family: inherit; transition: all 0.2s; }
 .btn-p { background: linear-gradient(135deg, #6366f1, #2dd4bf); color: #fff; }
 .fade-in { animation: fadeIn 0.35s ease-out; }
