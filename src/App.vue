@@ -10,8 +10,8 @@
             <i class="fas fa-search"></i>
             <span class="search-shortcut">Ctrl+K</span>
           </button>
-          <button class="btn btn-o btn-sm theme-btn" @click="toggleTheme">
-            <span class="theme-icon-wrapper">
+          <button class="btn btn-o btn-sm theme-btn" @click="toggleTheme" :title="isDark ? 'Светлая тема' : 'Тёмная тема'">
+            <span class="theme-icon-wrapper" :class="{ rotating: themeAnimating }">
               <span class="theme-icon">{{ isDark ? '☀️' : '🌙' }}</span>
             </span>
           </button>
@@ -85,7 +85,7 @@ export default {
   components: { ScrollToTop, WelcomeModal, PricingModal },
   data() { 
     return { 
-      user: null, settings: {}, isDark: false, menuOpen: false, showPricing: false,
+      user: null, settings: {}, isDark: false, themeAnimating: false, menuOpen: false, showPricing: false,
       showLogin: false, showReg: false, showWelcome: false, isNewUser: false,
       loginEmail: '', loginPassword: '', regUsername: '', regEmail: '', regPassword: '', regLevel: 'B1',
       toasts: [], toastId: 0,
@@ -108,10 +108,28 @@ export default {
       else this.$router.push('/');
     },
     toggleTheme() { 
+      this.themeAnimating = true;
       this.isDark = !this.isDark; 
       document.body.classList.toggle('dark', this.isDark);
       document.body.classList.toggle('light', !this.isDark);
-      localStorage.setItem('theme', this.isDark ? 'dark' : 'light'); 
+      localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
+      
+      // Звук переключения
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.frequency.value = this.isDark ? 600 : 800;
+        o.type = 'sine';
+        g.gain.setValueAtTime(0.05, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        o.start(ctx.currentTime);
+        o.stop(ctx.currentTime + 0.15);
+      } catch(e) {}
+      
+      setTimeout(() => { this.themeAnimating = false; }, 500);
     },
     async globalSearch() { if(this.globalSearchQuery.length<2){this.globalResults={posts:[],sessions:[]};return;} try{const r=await axios.get(`/api/search?q=${this.globalSearchQuery}`);this.globalResults=r.data;}catch(e){this.globalResults={posts:[],sessions:[]};} },
     handleGlobalKeydown(e) { if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();this.showGlobalSearch=true;this.$nextTick(()=>this.$refs.globalSearchInput?.focus());} if(e.key==='Escape'){this.showGlobalSearch=false;this.menuOpen=false;} },
@@ -119,40 +137,33 @@ export default {
     checkOnboarding() { if(!localStorage.getItem('onboarding_done')&&this.user){setTimeout(()=>{this.showOnboarding=true;},1000);} },
     checkWelcome() { if(this.user){ this.isNewUser=!localStorage.getItem('onboarding_done'); setTimeout(()=>{this.showWelcome=true;},800); } },
     async login() { 
-  try {
-    const r = await axios.post('/api/login', {
-      email: this.loginEmail, 
-      password: this.loginPassword
-    });
-    
-    // Новый формат с токеном
-    if (r.data.token) {
-      localStorage.setItem('token', r.data.token);
-      localStorage.setItem('user', JSON.stringify(r.data.user));
-      this.user = r.data.user;
-      this.showLogin = false;
-      this.loginEmail = '';
-      this.loginPassword = '';
-      this.addToast('Добро пожаловать! 👋', 'success');
-      this.$router.push('/dashboard');
-      this.checkOnboarding();
-      this.checkWelcome();
-    } 
-    // Старый формат (обратная совместимость)
-    else if (r.data.success) {
-      this.user = r.data.user;
-      this.showLogin = false;
-      this.loginEmail = '';
-      this.loginPassword = '';
-      this.addToast('Добро пожаловать! 👋', 'success');
-      this.$router.push('/dashboard');
-      this.checkOnboarding();
-      this.checkWelcome();
-    }
-  } catch(e) {
-    this.addToast(e.response?.data?.error || 'Ошибка входа', 'error');
-  } 
-},
+      try {
+        const r = await axios.post('/api/login', { email: this.loginEmail, password: this.loginPassword });
+        if (r.data.token) {
+          localStorage.setItem('token', r.data.token);
+          localStorage.setItem('user', JSON.stringify(r.data.user));
+          this.user = r.data.user;
+          this.showLogin = false;
+          this.loginEmail = '';
+          this.loginPassword = '';
+          this.addToast('Добро пожаловать! 👋', 'success');
+          this.$router.push('/dashboard');
+          this.checkOnboarding();
+          this.checkWelcome();
+        } else if (r.data.success) {
+          this.user = r.data.user;
+          this.showLogin = false;
+          this.loginEmail = '';
+          this.loginPassword = '';
+          this.addToast('Добро пожаловать! 👋', 'success');
+          this.$router.push('/dashboard');
+          this.checkOnboarding();
+          this.checkWelcome();
+        }
+      } catch(e) {
+        this.addToast(e.response?.data?.error || 'Ошибка входа', 'error');
+      } 
+    },
     async register() { try{const r=await axios.post('/api/reg',{username:this.regUsername,email:this.regEmail,password:this.regPassword,level:this.regLevel});if(r.data.success){this.showReg=false;this.showLogin=true;this.addToast('Регистрация успешна! ✨','success');}}catch(e){this.addToast(e.response?.data?.error||'Ошибка регистрации','error');} },
     async logout() { if(!confirm('Выйти из аккаунта?'))return; try{await axios.post('/api/out');this.addToast('До встречи! 👋','info'); localStorage.removeItem('welcome_dismissed'); }catch(e){} this.user=null;this.menuOpen=false;this.$router.push('/'); }
   },
@@ -167,6 +178,89 @@ export default {
   provide() { return { addToast:this.addToast }; }
 };
 </script>
+
+<style>
+/* ГЛОБАЛЬНЫЕ СТИЛИ */
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --t: #1e293b;
+  --t2: #64748b;
+  --b: #e2e8f0;
+  --p: #6366f1;
+  --p2: #2dd4bf;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 15px rgba(0,0,0,0.08);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.12);
+}
+
+body.dark {
+  --bg: #0b1120;
+  --surface: rgba(15,15,30,0.95);
+  --t: #e2e8f0;
+  --t2: #94a3b8;
+  --b: rgba(255,255,255,0.08);
+  --p: #6366f1;
+  --p2: #2dd4bf;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 15px rgba(0,0,0,0.4);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+body {
+  background: var(--bg);
+  color: var(--t);
+  font-family: 'Inter', 'Plus Jakarta Sans', sans-serif;
+  margin: 0;
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* АНИМАЦИЯ КНОПКИ ТЕМЫ */
+.theme-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.theme-icon-wrapper {
+  display: inline-block;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.theme-icon-wrapper.rotating {
+  animation: themeSpin 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes themeSpin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.3); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+/* СКРОЛЛБАР */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,0.5); }
+
+/* АНИМАЦИИ */
+.page-fade-enter-active, .page-fade-leave-active { transition: opacity 0.25s ease, transform 0.25s ease; }
+.page-fade-enter-from { opacity: 0; transform: translateY(8px); }
+.page-fade-leave-to { opacity: 0; transform: translateY(-8px); }
+
+.toast-list-enter-active { animation: slideInRight 0.3s ease; }
+.toast-list-leave-active { animation: slideOutRight 0.3s ease; }
+@keyframes slideInRight { from { opacity: 0; transform: translateX(100px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes slideOutRight { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(100px); } }
+
+.dropdown-fade-enter-active { animation: dropdownIn 0.2s ease; }
+.dropdown-fade-leave-active { animation: dropdownOut 0.2s ease; }
+@keyframes dropdownIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes dropdownOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-8px); } }
+</style>
 
 <style scoped>
 .logo { display: flex; align-items: center; gap: 8px; cursor: pointer; }
