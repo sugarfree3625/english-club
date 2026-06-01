@@ -1,9 +1,6 @@
 <template>
   <div id="page-home">
-    <!-- 3D Hero -->
     <HeroSection />
-    
-    <!-- Премиальные секции -->
     <LandingSections />
   </div>
 </template>
@@ -21,6 +18,6 @@ export default {
 
 <style scoped>
 #page-home {
-  background: #f8fafc;
+  background: #0b1120;
 }
 </style>
