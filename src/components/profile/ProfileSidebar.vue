@@ -15,6 +15,24 @@
         <span>{{ user?.rating }}</span>
       </div>
       <div class="sidebar-role" :class="roleClass">{{ roleLabel }}</div>
+
+      <!-- СТРИК -->
+      <div v-if="streak > 0" class="streak-mini">
+        <span class="streak-flame">🔥</span>
+        <span>{{ streak }} дней стрика</span>
+      </div>
+
+      <!-- ПРОГРЕСС-БАР УРОВНЯ -->
+      <div class="level-progress">
+        <div class="level-bar">
+          <div class="level-fill" :style="{ width: levelPercent + '%' }"></div>
+        </div>
+        <div class="level-labels">
+          <span>{{ user?.level || 'A1' }}</span>
+          <span>{{ nextLevel }}</span>
+        </div>
+        <span class="level-xp">{{ xpToNext }} XP до следующего уровня</span>
+      </div>
     </div>
 
     <!-- Быстрые действия -->
@@ -63,6 +81,7 @@
           <i class="fas fa-comments"></i>
         </span>
         <span class="nav-label">Чат</span>
+        <span v-if="unreadMessages > 0" class="nav-badge">{{ unreadMessages }}</span>
       </button>
       <button class="nav-btn" @click="$router.push('/dashboard')">
         <span class="nav-icon-wrap back">
@@ -85,7 +104,9 @@ export default {
     currentTab: String,
     isStudent: Boolean,
     isParent: Boolean,
-    isTutor: Boolean
+    isTutor: Boolean,
+    streak: { type: Number, default: 0 },
+    unreadMessages: { type: Number, default: 0 }
   },
   emits: ['switch-tab', 'upload-avatar', 'link-telegram', 'export-pdf'],
   computed: {
@@ -99,6 +120,17 @@ export default {
       if (this.user?.role === 'parent') return 'role-parent';
       if (this.user?.role === 'admin' || this.user?.role === 'host') return 'role-tutor';
       return 'role-student';
+    },
+    levelPercent() {
+      return Math.min(100, (this.user?.rating || 0) % 100);
+    },
+    nextLevel() {
+      const levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+      const idx = levels.indexOf(this.user?.level || 'A1');
+      return idx >= 0 && idx < levels.length - 1 ? levels[idx + 1] : 'MAX';
+    },
+    xpToNext() {
+      return 100 - (this.user?.rating || 0) % 100;
     },
     visibleButtons() {
       const btns = [
@@ -246,6 +278,58 @@ export default {
 .sidebar-role.role-parent { background: rgba(251,191,36,0.12); color: #fbbf24; }
 .sidebar-role.role-tutor { background: rgba(16,185,129,0.12); color: #10b981; }
 
+/* СТРИК-МИНИ */
+.streak-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: rgba(251,191,36,0.1);
+  border: 1px solid rgba(251,191,36,0.2);
+  border-radius: 10px;
+  font-size: 0.7rem;
+  color: #fbbf24;
+  margin-top: 6px;
+}
+.streak-flame {
+  animation: flamePulse 1s ease-in-out infinite;
+}
+@keyframes flamePulse {
+  0%,100%{transform:scale(1)}50%{transform:scale(1.3)}
+}
+
+/* ПРОГРЕСС УРОВНЯ */
+.level-progress {
+  margin-top: 10px;
+  padding: 0 4px;
+}
+.level-bar {
+  height: 4px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.level-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #2dd4bf);
+  border-radius: 2px;
+  transition: width 0.6s ease;
+}
+.level-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6rem;
+  color: #64748b;
+  margin-top: 3px;
+}
+.level-xp {
+  font-size: 0.6rem;
+  color: #818cf8;
+  display: block;
+  text-align: center;
+  margin-top: 2px;
+}
+
 /* КНОПКИ ДЕЙСТВИЙ */
 .sidebar-actions {
   display: flex;
@@ -363,7 +447,6 @@ export default {
   box-shadow: 0 4px 12px rgba(99,102,241,0.2);
 }
 
-/* Цвета иконок по вкладкам */
 .nav-icon-wrap.info { color: #60a5fa; }
 .nav-icon-wrap.achievements { color: #fbbf24; }
 .nav-icon-wrap.myschedule { color: #34d399; }
