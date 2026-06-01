@@ -92,7 +92,9 @@
         </button>
       </div>
 
-      <textarea class="editor-textarea" v-model="currentNote.content" placeholder="Пишите здесь..." rows="15" @keydown.tab="insertTab"></textarea>
+      <!-- 🔥🔥🔥 QUILL РЕДАКТОР 🔥🔥🔥 -->
+      <div ref="quillEditor" class="quill-editor-wrapper"></div>
+
       <div class="editor-footer">
         <span class="auto-save" v-if="saving">💾 Сохраняю...</span>
         <span class="auto-save saved" v-else-if="lastSaved">✅ Сохранено {{ lastSaved }}</span>
@@ -112,6 +114,8 @@
 
 <script>
 import axios from 'axios';
+import Quill from 'quill';
+import 'quill/dist/quill.snow.css';
 
 export default {
   name: 'ProfileTabNotes',
@@ -119,12 +123,22 @@ export default {
   emits: ['update-note'],
   data() {
     return {
-      notes: [], editingNote: false,
+      notes: [],
+      editingNote: false,
       currentNote: { id: null, title: '', content: '', tags: [], folder: '', color: '#6366f1', attachments: [] },
-      tagInput: '', searchQuery: '', activeFolder: null, showFolders: true,
-      saving: false, lastSaved: null, uploading: false,
+      tagInput: '',
+      searchQuery: '',
+      activeFolder: null,
+      showFolders: true,
+      saving: false,
+      lastSaved: null,
+      uploading: false,
       colors: ['#6366f1','#10b981','#f59e0b','#ef4444','#ec4899','#8b5cf6','#06b6d4','#84cc16'],
-      folderColors: {}, dragNote: null, dragOverFolder: null, fullscreenImage: null
+      folderColors: {},
+      dragNote: null,
+      dragOverFolder: null,
+      fullscreenImage: null,
+      quillInstance: null
     };
   },
   computed: {
@@ -136,10 +150,18 @@ export default {
       if (this.searchQuery) { const q = this.searchQuery.toLowerCase(); list = list.filter(n => (n.title||'').toLowerCase().includes(q) || (n.content||'').toLowerCase().includes(q) || (n.tags||[]).some(t => t.toLowerCase().includes(q))); }
       return list.sort((a,b) => new Date(b.updated_at||b.created_at) - new Date(a.updated_at||a.created_at));
     },
-    wordCount() { return this.currentNote.content ? this.currentNote.content.trim().split(/\s+/).filter(w=>w).length : 0; }
+    wordCount() {
+      if (this.quillInstance) {
+        const text = this.quillInstance.getText();
+        return text.trim().split(/\s+/).filter(w => w).length;
+      }
+      return 0;
+    }
   },
-  watch: { 'currentNote.content': function() { this.autoSave(); }, 'currentNote.title': function() { this.autoSave(); } },
-  mounted() { this.loadNotes(); if (this.note) this.currentNote.content = this.note; },
+  mounted() {
+    this.loadNotes();
+    if (this.note) this.currentNote.content = this.note;
+  },
   methods: {
     loadNotes() {
       const saved = localStorage.getItem('notebook_notes');
@@ -147,53 +169,169 @@ export default {
       const colors = localStorage.getItem('notebook_colors');
       if (colors) { try { this.folderColors = JSON.parse(colors); } catch(e) {} }
     },
-    saveNotes() { localStorage.setItem('notebook_notes', JSON.stringify(this.notes)); localStorage.setItem('notebook_colors', JSON.stringify(this.folderColors)); },
+    saveNotes() {
+      localStorage.setItem('notebook_notes', JSON.stringify(this.notes));
+      localStorage.setItem('notebook_colors', JSON.stringify(this.folderColors));
+    },
+
     addNote() {
-      const note = { id: Date.now(), title: 'Новая заметка', content: '', tags: [], folder: this.activeFolder || '', color: this.colors[Math.floor(Math.random()*this.colors.length)], attachments: [], created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-      this.notes.push(note); this.saveNotes(); this.editNote(note);
-    },
-    editNote(note) { this.currentNote = { ...note, tags: [...note.tags], attachments: [...(note.attachments||[])] }; this.editingNote = true; },
-
-    async saveAndClose() {
-      this.saving = true;
-      const idx = this.notes.findIndex(n => n.id === this.currentNote.id);
-      if (idx >= 0) { this.currentNote.updated_at = new Date().toISOString(); this.notes[idx] = { ...this.currentNote }; }
+      const note = {
+        id: Date.now(),
+        title: 'Новая заметка',
+        content: '',
+        tags: [],
+        folder: this.activeFolder || '',
+        color: this.colors[Math.floor(Math.random() * this.colors.length)],
+        attachments: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      this.notes.push(note);
       this.saveNotes();
-      try { await axios.put('/api/notes', { note: this.currentNote.content, attachments: this.currentNote.attachments }); } catch(e) {}
-      this.lastSaved = `в ${new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}`;
-      this.editingNote = false; this.saving = false;
-    },
-    autoSave() {
-      if (this._saveTimer) clearTimeout(this._saveTimer);
-      this._saveTimer = setTimeout(async () => {
-        const idx = this.notes.findIndex(n => n.id === this.currentNote.id);
-        if (idx >= 0) { this.currentNote.updated_at = new Date().toISOString(); this.notes[idx] = { ...this.currentNote }; this.saveNotes(); }
-        try { await axios.put('/api/notes', { note: this.currentNote.content, attachments: this.currentNote.attachments }); } catch(e) {}
-      }, 2000);
+      this.editNote(note);
     },
 
-    // 🔥 ЗАГРУЗКА ФАЙЛА
-    async uploadFile(e) {
-      const file = e.target.files[0];
-      if (!file) return;
+    editNote(note) {
+      this.currentNote = { ...note, tags: [...note.tags], attachments: [...(note.attachments || [])] };
+      this.editingNote = true;
+      this.$nextTick(() => { this.initQuill(); });
+    },
+
+    // 🔥 ИНИЦИАЛИЗАЦИЯ QUILL
+    initQuill() {
+      if (this.quillInstance) {
+        this.quillInstance.off('text-change');
+        this.quillInstance = null;
+      }
+      if (this.$refs.quillEditor) {
+        this.$refs.quillEditor.innerHTML = '';
+      }
+      this.$nextTick(() => {
+        this.quillInstance = new Quill(this.$refs.quillEditor, {
+          theme: 'snow',
+          modules: {
+            toolbar: [
+              [{ 'header': [1, 2, 3, false] }],
+              ['bold', 'italic', 'underline', 'strike'],
+              [{ 'color': [] }, { 'background': [] }],
+              [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'list': 'check' }],
+              [{ 'indent': '-1' }, { 'indent': '+1' }],
+              ['blockquote', 'code-block'],
+              ['link', 'image', 'video'],
+              ['clean']
+            ]
+          },
+          placeholder: 'Пишите здесь...'
+        });
+
+        if (this.currentNote.content) {
+          this.quillInstance.root.innerHTML = this.currentNote.content;
+        }
+
+        this.quillInstance.on('text-change', () => {
+          this.currentNote.content = this.quillInstance.root.innerHTML;
+          this.autoSave();
+        });
+
+        // Drag & Drop в редактор
+        this.setupQuillDragDrop();
+      });
+    },
+
+    // 🔥 DRAG & DROP В QUILL
+    setupQuillDragDrop() {
+      if (!this.quillInstance) return;
+      const editorElement = this.quillInstance.root;
+
+      editorElement.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        editorElement.style.borderColor = '#6366f1';
+      });
+      editorElement.addEventListener('dragleave', () => {
+        editorElement.style.borderColor = '';
+      });
+      editorElement.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        editorElement.style.borderColor = '';
+        const files = Array.from(e.dataTransfer.files);
+        for (const file of files) {
+          await this.uploadFileToNote(file);
+        }
+      });
+
+      // Вставка из буфера (Ctrl+V)
+      editorElement.addEventListener('paste', async (e) => {
+        const items = Array.from(e.clipboardData?.items || []);
+        for (const item of items) {
+          if (item.type.startsWith('image/')) {
+            e.preventDefault();
+            const file = item.getAsFile();
+            await this.uploadFileToNote(file);
+          }
+        }
+      });
+    },
+
+    // 🔥 ЗАГРУЗКА ФАЙЛА В ЗАМЕТКУ
+    async uploadFileToNote(file) {
       if (file.size > 10 * 1024 * 1024) { alert('Файл больше 10MB'); return; }
-      
       this.uploading = true;
       try {
         const formData = new FormData();
         formData.append('file', file);
-        const { data } = await axios.post('/api/notes/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-        
+        const { data } = await axios.post('/api/notes/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
         if (!this.currentNote.attachments) this.currentNote.attachments = [];
         this.currentNote.attachments.push({ url: data.url, name: data.name, type: data.type, size: data.size });
-        
-        // Сохраняем сразу
+
+        if (data.type.startsWith('image/')) {
+          const range = this.quillInstance.getSelection(true);
+          this.quillInstance.insertEmbed(range.index, 'image', data.url);
+        }
+
         const idx = this.notes.findIndex(n => n.id === this.currentNote.id);
         if (idx >= 0) { this.currentNote.updated_at = new Date().toISOString(); this.notes[idx] = { ...this.currentNote }; this.saveNotes(); }
-      } catch(e) { console.error('Ошибка загрузки:', e); }
-      finally { this.uploading = false; e.target.value = ''; }
+      } catch (e) { console.error('Ошибка загрузки:', e); }
+      finally { this.uploading = false; }
     },
-    
+
+    // 🔥 ЗАГРУЗКА ЧЕРЕЗ КНОПКУ
+    async uploadFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      await this.uploadFileToNote(file);
+      e.target.value = '';
+    },
+
+    async saveAndClose() {
+      this.saving = true;
+      if (this.quillInstance) {
+        this.currentNote.content = this.quillInstance.root.innerHTML;
+      }
+      const idx = this.notes.findIndex(n => n.id === this.currentNote.id);
+      if (idx >= 0) { this.currentNote.updated_at = new Date().toISOString(); this.notes[idx] = { ...this.currentNote }; }
+      this.saveNotes();
+      try { await axios.put('/api/notes', { note: this.currentNote.content, attachments: this.currentNote.attachments }); } catch (e) {}
+      this.lastSaved = `в ${new Date().toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}`;
+      this.editingNote = false;
+      this.saving = false;
+      this.quillInstance = null;
+    },
+
+    autoSave() {
+      if (this._saveTimer) clearTimeout(this._saveTimer);
+      this._saveTimer = setTimeout(async () => {
+        if (this.quillInstance) {
+          this.currentNote.content = this.quillInstance.root.innerHTML;
+        }
+        const idx = this.notes.findIndex(n => n.id === this.currentNote.id);
+        if (idx >= 0) { this.currentNote.updated_at = new Date().toISOString(); this.notes[idx] = { ...this.currentNote }; this.saveNotes(); }
+        try { await axios.put('/api/notes', { note: this.currentNote.content, attachments: this.currentNote.attachments }); } catch (e) {}
+      }, 2000);
+    },
+
     removeAttachment(index) {
       this.currentNote.attachments.splice(index, 1);
       const idx = this.notes.findIndex(n => n.id === this.currentNote.id);
@@ -201,25 +339,49 @@ export default {
     },
 
     deleteNote(id) { if (!confirm('Удалить заметку?')) return; this.notes = this.notes.filter(n => n.id !== id); this.saveNotes(); },
-    addTag() { const tag = this.tagInput.trim().toLowerCase().replace(/\s+/g,'_'); if (tag && !this.currentNote.tags.includes(tag)) this.currentNote.tags.push(tag); this.tagInput = ''; },
+    addTag() { const tag = this.tagInput.trim().toLowerCase().replace(/\s+/g, '_'); if (tag && !this.currentNote.tags.includes(tag)) this.currentNote.tags.push(tag); this.tagInput = ''; },
     removeTag(tag) { this.currentNote.tags = this.currentNote.tags.filter(t => t !== tag); },
-    addFolder() { const name = prompt('Название папки:'); if (name && name.trim()) { this.folderColors[name.trim()] = this.colors[Math.floor(Math.random()*this.colors.length)]; this.saveNotes(); this.$forceUpdate(); } },
+    addFolder() { const name = prompt('Название папки:'); if (name && name.trim()) { this.folderColors[name.trim()] = this.colors[Math.floor(Math.random() * this.colors.length)]; this.saveNotes(); this.$forceUpdate(); } },
     deleteFolder(folder) { if (!confirm(`Удалить папку "${folder}"?`)) return; this.notes.forEach(n => { if (n.folder === folder) n.folder = ''; }); delete this.folderColors[folder]; if (this.activeFolder === folder) this.activeFolder = null; this.saveNotes(); },
     dropToFolder(folder) { if (this.dragNote) { this.dragNote.folder = folder; this.saveNotes(); } this.dragNote = null; this.dragOverFolder = null; },
     getFolderCount(folder) { return this.notes.filter(n => n.folder === folder).length; },
-    getPreview(c) { return c ? c.substring(0,100) + (c.length>100?'...':'') : 'Пустая заметка'; },
-    insertTab(e) { e.preventDefault(); const s=e.target.selectionStart, en=e.target.selectionEnd; this.currentNote.content = this.currentNote.content.substring(0,s) + '  ' + this.currentNote.content.substring(en); this.$nextTick(()=>{ e.target.selectionStart = e.target.selectionEnd = s+2; }); },
-    exportNotes() {
-      const text = this.notes.map(n => `# ${n.title}\n${n.folder?`📁 ${n.folder}\n`:''}${n.tags.length?n.tags.map(t=>'#'+t).join(' ')+'\n':''}\n${n.content}\n---`).join('\n\n');
-      const b = new Blob([text],{type:'text/plain'}); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href=u; a.download='заметки.txt'; a.click(); URL.revokeObjectURL(u);
+    getPreview(c) {
+      const text = c ? c.replace(/<[^>]*>/g, '') : '';
+      return text ? text.substring(0, 100) + (text.length > 100 ? '...' : '') : 'Пустая заметка';
     },
-    formatDate(ts) { return ts ? new Date(ts).toLocaleDateString('ru',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : ''; },
-    
+    exportNotes() {
+      const text = this.notes.map(n => {
+        const cleanContent = n.content.replace(/<[^>]*>/g, '');
+        return `# ${n.title}\n${n.folder ? `📁 ${n.folder}\n` : ''}${n.tags.length ? n.tags.map(t => '#' + t).join(' ') + '\n' : ''}\n${cleanContent}\n---`;
+      }).join('\n\n');
+      const b = new Blob([text], { type: 'text/plain' });
+      const u = URL.createObjectURL(b);
+      const a = document.createElement('a');
+      a.href = u;
+      a.download = 'заметки.txt';
+      a.click();
+      URL.revokeObjectURL(u);
+    },
+    formatDate(ts) {
+      return ts ? new Date(ts).toLocaleDateString('ru', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+    },
     isImage(url) { return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url); },
-    getFileIcon(type) { if (/image/.test(type)) return '🖼️'; if (/video/.test(type)) return '🎬'; if (/audio/.test(type)) return '🎵'; if (/pdf/.test(type)) return '📄'; if (/zip/.test(type)) return '📦'; return '📎'; },
+    getFileIcon(type) {
+      if (/image/.test(type)) return '🖼️';
+      if (/video/.test(type)) return '🎬';
+      if (/audio/.test(type)) return '🎵';
+      if (/pdf/.test(type)) return '📄';
+      if (/zip/.test(type)) return '📦';
+      return '📎';
+    },
     openFullscreen(url) { this.fullscreenImage = url; }
   },
-  beforeUnmount() { if (this._saveTimer) clearTimeout(this._saveTimer); }
+  beforeUnmount() {
+    if (this._saveTimer) clearTimeout(this._saveTimer);
+    if (this.quillInstance) {
+      this.quillInstance.off('text-change');
+    }
+  }
 };
 </script>
 
@@ -282,8 +444,6 @@ export default {
 .tags-input { flex: 1; min-width: 120px; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; background: rgba(255,255,255,0.03); color: #fff; font-size: 0.8rem; outline: none; font-family: inherit; }
 .tag-badge { display: flex; align-items: center; gap: 4px; padding: 3px 8px; background: rgba(99,102,241,0.15); color: #818cf8; border-radius: 6px; font-size: 0.75rem; }
 .tag-remove { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1rem; padding: 0; }
-
-/* 🔥 ВЛОЖЕНИЯ */
 .attachments-section { margin-bottom: 4px; }
 .attachments-label { font-size: 0.75rem; color: #94a3b8; margin-bottom: 6px; font-weight: 600; }
 .attachments-grid { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -297,25 +457,48 @@ export default {
 .file-download:hover { color: #a5b4fc; }
 .attachment-remove { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; color: #fff; border: none; cursor: pointer; font-size: 0.6rem; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; }
 .attachment-item:hover .attachment-remove { opacity: 1; }
-
 .upload-section { }
 .file-input-hidden { display: none; }
 .upload-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1px dashed rgba(255,255,255,0.2); border-radius: 10px; background: rgba(255,255,255,0.03); color: #94a3b8; cursor: pointer; font-size: 0.8rem; font-weight: 500; transition: all 0.2s; font-family: inherit; width: 100%; justify-content: center; }
 .upload-btn:hover { border-color: #6366f1; color: #fff; background: rgba(99,102,241,0.08); }
 .upload-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.editor-textarea { width: 100%; padding: 14px; border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; background: rgba(255,255,255,0.04); color: #fff; font-size: 0.9rem; line-height: 1.7; outline: none; resize: vertical; min-height: 200px; font-family: 'Inter', sans-serif; }
-.editor-textarea:focus { border-color: #6366f1; }
+/* 🔥 QUILL EDITOR */
+.quill-editor-wrapper {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+.quill-editor-wrapper :deep(.ql-toolbar) {
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+.quill-editor-wrapper :deep(.ql-container) {
+  border: none;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9rem;
+  color: #e2e8f0;
+  min-height: 300px;
+}
+.quill-editor-wrapper :deep(.ql-editor) {
+  padding: 14px;
+  line-height: 1.7;
+  min-height: 300px;
+}
+.quill-editor-wrapper :deep(.ql-editor.ql-blank::before) {
+  color: #64748b;
+  font-style: normal;
+}
+
 .editor-footer { display: flex; justify-content: space-between; align-items: center; }
 .auto-save { font-size: 0.75rem; color: #94a3b8; }
 .auto-save.saved { color: #10b981; }
 .word-count { font-size: 0.75rem; color: #64748b; }
-
-/* Полноэкранный просмотр */
 .fullscreen-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.95); display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .fullscreen-image { max-width: 95%; max-height: 95%; border-radius: 12px; }
 .fullscreen-close { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.1); border: none; color: #fff; font-size: 2rem; cursor: pointer; padding: 10px 16px; border-radius: 50%; }
-
 .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border-radius: 50px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border: none; font-family: inherit; transition: all 0.2s; }
 .btn-p { background: linear-gradient(135deg, #6366f1, #2dd4bf); color: #fff; }
 .fade-in { animation: fadeIn 0.35s ease-out; }
