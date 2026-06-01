@@ -33,12 +33,12 @@
 
 <script>
 import axios from 'axios';
-import AdminHero from './admin/AdminHero.vue';
-import AdminServices from './admin/AdminServices.vue';
-import AdminReviews from './admin/AdminReviews.vue';
-import AdminFAQ from './admin/AdminFAQ.vue';
-import AdminContacts from './admin/AdminContacts.vue';
-import AdminBrand from './admin/AdminBrand.vue';
+import AdminHero from '../components/admin/AdminHero.vue';
+import AdminServices from '../components/admin/AdminServices.vue';
+import AdminReviews from '../components/admin/AdminReviews.vue';
+import AdminFAQ from '../components/admin/AdminFAQ.vue';
+import AdminContacts from '../components/admin/AdminContacts.vue';
+import AdminBrand from '../components/admin/AdminBrand.vue';
 
 export default {
   name: 'SiteEditor',
