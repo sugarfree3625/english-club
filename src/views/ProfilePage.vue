@@ -96,15 +96,34 @@ export default {
   props: ['user'],
   inject: ['addToast'],
   data() {
-    return {
-      tab: 'info', words: [], wordsLoading: false, note: '', allBookings: [],
-      allAchievements: [], earnedCount: 0, totalCount: 50, showConfetti: false,
-      allHomework: [], homeworkLoading: false, selectedHomework: null,
-      myStudents: [], allStudents: [], viewingStudent: null, mySlots: [],
-      showBindParent: false, bindStudentId: null, parentResults: [],
-      showFeedback: false, fbStudentId: null, newAchievement: null, feedbacks: []
-    };
-  },
+  return {
+    tab: 'info',
+    words: [],
+    wordsLoading: false,
+    note: '',
+    allBookings: [],
+    allAchievements: [],
+    earnedCount: 0,
+    totalCount: 50,
+    showConfetti: false,
+    allHomework: [],
+    homeworkLoading: false,
+    selectedHomework: null,
+    myStudents: [],
+    allStudents: [],
+    viewingStudent: null,
+    mySlots: [],
+    showBindParent: false,
+    bindStudentId: null,
+    parentResults: [],
+    showFeedback: false,
+    fbStudentId: null,
+    newAchievement: null,
+    feedbacks: [],
+    streak: 0,           
+    unreadMessages: 0, 
+  };
+},
   computed: {
     isStudent() { return !this.user?.role || this.user.role === 'user' || this.user.role === 'student'; },
     isParent() { return this.user?.role === 'parent'; },
