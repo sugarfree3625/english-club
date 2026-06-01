@@ -5,11 +5,18 @@
     <div class="container">
       <div class="profile-page">
         <ProfileSidebar
-          :user="user" :currentTab="tab"
-          :isStudent="isStudent" :isParent="isParent" :isTutor="isTutor"
-          @switch-tab="switchTab" @upload-avatar="uploadAvatar"
-          @link-telegram="linkTelegram" @export-pdf="exportPDF"
-        />
+  :user="user"
+  :currentTab="tab"
+  :isStudent="isStudent"
+  :isParent="isParent"
+  :isTutor="isTutor"
+  :streak="streak"
+  :unreadMessages="unreadMessages"
+  @switch-tab="switchTab"
+  @upload-avatar="uploadAvatar"
+  @link-telegram="linkTelegram"
+  @export-pdf="exportPDF"
+/>
         <div class="profile-main">
           <ProfileTabInfo v-if="tab === 'info'" :user="user" />
           <ProfileTabAchievements v-if="tab === 'achievements'" :achievements="allAchievements" :earned="earnedCount" :total="totalCount" :percent="completionPercent" />
