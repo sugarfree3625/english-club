@@ -7,11 +7,11 @@
     <div v-show="open" class="cm-card-body">
       <div class="field-group">
         <label>Заголовок</label>
-        <input class="input" v-model="form.hero_title" placeholder="Анна Петрова" @input="$emit('change')">
+        <input class="input" :value="form.hero_title" @input="update('hero_title', $event.target.value)" placeholder="Анна Петрова">
       </div>
       <div class="field-group">
         <label>Подзаголовок</label>
-        <textarea class="input note-area" v-model="form.hero_subtitle" rows="2" placeholder="Разговорный клуб..." @input="$emit('change')"></textarea>
+        <textarea class="input note-area" :value="form.hero_subtitle" @input="update('hero_subtitle', $event.target.value)" rows="2" placeholder="Разговорный клуб..."></textarea>
       </div>
       <div class="field-group">
         <label>Фото репетитора</label>
@@ -28,7 +28,7 @@
             <span v-else>📷</span>
           </div>
           <div class="photo-actions">
-            <input class="input" v-model="form.tutor_photo" placeholder="URL фото" @input="$emit('change')">
+            <input class="input" :value="form.tutor_photo" @input="update('tutor_photo', $event.target.value)" placeholder="URL фото">
             <button class="btn btn-o btn-sm" @click="$refs.photoInput.click()">
               <i class="fas fa-upload"></i> Загрузить с компьютера
             </button>
@@ -38,11 +38,11 @@
       </div>
       <div class="field-group">
         <label>Имя репетитора</label>
-        <input class="input" v-model="form.tutor_name" placeholder="Анна Иванова" @input="$emit('change')">
+        <input class="input" :value="form.tutor_name" @input="update('tutor_name', $event.target.value)" placeholder="Анна Иванова">
       </div>
       <div class="field-group">
         <label>О себе</label>
-        <textarea class="input note-area" v-model="form.tutor_bio" rows="3" placeholder="Расскажите о себе..." @input="$emit('change')"></textarea>
+        <textarea class="input note-area" :value="form.tutor_bio" @input="update('tutor_bio', $event.target.value)" rows="3" placeholder="Расскажите о себе..."></textarea>
       </div>
     </div>
   </div>
@@ -52,10 +52,15 @@
 import { ref } from 'vue';
 
 const props = defineProps({ form: Object });
-defineEmits(['change', 'upload-photo']);
+const emit = defineEmits(['change', 'upload-photo']);
 
 const open = ref(true);
 const dragOver = ref(false);
+
+const update = (key, value) => {
+  props.form[key] = value;
+  emit('change');
+};
 
 const onDrop = (e) => {
   dragOver.value = false;
@@ -67,8 +72,6 @@ const onFileSelect = (e) => {
   const file = e.target.files[0];
   if (file) emit('upload-photo', file);
 };
-
-const emit = defineEmits(['change', 'upload-photo']);
 </script>
 
 <style scoped>
