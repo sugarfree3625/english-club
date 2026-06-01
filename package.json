@@ -26,6 +26,7 @@
     "@fullcalendar/interaction": "^6.1.15",
     "@fullcalendar/list": "^6.1.15",
     "express": "^4.21.0",
+    "canvas-confetti": "^1.9.3",
     "express-session": "^1.18.0",
     "googleapis": "^144.0.0",
     "node-vk-bot-api": "^3.0.0",
