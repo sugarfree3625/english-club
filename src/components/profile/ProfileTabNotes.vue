@@ -90,7 +90,6 @@
         </button>
       </div>
 
-      <!-- 🔥 QUILL РЕДАКТОР -->
       <div ref="quillEditor" class="quill-editor-wrapper"></div>
 
       <div class="editor-footer">
@@ -194,7 +193,7 @@ export default {
       this.$nextTick(() => { this.initQuill(); });
     },
 
-    // 🔥 QUILL
+    // 🔥 QUILL (ИСПРАВЛЕНО)
     initQuill() {
       if (this.quillInstance) {
         this.quillInstance.off('text-change');
@@ -231,7 +230,11 @@ export default {
         });
 
         this.setupQuillDragDrop();
-        this.setupImageControls(); // 🔥 НОВАЯ ФУНКЦИЯ
+        
+        // Вызываем с задержкой чтобы DOM точно был готов
+        setTimeout(() => {
+          this.setupImageControls();
+        }, 200);
       });
     },
 
@@ -267,13 +270,12 @@ export default {
       });
     },
 
-    // 🔥🔥🔥 УПРАВЛЕНИЕ КАРТИНКАМИ (УДАЛЕНИЕ + РЕСАЙЗ)
+    // 🔥 УПРАВЛЕНИЕ КАРТИНКАМИ (ИСПРАВЛЕНО)
     setupImageControls() {
       if (!this.quillInstance) return;
 
       this.quillInstance.root.addEventListener('click', (e) => {
         if (e.target.tagName === 'IMG') {
-          // Убираем выделение с других
           this.quillInstance.root.querySelectorAll('img.selected').forEach(img => {
             if (img !== e.target) {
               img.classList.remove('selected');
@@ -282,13 +284,11 @@ export default {
             }
           });
 
-          // Выделяем текущую
           e.target.classList.add('selected');
           this.addDeleteBtn(e.target);
           this.makeResizable(e.target);
           e.stopPropagation();
         } else {
-          // Клик мимо — убираем все
           this.quillInstance.root.querySelectorAll('img.selected').forEach(img => {
             img.classList.remove('selected');
             this.removeDeleteBtn(img);
@@ -297,51 +297,52 @@ export default {
         }
       });
 
-      // Изначально применяем ресайз ко всем картинкам
       this.quillInstance.root.querySelectorAll('img').forEach(img => {
         this.makeResizable(img);
       });
     },
 
     addDeleteBtn(img) {
+      if (!img || !img.parentNode) return;
       this.removeDeleteBtn(img);
+      
       const parent = img.parentNode;
-      if (!parent) return;
-
       const btn = document.createElement('button');
       btn.innerHTML = '×';
       btn.className = 'img-delete-btn';
       btn.onclick = (e) => {
         e.stopPropagation();
+        this.removeResize(img);
         img.remove();
         this.currentNote.content = this.quillInstance.root.innerHTML;
         this.autoSave();
       };
 
-      // Если img в wrapper'е — вешаем на wrapper
       const wrapper = parent.closest('.img-resize-wrapper') || parent;
       wrapper.style.position = 'relative';
       wrapper.appendChild(btn);
     },
 
     removeDeleteBtn(img) {
+      if (!img || !img.parentNode) return;
       const parent = img.parentNode;
-      if (!parent) return;
       const wrapper = parent.closest('.img-resize-wrapper') || parent;
       const btn = wrapper.querySelector('.img-delete-btn');
       if (btn) btn.remove();
     },
 
     makeResizable(img) {
+      // Проверка что элемент в DOM
+      if (!img || !img.parentNode || !document.body.contains(img)) return;
+      if (img._resizeHandler) return; // Уже есть обёртка
+      
       this.removeResize(img);
 
-      // Создаём обёртку
       const wrapper = document.createElement('div');
       wrapper.className = 'img-resize-wrapper';
       img.parentNode.insertBefore(wrapper, img);
       wrapper.appendChild(img);
 
-      // Ручка ресайза
       const handle = document.createElement('div');
       handle.className = 'img-resize-handle';
       handle.innerHTML = '◢';
@@ -365,11 +366,9 @@ export default {
         const dx = e.clientX - startX;
         const ratio = startWidth / startHeight;
         let newWidth = startWidth + dx;
-        let newHeight = newWidth / ratio;
 
         if (newWidth < 50) newWidth = 50;
-        if (newHeight < 50) newHeight = 50;
-        const maxWidth = this.quillInstance.root.offsetWidth - 40;
+        const maxWidth = this.quillInstance?.root?.offsetWidth - 40 || 500;
         if (newWidth > maxWidth) newWidth = maxWidth;
 
         img.style.width = newWidth + 'px';
@@ -379,8 +378,10 @@ export default {
       const onMouseUp = () => {
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
-        this.currentNote.content = this.quillInstance.root.innerHTML;
-        this.autoSave();
+        if (this.quillInstance) {
+          this.currentNote.content = this.quillInstance.root.innerHTML;
+          this.autoSave();
+        }
       };
 
       handle.addEventListener('mousedown', onMouseDown);
@@ -388,15 +389,17 @@ export default {
     },
 
     removeResize(img) {
-      if (img._resizeHandler) {
-        const { handle, wrapper, onMouseDown } = img._resizeHandler;
-        handle.removeEventListener('mousedown', onMouseDown);
-        if (wrapper && wrapper.parentNode) {
-          wrapper.parentNode.insertBefore(img, wrapper);
-          wrapper.remove();
-        }
-        delete img._resizeHandler;
+      if (!img || !img._resizeHandler) return;
+      
+      const { handle, wrapper, onMouseDown } = img._resizeHandler;
+      if (handle) handle.removeEventListener('mousedown', onMouseDown);
+      
+      if (wrapper && wrapper.parentNode && img.parentNode === wrapper) {
+        wrapper.parentNode.insertBefore(img, wrapper);
+        wrapper.remove();
       }
+      
+      delete img._resizeHandler;
     },
 
     async uploadFileToNote(file) {
@@ -415,11 +418,12 @@ export default {
         if (data.type.startsWith('image/')) {
           const range = this.quillInstance.getSelection(true);
           this.quillInstance.insertEmbed(range.index, 'image', data.url);
-          // 🔥 Применяем ресайз к новой картинке
           this.$nextTick(() => {
-            const imgs = this.quillInstance.root.querySelectorAll('img');
-            const lastImg = imgs[imgs.length - 1];
-            if (lastImg) this.makeResizable(lastImg);
+            setTimeout(() => {
+              const imgs = this.quillInstance.root.querySelectorAll('img');
+              const lastImg = imgs[imgs.length - 1];
+              if (lastImg) this.makeResizable(lastImg);
+            }, 100);
           });
         }
 
@@ -439,7 +443,6 @@ export default {
     async saveAndClose() {
       this.saving = true;
       if (this.quillInstance) {
-        // Убираем выделение со всех картинок перед сохранением
         this.quillInstance.root.querySelectorAll('img.selected').forEach(img => {
           img.classList.remove('selected');
           this.removeDeleteBtn(img);
@@ -515,7 +518,6 @@ export default {
   beforeUnmount() {
     if (this._saveTimer) clearTimeout(this._saveTimer);
     if (this.quillInstance) {
-      // Очищаем все обработчики
       this.quillInstance.root.querySelectorAll('img').forEach(img => {
         this.removeDeleteBtn(img);
         this.removeResize(img);
@@ -604,7 +606,6 @@ export default {
 .upload-btn:hover { border-color: #6366f1; color: #fff; background: rgba(99,102,241,0.08); }
 .upload-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* 🔥 QUILL */
 .quill-editor-wrapper {
   border-radius: 14px;
   overflow: hidden;
@@ -633,7 +634,6 @@ export default {
   font-style: normal;
 }
 
-/* 🔥 КНОПКА УДАЛЕНИЯ КАРТИНКИ */
 :deep(.img-delete-btn) {
   position: absolute;
   top: -8px;
@@ -660,7 +660,6 @@ export default {
   transform: scale(1.15);
 }
 
-/* 🔥 РЕСАЙЗ КАРТИНКИ */
 :deep(.img-resize-wrapper) {
   display: inline-block;
   position: relative;
@@ -679,7 +678,6 @@ export default {
   border-color: #6366f1;
   box-shadow: 0 0 15px rgba(99, 102, 241, 0.3);
 }
-
 :deep(.img-resize-handle) {
   position: absolute;
   bottom: 4px;
