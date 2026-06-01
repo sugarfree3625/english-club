@@ -32,7 +32,10 @@
       <div class="chat-header">
         <div style="display:flex;align-items:center;gap:12px">
           <AppAvatar :src="partnerAvatar" :name="activeChatName" :size="40" class="chat-avatar tilt-avatar" />
-          <div><strong>{{ activeChatName }}</strong><small :class="{ online: isPartnerOnline }">{{ isPartnerOnline ? '🟢 Онлайн' : '⚫ Оффлайн' }}</small></div>
+          <div>
+            <strong>{{ activeChatName }}</strong>
+            <small :class="{ online: isPartnerOnline }">{{ partnerStatusText }}</small>
+          </div>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-o btn-sm interactive-btn" @click="startVideoCall" title="Видеозвонок">📹</button>
@@ -53,30 +56,58 @@
       </div>
 
       <div class="chat-messages" ref="msgContainer">
-        <transition-group name="msg-pop">
-          <div v-for="(m, idx) in filteredMessages" :key="m.id || m.ts || idx" class="msg" :class="{ mine: m.sender_id === currentUserId || m.from === currentUserId }">
-            <div v-if="m.reply_to" class="reply-preview">↩ {{ m.reply_to?.substring(0, 60) }}</div>
-            <div v-if="m.message" class="msg-text" v-html="linkify(m.message)"></div>
-            <div v-if="m.files?.length" class="msg-files">
-              <div v-for="(f, i) in m.files" :key="i" class="msg-file">
-                <img v-if="f.type === 'image'" :src="proxifyUrl(f.url)" class="msg-img" @click="lightbox = proxifyUrl(f.url)" @error="$event.target.style.display='none'">
-                <div v-else-if="f.type === 'audio'" class="voice-msg">
-                  <button @click="toggleAudio($event, proxifyUrl(f.url))" class="voice-play-btn interactive-btn">▶️</button>
-                  <div class="voice-wave"><div class="voice-wave-bar" v-for="n in 12" :key="n" :style="{ height: Math.random() * 16 + 4 + 'px' }"></div></div>
-                  <span class="voice-label">{{ f.name || '🎤 Голосовое' }}</span>
+        <!-- Группировка по датам -->
+        <template v-for="(group, gIdx) in groupedMessages" :key="'g-'+gIdx">
+          <div class="date-divider">
+            <span>{{ group.label }}</span>
+          </div>
+          <transition-group name="msg-pop">
+            <div v-for="(m, idx) in group.messages" :key="m.id || m.ts || idx" class="msg" :class="{ mine: m.sender_id === currentUserId || m.from === currentUserId }">
+              <div v-if="m.reply_to" class="reply-preview">↩ {{ m.reply_to?.substring(0, 60) }}</div>
+              <div v-if="m.message" class="msg-text" v-html="linkify(m.message)"></div>
+              <div v-if="m.files?.length" class="msg-files">
+                <div v-for="(f, i) in m.files" :key="i" class="msg-file">
+                  <img v-if="f.type === 'image'" :src="proxifyUrl(f.url)" class="msg-img" @click="lightbox = proxifyUrl(f.url)" @error="$event.target.style.display='none'">
+                  <div v-else-if="f.type === 'audio'" class="voice-msg">
+                    <button @click="toggleAudio($event, proxifyUrl(f.url))" class="voice-play-btn interactive-btn">▶️</button>
+                    <div class="voice-wave"><div class="voice-wave-bar" v-for="n in 12" :key="n" :style="{ height: Math.random() * 16 + 4 + 'px' }"></div></div>
+                    <span class="voice-label">{{ f.name || '🎤 Голосовое' }}</span>
+                  </div>
+                  <video v-else-if="f.type === 'video'" :src="proxifyUrl(f.url)" controls class="msg-video"></video>
+                  <a v-else :href="proxifyUrl(f.url)" target="_blank" class="file-link" :download="f.name || 'file'">📎 {{ f.name || 'Файл' }}</a>
                 </div>
-                <video v-else-if="f.type === 'video'" :src="proxifyUrl(f.url)" controls class="msg-video"></video>
-                <a v-else :href="proxifyUrl(f.url)" target="_blank" class="file-link" :download="f.name || 'file'">📎 {{ f.name || 'Файл' }}</a>
+              </div>
+
+              <!-- 🔥 РЕАКЦИИ -->
+              <div v-if="m.reactions && Object.keys(m.reactions).length" class="msg-reactions">
+                <span v-for="(count, emoji) in m.reactions" :key="emoji" class="reaction-badge" @click="toggleReaction(m, emoji)">
+                  {{ emoji }} {{ count }}
+                </span>
+              </div>
+
+              <small class="msg-time">{{ formatTime(m.ts) }}</small>
+              <div class="msg-actions">
+                <button @click="replyTo(m)" title="Ответить" class="interactive-btn">↩</button>
+                <button @click="openReactionPicker(m)" title="Реакция" class="interactive-btn">😊</button>
+                <button @click="translateMsg(m)" title="Перевести" class="interactive-btn">🌐</button>
+                <button v-if="m.sender_id === currentUserId || m.from === currentUserId" @click="deleteMsg(m.id)" title="Удалить" class="interactive-btn">🗑</button>
+              </div>
+
+              <!-- 🔥 ПИКЕР РЕАКЦИЙ -->
+              <div v-if="reactionPickerId === (m.id || m.ts)" class="reaction-picker">
+                <span v-for="e in reactionEmojis" :key="e" @click="addReaction(m, e)" class="reaction-emoji">{{ e }}</span>
               </div>
             </div>
-            <small class="msg-time">{{ formatTime(m.ts) }}</small>
-            <div class="msg-actions">
-              <button @click="replyTo(m)" title="Ответить" class="interactive-btn">↩</button>
-              <button @click="translateMsg(m)" title="Перевести" class="interactive-btn">🌐</button>
-              <button v-if="m.sender_id === currentUserId || m.from === currentUserId" @click="deleteMsg(m.id)" title="Удалить" class="interactive-btn">🗑</button>
-            </div>
-          </div>
-        </transition-group>
+          </transition-group>
+        </template>
+      </div>
+
+      <!-- Индикатор "печатает..." -->
+      <div v-if="partnerTyping" class="typing-indicator">
+        <div class="typing-dots">
+          <span></span><span></span><span></span>
+        </div>
+        <span class="typing-text">{{ activeChatName }} печатает...</span>
       </div>
 
       <div v-if="showTranslate" class="translate-popup">
@@ -103,7 +134,7 @@
             <button @click="pendingFiles.splice(i, 1)" class="file-preview-remove">✕</button>
           </div>
         </div>
-        <textarea v-model="msgText" @keydown.enter.exact.prevent="sendMsg" placeholder="Сообщение..." rows="1" :disabled="recording"></textarea>
+        <textarea v-model="msgText" @keydown.enter.exact.prevent="sendMsg" @input="emitTyping" placeholder="Сообщение..." rows="1" :disabled="recording"></textarea>
         <button class="btn btn-p btn-sm send-btn interactive-btn" @click="sendMsg"><i class="fas fa-paper-plane"></i></button>
       </div>
     </div>
@@ -140,11 +171,42 @@ export default {
       msgSearchQuery: '', showTranslate: false, selectedWord: '', translatedText: '',
       translating: false, recordingTime: 0, recordingTimer: null, soundEnabled: false,
       emojis: ['😀','😂','🤣','😍','🥰','😘','😎','🤩','😇','🤔','😴','🥳','❤️','🔥','🎉','⭐','✅','💯','🙏','💪','🚀','🌈'],
+      reactionEmojis: ['👍','❤️','😂','😮','😢','😡','🔥','👏','🎉','💯'],
+      reactionPickerId: null,
       jitsiActive: false,
-      jitsiUrl: ''
+      jitsiUrl: '',
+      partnerTyping: false,
+      typingTimer: null,
+      typingEmitTimer: null
     };
   },
-  computed: { isDark() { return document.body.classList.contains('dark'); } },
+  computed: {
+    isDark() { return document.body.classList.contains('dark'); },
+    partnerStatusText() {
+      if (this.partnerTyping) return '✍️ Печатает...';
+      return this.isPartnerOnline ? '🟢 Онлайн' : '⚫ Оффлайн';
+    },
+    // 🔥 Группировка сообщений по датам
+    groupedMessages() {
+      const groups = [];
+      const today = new Date().toDateString();
+      const yesterday = new Date(Date.now() - 86400000).toDateString();
+      
+      this.filteredMessages.forEach(m => {
+        const date = new Date(m.ts).toDateString();
+        let label;
+        if (date === today) label = 'Сегодня';
+        else if (date === yesterday) label = 'Вчера';
+        else label = new Date(m.ts).toLocaleDateString('ru', { day: 'numeric', month: 'long' });
+        
+        let group = groups.find(g => g.label === label);
+        if (!group) { group = { label, messages: [] }; groups.push(group); }
+        group.messages.push(m);
+      });
+      
+      return groups;
+    }
+  },
   async mounted() {
     if (!this.user?.id) return;
     this.currentUserId = this.user.id;
@@ -153,15 +215,53 @@ export default {
     this.socket = useSocket(this.currentUserId, this.user.username, this.user.role);
     this.socket.on('unread', ({ count }) => { this.unreadCount = count; });
     this.socket.on('dm', (msg) => this.handleIncomingMessage(msg));
+    this.socket.on('typing', ({ from }) => {
+      if (from === this.activeChat) {
+        this.partnerTyping = true;
+        clearTimeout(this.typingTimer);
+        this.typingTimer = setTimeout(() => { this.partnerTyping = false; }, 2000);
+      }
+    });
     this.searchUsers = useDebounce(this.searchUsers, 300);
     document.addEventListener('click', (e) => {
       if (!e.target.closest('.translate-popup') && !e.target.closest('.msg-actions')) this.showTranslate = false;
+      if (!e.target.closest('.reaction-picker') && !e.target.closest('.msg-actions')) this.reactionPickerId = null;
     });
   },
-  beforeUnmount() { this.socket?.disconnect(); },
+  beforeUnmount() {
+    this.socket?.disconnect();
+    clearTimeout(this.typingTimer);
+    clearTimeout(this.typingEmitTimer);
+  },
   methods: {
     proxifyUrl,
     fileIcon: getFileIcon,
+
+    // 🔥 РЕАКЦИИ
+    openReactionPicker(m) {
+      this.reactionPickerId = this.reactionPickerId === (m.id || m.ts) ? null : (m.id || m.ts);
+    },
+    addReaction(m, emoji) {
+      if (!m.reactions) m.reactions = {};
+      if (m.reactions[emoji]) {
+        m.reactions[emoji]++;
+      } else {
+        m.reactions[emoji] = 1;
+      }
+      this.reactionPickerId = null;
+      this.socket?.emit('reaction', { messageId: m.id || m.ts, emoji, to: this.activeChat });
+    },
+    toggleReaction(m, emoji) {
+      this.addReaction(m, emoji);
+    },
+
+    // 🔥 ИНДИКАТОР "ПЕЧАТАЕТ..."
+    emitTyping() {
+      if (!this.socket?.connected || !this.activeChat) return;
+      clearTimeout(this.typingEmitTimer);
+      this.socket.emit('typing', { to: this.activeChat });
+      this.typingEmitTimer = setTimeout(() => {}, 1000);
+    },
 
     startVideoCall() {
       const roomName = `english-club-${this.currentUserId}-${this.activeChat}`;
@@ -195,7 +295,7 @@ export default {
       const replyTo = text.startsWith('↩') ? text.split('\n')[0] : null;
       const cleanText = replyTo ? text.split('\n').slice(1).join('\n').trim() : text;
       if (cleanText) {
-        this.messages.push({ id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: cleanText, ts: new Date().toISOString() });
+        this.messages.push({ id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: cleanText, ts: new Date().toISOString(), reactions: {} });
         this.filterMessages();
         this.socket.emit('dm', { to: this.activeChat, msg: cleanText, replyTo });
       }
@@ -204,12 +304,13 @@ export default {
         if (url) {
           const type = getFileType(file);
           const msgText = type === 'audio' ? `🎵 ${file.name}` : `${getFileIcon(type)} ${file.name}`;
-          this.messages.push({ id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: msgText, files: [{ url, type, name: file.name }], ts: new Date().toISOString() });
+          this.messages.push({ id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: msgText, files: [{ url, type, name: file.name }], ts: new Date().toISOString(), reactions: {} });
           this.filterMessages();
           this.socket.emit('dm', { to: this.activeChat, msg: msgText, files: [{ url, type, name: file.name }] });
         }
       }
       this.playSendSound(); this.msgText = ''; this.pendingFiles = []; this.$nextTick(() => this.scrollToBottom());
+      this.partnerTyping = false;
     },
 
     handleFiles(e) {
@@ -251,7 +352,7 @@ export default {
           try {
             const r = await axios.post('/api/nimg', form);
             if (r.data?.url) {
-              this.messages.push({ id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }], ts: new Date().toISOString() });
+              this.messages.push({ id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }], ts: new Date().toISOString(), reactions: {} });
               this.filterMessages();
               this.socket.emit('dm', { to: this.activeChat, msg: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }] });
             }
@@ -265,9 +366,9 @@ export default {
     },
     stopRecord() { if (this.mediaRecorder?.state === 'recording') this.mediaRecorder.stop(); },
     async loadDialogs() { if (!this.currentUserId) return; try { const r = await axios.get('/api/dialogs'); this.dialogs = Array.isArray(r.data) ? r.data : []; } catch(e) {} },
-    async startChat(u) { Object.assign(this, { activeChat: u.id, activeChatName: u.username, partnerAvatar: u.avatar_url, searchQuery: '', searchResults: [], showSidebar: false }); await this.loadMessages(u.id); this.loadDialogs(); },
-    async openChat(d) { const pid = d.partner_id || d.id; Object.assign(this, { activeChat: pid, activeChatName: d.username, partnerAvatar: d.avatar_url, showSidebar: false }); await this.loadMessages(pid); },
-    async loadMessages(userId) { try { const r = await axios.get(`/api/messages/${userId}`); this.messages = (r.data || []).map(m => { if (m.files && typeof m.files === 'string') try { m.files = JSON.parse(m.files); } catch(e) { m.files = null; } return m; }); this.filterMessages(); this.$nextTick(() => this.scrollToBottom()); } catch(e) {} },
+    async startChat(u) { Object.assign(this, { activeChat: u.id, activeChatName: u.username, partnerAvatar: u.avatar_url, searchQuery: '', searchResults: [], showSidebar: false, partnerTyping: false }); await this.loadMessages(u.id); this.loadDialogs(); },
+    async openChat(d) { const pid = d.partner_id || d.id; Object.assign(this, { activeChat: pid, activeChatName: d.username, partnerAvatar: d.avatar_url, showSidebar: false, partnerTyping: false }); await this.loadMessages(pid); },
+    async loadMessages(userId) { try { const r = await axios.get(`/api/messages/${userId}`); this.messages = (r.data || []).map(m => { if (m.files && typeof m.files === 'string') try { m.files = JSON.parse(m.files); } catch(e) { m.files = null; } if (!m.reactions) m.reactions = {}; return m; }); this.filterMessages(); this.$nextTick(() => this.scrollToBottom()); } catch(e) {} },
     async searchUsers() { if (this.searchQuery.length < 2) { this.searchResults = []; return; } try { const r = await axios.get(`/api/users?q=${this.searchQuery}`); this.searchResults = (r.data || []).filter(u => u.id !== this.currentUserId); } catch(e) {} },
     filterMessages() { const q = this.msgSearchQuery.toLowerCase(); this.filteredMessages = q ? this.messages.filter(m => m.message?.toLowerCase().includes(q)) : this.messages; },
     formatTime(ts) { return ts ? new Date(ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }) : ''; },
@@ -310,6 +411,106 @@ export default {
 .tilt-avatar:hover { transform: scale(1.1) rotate(-3deg); }
 .chat-header small { font-size: 0.75rem; color: var(--t2); }
 .chat-header small.online { color: #22c55e; }
+
+/* 🔥 ИНДИКАТОР "ПЕЧАТАЕТ..." */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 22px;
+  background: var(--surface);
+  border-top: 1px solid var(--b);
+}
+.typing-dots {
+  display: flex;
+  gap: 3px;
+}
+.typing-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--p);
+  animation: typingBounce 1.4s infinite ease-in-out both;
+}
+.typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+.typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+.typing-dots span:nth-child(3) { animation-delay: 0s; }
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+.typing-text {
+  font-size: 0.8rem;
+  color: var(--t2);
+  font-style: italic;
+}
+
+/* 🔥 ДАТЫ-РАЗДЕЛИТЕЛИ */
+.date-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+.date-divider::before,
+.date-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--b);
+}
+.date-divider span {
+  font-size: 0.7rem;
+  color: var(--t2);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* 🔥 РЕАКЦИИ */
+.msg-reactions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.reaction-badge {
+  padding: 2px 8px;
+  background: rgba(99,102,241,0.1);
+  border: 1px solid rgba(99,102,241,0.2);
+  border-radius: 10px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.reaction-badge:hover {
+  background: rgba(99,102,241,0.2);
+  transform: scale(1.1);
+}
+.reaction-picker {
+  position: absolute;
+  bottom: -40px;
+  right: 0;
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--b);
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+  z-index: 50;
+}
+.reaction-emoji {
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 4px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+.reaction-emoji:hover {
+  background: rgba(99,102,241,0.1);
+  transform: scale(1.3);
+}
+
 .jitsi-container { position: relative; width: 100%; height: 500px; margin-bottom: 8px; }
 .jitsi-frame { width: 100%; height: 100%; border: none; border-radius: 16px; }
 .jitsi-close { position: absolute; top: 8px; right: 8px; z-index: 10; padding: 8px 16px; background: #ef4444; color: #fff; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; }
@@ -338,7 +539,7 @@ export default {
 .file-link { color: var(--p); text-decoration: none; font-size: 0.85rem; font-weight: 500; }
 .msg.mine .file-link { color: #fff; }
 .msg-time { font-size: 0.7rem; opacity: 0.65; display: block; margin-top: 8px; }
-.chat-input { display: flex; gap: 10px; padding: 16px 22px; background: var(--surface); border-top: 1px solid var(--b); align-items: flex-end; flex-wrap: wrap; }
+.chat-input { display: flex; gap: 10px; padding: 16px 22px; background: var(--surface); border-top: 1px solid var(--b); align-items: flex-end; flex-wrap: wrap; position: relative; }
 .file-preview-bar { display: flex; gap: 6px; padding: 6px 0; width: 100%; flex-wrap: wrap; }
 .file-preview-item { display: flex; align-items: center; gap: 4px; background: var(--bg); padding: 4px 8px; border-radius: 8px; font-size: 0.75rem; }
 .file-preview-img { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; }
