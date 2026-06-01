@@ -12,13 +12,6 @@
         <button class="btn btn-p btn-sm" @click="saveAll">
           <i class="fas fa-save"></i> Сохранить всё
         </button>
-        <button class="btn btn-o btn-sm" @click="previewMode = !previewMode">
-          <i :class="previewMode ? 'fas fa-edit' : 'fas fa-eye'"></i>
-          {{ previewMode ? 'Редактор' : 'Предпросмотр' }}
-        </button>
-        <button class="btn btn-o btn-sm" @click="window.open('/', '_blank')">
-          <i class="fas fa-external-link-alt"></i> Сайт
-        </button>
         <button class="btn btn-o btn-sm" @click="$router.push('/dashboard')">
           <i class="fas fa-arrow-left"></i> Дашборд
         </button>
@@ -36,7 +29,6 @@
       >
         <span>{{ t.icon }}</span>
         <span>{{ t.label }}</span>
-        <span v-if="t.count" class="tab-count">{{ t.count }}</span>
       </button>
     </div>
 
@@ -82,107 +74,13 @@
         </div>
       </div>
 
-      <!-- Услуги -->
+      <!-- Контакты -->
       <div class="cm-card">
-        <div class="cm-card-header" @click="sections.services = !sections.services">
-          <h3>📦 Услуги</h3>
-          <div class="cm-card-header-right">
-            <span class="tab-count">{{ services.length }}</span>
-            <i :class="sections.services ? 'fas fa-chevron-up' : 'fas fa-chevron-down'"></i>
-          </div>
-        </div>
-        <div v-show="sections.services" class="cm-card-body">
-          <draggable v-model="services" handle=".drag-handle" @end="onDragEnd">
-            <div class="service-item" v-for="(s, i) in services" :key="s.id">
-              <div class="drag-handle" title="Перетащить">⋮⋮</div>
-              <div class="service-fields">
-                <input class="input" v-model="s.title" placeholder="Название услуги">
-                <input class="input" v-model="s.desc" placeholder="Описание">
-                <div class="row-fields">
-                  <input class="input" v-model="s.price" placeholder="Цена (например: 1 500 ₽)">
-                  <input class="input" v-model="s.duration" placeholder="Длительность (например: 60 минут)">
-                  <input class="input" v-model="s.icon" placeholder="Иконка" style="max-width:80px">
-                </div>
-                <label class="checkbox-label">
-                  <input type="checkbox" v-model="s.popular">
-                  <span>Популярный выбор</span>
-                </label>
-              </div>
-              <button class="btn btn-o btn-sm" style="color:#ef4444" @click="services.splice(i, 1)">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          </draggable>
-          <button class="btn btn-p btn-sm w-100" @click="addService">
-            <i class="fas fa-plus"></i> Добавить услугу
-          </button>
-        </div>
-      </div>
-
-      <!-- Отзывы -->
-      <div class="cm-card">
-        <div class="cm-card-header" @click="sections.reviews = !sections.reviews">
-          <h3>⭐ Отзывы</h3>
-          <div class="cm-card-header-right">
-            <span class="tab-count">{{ reviews.length }}</span>
-            <i :class="sections.reviews ? 'fas fa-chevron-up' : 'fas fa-chevron-down'"></i>
-          </div>
-        </div>
-        <div v-show="sections.reviews" class="cm-card-body">
-          <div class="service-item" v-for="(r, i) in reviews" :key="i">
-            <div class="service-fields">
-              <input class="input" v-model="r.name" placeholder="Имя ученика">
-              <textarea class="input note-area" v-model="r.text" rows="2" placeholder="Текст отзыва"></textarea>
-              <div class="row-fields">
-                <select class="input" v-model.number="r.stars">
-                  <option v-for="s in 5" :key="s" :value="s">{{ '⭐'.repeat(s) }}</option>
-                </select>
-                <input class="input" v-model="r.role" placeholder="Роль (например: Senior Developer)">
-              </div>
-            </div>
-            <button class="btn btn-o btn-sm" style="color:#ef4444" @click="reviews.splice(i, 1)">
-              <i class="fas fa-trash"></i>
-            </button>
-          </div>
-          <button class="btn btn-p btn-sm w-100" @click="addReview">
-            <i class="fas fa-plus"></i> Добавить отзыв
-          </button>
-        </div>
-      </div>
-
-      <!-- FAQ -->
-      <div class="cm-card">
-        <div class="cm-card-header" @click="sections.faqs = !sections.faqs">
-          <h3>❓ Частые вопросы</h3>
-          <div class="cm-card-header-right">
-            <span class="tab-count">{{ faqs.length }}</span>
-            <i :class="sections.faqs ? 'fas fa-chevron-up' : 'fas fa-chevron-down'"></i>
-          </div>
-        </div>
-        <div v-show="sections.faqs" class="cm-card-body">
-          <div class="service-item" v-for="(f, i) in faqs" :key="i">
-            <div class="service-fields">
-              <input class="input" v-model="f.q" placeholder="Вопрос">
-              <textarea class="input note-area" v-model="f.a" rows="2" placeholder="Ответ"></textarea>
-            </div>
-            <button class="btn btn-o btn-sm" style="color:#ef4444" @click="faqs.splice(i, 1)">
-              <i class="fas fa-trash"></i>
-            </button>
-          </div>
-          <button class="btn btn-p btn-sm w-100" @click="addFaq">
-            <i class="fas fa-plus"></i> Добавить вопрос
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- НАСТРОЙКИ -->
-    <div v-if="tab === 'settings'" class="se-panel">
-      <div class="cm-card">
-        <div class="cm-card-header">
+        <div class="cm-card-header" @click="sections.contacts = !sections.contacts">
           <h3>📞 Контакты</h3>
+          <i :class="sections.contacts ? 'fas fa-chevron-up' : 'fas fa-chevron-down'"></i>
         </div>
-        <div class="cm-card-body">
+        <div v-show="sections.contacts" class="cm-card-body">
           <div class="field-group">
             <label><i class="fab fa-telegram"></i> Telegram</label>
             <input class="input" v-model="form.tg" placeholder="https://t.me/username">
@@ -202,11 +100,13 @@
         </div>
       </div>
 
+      <!-- Бренд -->
       <div class="cm-card">
-        <div class="cm-card-header">
+        <div class="cm-card-header" @click="sections.brand = !sections.brand">
           <h3>🎨 Бренд</h3>
+          <i :class="sections.brand ? 'fas fa-chevron-up' : 'fas fa-chevron-down'"></i>
         </div>
-        <div class="cm-card-body">
+        <div v-show="sections.brand" class="cm-card-body">
           <div class="field-group">
             <label>Название клуба</label>
             <input class="input" v-model="form.club_name" placeholder="English Club">
@@ -220,50 +120,18 @@
           </div>
         </div>
       </div>
-
-      <div class="cm-card">
-        <div class="cm-card-header">
-          <h3>🔍 SEO</h3>
-        </div>
-        <div class="cm-card-body">
-          <div class="field-group">
-            <label>Заголовок страницы (title)</label>
-            <input class="input" v-model="form.seo_title" placeholder="English Club — Разговорный клуб">
-          </div>
-          <div class="field-group">
-            <label>Описание (description)</label>
-            <textarea class="input note-area" v-model="form.seo_desc" rows="2" placeholder="Краткое описание сайта..."></textarea>
-          </div>
-          <div class="field-group">
-            <label>Ключевые слова</label>
-            <input class="input" v-model="form.seo_keywords" placeholder="английский, разговорный клуб, репетитор">
-          </div>
-        </div>
-      </div>
     </div>
 
-    <!-- СТАТИСТИКА -->
-    <div v-if="tab === 'stats'" class="se-panel">
-      <div class="stats-grid">
-        <div class="stat-card">
-          <span class="stat-icon">👥</span>
-          <span class="stat-value">{{ stats.users }}</span>
-          <span class="stat-label">Пользователей</span>
+    <!-- НАСТРОЙКИ -->
+    <div v-if="tab === 'settings'" class="se-panel">
+      <div class="cm-card">
+        <div class="cm-card-header">
+          <h3>⚙️ Общие настройки</h3>
         </div>
-        <div class="stat-card">
-          <span class="stat-icon">📅</span>
-          <span class="stat-value">{{ stats.slots }}</span>
-          <span class="stat-label">Занятий</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-icon">💬</span>
-          <span class="stat-value">{{ stats.messages }}</span>
-          <span class="stat-label">Сообщений</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-icon">📝</span>
-          <span class="stat-value">{{ stats.homework }}</span>
-          <span class="stat-label">Домашек</span>
+        <div class="cm-card-body">
+          <p style="color:#94a3b8;text-align:center;padding:20px">
+            Настройки сохраняются автоматически при изменении любого поля на вкладке "Контент"
+          </p>
         </div>
       </div>
     </div>
@@ -283,19 +151,16 @@ export default {
   data() {
     return {
       tab: 'content',
-      previewMode: false,
       saving: false,
       saved: false,
       sections: {
         home: true,
-        services: true,
-        reviews: false,
-        faqs: false
+        contacts: false,
+        brand: false
       },
       tabs: [
         { id: 'content', icon: '📝', label: 'Контент' },
-        { id: 'settings', icon: '⚙️', label: 'Настройки' },
-        { id: 'stats', icon: '📊', label: 'Статистика' }
+        { id: 'settings', icon: '⚙️', label: 'Настройки' }
       ],
       form: {
         hero_title: '',
@@ -308,19 +173,7 @@ export default {
         vk: '',
         email: '',
         club_name: '',
-        primary_color: '#6366f1',
-        seo_title: '',
-        seo_desc: '',
-        seo_keywords: ''
-      },
-      services: [],
-      reviews: [],
-      faqs: [],
-      stats: {
-        users: 0,
-        slots: 0,
-        messages: 0,
-        homework: 0
+        primary_color: '#6366f1'
       }
     };
   },
@@ -330,69 +183,31 @@ export default {
       handler() {
         this.autoSave();
       }
-    },
-    services: {
-      deep: true,
-      handler() {
-        this.autoSave();
-      }
-    },
-    reviews: {
-      deep: true,
-      handler() {
-        this.autoSave();
-      }
-    },
-    faqs: {
-      deep: true,
-      handler() {
-        this.autoSave();
-      }
     }
   },
   async mounted() {
-    await this.loadAll();
-    await this.loadStats();
+    await this.loadSettings();
   },
   methods: {
-    async loadAll() {
+    async loadSettings() {
       try {
-        const [s, r] = await Promise.all([
-          axios.get('/api/services'),
-          axios.get('/api/settings')
-        ]);
-        this.services = (s.data || []).map(s => ({
-          ...s,
-          popular: s.popular || false,
-          duration: s.duration || '60 минут'
-        }));
-        const st = r.data || {};
-        Object.keys(this.form).forEach(k => {
-          if (st[k] !== undefined) this.form[k] = st[k];
-        });
-        this.reviews = JSON.parse(st.reviews || '[]');
-        this.faqs = JSON.parse(st.faqs || '[]');
+        const { data } = await axios.get('/api/settings');
+        if (data) {
+          Object.keys(this.form).forEach(k => {
+            if (data[k] !== undefined) this.form[k] = data[k];
+          });
+        }
       } catch(e) {
-        console.error('Ошибка загрузки:', e);
-      }
-    },
-
-    async loadStats() {
-      try {
-        const [users, slots, messages, homework] = await Promise.all([
-          axios.get('/api/users/count'),
-          axios.get('/api/slots/count'),
-          axios.get('/api/messages/count'),
-          axios.get('/api/homework/count')
-        ]);
-        this.stats = {
-          users: users.data?.count || 0,
-          slots: slots.data?.count || 0,
-          messages: messages.data?.count || 0,
-          homework: homework.data?.count || 0
-        };
-      } catch(e) {
-        // Статистика недоступна — не страшно
+        // Настройки ещё нет — используем данные из localStorage
+        const saved = localStorage.getItem('site_settings');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            Object.keys(this.form).forEach(k => {
+              if (parsed[k] !== undefined) this.form[k] = parsed[k];
+            });
+          } catch(e) {}
+        }
       }
     },
 
@@ -401,31 +216,25 @@ export default {
       clearTimeout(this._saveTimer);
       this._saveTimer = setTimeout(() => {
         this.saveAll(true);
-      }, 3000);
+      }, 2000);
     },
 
     async saveAll(silent = false) {
       if (!silent) this.saving = true;
       try {
-        await axios.put('/api/settings', {
-          ...this.form,
-          reviews: JSON.stringify(this.reviews),
-          faqs: JSON.stringify(this.faqs)
-        });
-        await axios.put('/api/services', { services: this.services });
-        
-        if (!silent) {
-          this.saving = false;
-          this.saved = true;
-          setTimeout(() => { this.saved = false; }, 2000);
-        } else {
-          this.saved = true;
-        }
+        // Пробуем сохранить на сервер
+        await axios.put('/api/settings', this.form);
       } catch(e) {
-        if (!silent) {
-          this.saving = false;
-          alert('Ошибка сохранения');
-        }
+        // Если сервер не отвечает — сохраняем в localStorage
+        localStorage.setItem('site_settings', JSON.stringify(this.form));
+      }
+      
+      if (!silent) {
+        this.saving = false;
+        this.saved = true;
+        setTimeout(() => { this.saved = false; }, 2000);
+      } else {
+        this.saved = true;
       }
     },
 
@@ -442,35 +251,6 @@ export default {
       } catch(e) {
         alert('Ошибка загрузки фото');
       }
-    },
-
-    addService() {
-      this.services.push({
-        id: Date.now(),
-        title: '',
-        desc: '',
-        price: '',
-        duration: '60 минут',
-        icon: '📦',
-        popular: false
-      });
-    },
-
-    addReview() {
-      this.reviews.push({
-        name: '',
-        text: '',
-        stars: 5,
-        role: 'Ученик'
-      });
-    },
-
-    addFaq() {
-      this.faqs.push({ q: '', a: '' });
-    },
-
-    onDragEnd() {
-      // Успешное перетаскивание
     }
   },
   beforeUnmount() {
@@ -484,12 +264,11 @@ export default {
   min-height: 100vh;
   background: #0b1120;
   padding: 24px;
-  max-width: 1200px;
+  max-width: 1000px;
   margin: 0 auto;
   color: #e2e8f0;
 }
 
-/* ШАПКА */
 .se-header {
   display: flex;
   justify-content: space-between;
@@ -534,7 +313,6 @@ export default {
   gap: 8px;
 }
 
-/* ВКЛАДКИ */
 .se-tabs {
   display: flex;
   gap: 4px;
@@ -570,15 +348,6 @@ export default {
   color: #fff;
 }
 
-.tab-count {
-  padding: 1px 8px;
-  background: rgba(99,102,241,0.2);
-  border-radius: 8px;
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-
-/* КАРТОЧКИ */
 .cm-card {
   background: rgba(255,255,255,0.04);
   backdrop-filter: blur(20px);
@@ -608,12 +377,6 @@ export default {
   color: #fff;
 }
 
-.cm-card-header-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
 .cm-card-body {
   padding: 0 24px 24px;
 }
@@ -630,7 +393,6 @@ export default {
   margin-bottom: 6px;
 }
 
-/* ФОТО */
 .photo-upload {
   display: flex;
   gap: 16px;
@@ -664,94 +426,12 @@ export default {
   gap: 8px;
 }
 
-/* УСЛУГИ / ОТЗЫВЫ / FAQ */
-.service-item {
+.color-picker-row {
   display: flex;
   gap: 12px;
-  padding: 14px;
-  background: rgba(255,255,255,0.02);
-  border-radius: 14px;
-  margin-bottom: 10px;
-  align-items: flex-start;
-}
-
-.drag-handle {
-  cursor: grab;
-  color: #64748b;
-  font-size: 1.2rem;
-  padding: 4px;
-  margin-top: 4px;
-}
-
-.drag-handle:active {
-  cursor: grabbing;
-}
-
-.service-fields {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.row-fields {
-  display: flex;
-  gap: 8px;
-}
-
-.checkbox-label {
-  display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.85rem;
-  color: #cbd5e1;
-  cursor: pointer;
 }
 
-.checkbox-label input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: #6366f1;
-}
-
-/* СТАТИСТИКА */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-}
-
-.stat-card {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 16px;
-  padding: 24px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.stat-icon {
-  font-size: 2rem;
-}
-
-.stat-value {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 2rem;
-  font-weight: 800;
-  background: linear-gradient(135deg, #6366f1, #2dd4bf);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.stat-label {
-  font-size: 0.8rem;
-  color: #94a3b8;
-  font-weight: 600;
-}
-
-/* КНОПКИ */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -792,11 +472,6 @@ export default {
   font-size: 0.8rem;
 }
 
-.w-100 {
-  width: 100%;
-}
-
-/* ПОЛЯ ВВОДА */
 .input {
   width: 100%;
   padding: 10px 14px;
@@ -819,41 +494,19 @@ export default {
   min-height: 60px;
 }
 
-.color-picker-row {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-/* АНИМАЦИИ */
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
 
-/* АДАПТИВ */
 @media (max-width: 768px) {
   .se-header {
     flex-direction: column;
     align-items: flex-start;
   }
-  
   .se-header-right {
     width: 100%;
     flex-wrap: wrap;
-  }
-  
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .row-fields {
-    flex-direction: column;
-  }
-  
-  .se-tab {
-    padding: 8px 14px;
-    font-size: 0.8rem;
   }
 }
 </style>
