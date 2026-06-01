@@ -53,6 +53,7 @@
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import * as THREE from 'three';
 import anime from 'animejs';
+import confetti from 'canvas-confetti';
 
 const heroSection = ref(null);
 const canvasContainer = ref(null);
@@ -175,14 +176,44 @@ const resetMagneticEffect = () => {
   });
 };
 
+// 🔥 КНОПКА CTA С КОНФЕТТИ
 const handleCTAClick = () => {
   const btn = ctaButton.value;
   if (!btn) return;
+  
+  // Ripple effect
   if (ctaRipple) ctaRipple.remove();
   ctaRipple = document.createElement('div');
   ctaRipple.className = 'cta-ripple';
   btn.appendChild(ctaRipple);
   setTimeout(() => { if (ctaRipple) ctaRipple.remove(); }, 1000);
+  
+  // Конфетти!
+  confetti({
+    particleCount: 150,
+    spread: 80,
+    origin: { y: 0.7 },
+    colors: ['#6366f1', '#2dd4bf', '#f59e0b', '#ffffff', '#818cf8'],
+    ticks: 200,
+    gravity: 0.8,
+    scalar: 1.2,
+    shapes: ['circle', 'square'],
+  });
+  
+  setTimeout(() => {
+    confetti({
+      particleCount: 50,
+      spread: 60,
+      origin: { y: 0.8, x: 0.3 },
+      colors: ['#2dd4bf', '#6366f1'],
+    });
+    confetti({
+      particleCount: 50,
+      spread: 60,
+      origin: { y: 0.8, x: 0.7 },
+      colors: ['#f59e0b', '#6366f1'],
+    });
+  }, 300);
 };
 
 // ===== THREE.JS СЦЕНА С БУКВАМИ, ОБЛАКАМИ И СИМВОЛАМИ =====
