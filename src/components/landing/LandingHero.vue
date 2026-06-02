@@ -45,10 +45,10 @@ const orb1 = ref(null);
 const orb2 = ref(null);
 
 const counters = [
-  { label: 'учеников', value: 500, suffix: '+' },
-  { label: 'лет опыта', value: 10, suffix: '+' },
+  { label: 'учеников', value: 100, suffix: '+' },
+  { label: 'лет опыта', value: 5, suffix: '+' },
   { label: 'уроков', value: 1500, suffix: '+' },
-  { label: 'довольных', value: 98, suffix: '%' },
+  { label: 'довольных', value: 97, suffix: '%' },
 ];
 
 const animatedCounters = reactive({});
