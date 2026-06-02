@@ -25,10 +25,10 @@ import LandingContacts from './landing/LandingContacts.vue';
 
 const loaded = ref(false);
 
-// Данные по умолчанию (если API не ответит)
+// Данные по умолчанию
 const tutor = ref({
-  name: 'Лиана Кудина',
-  bio: 'Репетитор английского языка. 5 лет опыта.',
+  name: 'Анна Иванова',
+  bio: 'Репетитор английского языка. 10+ лет опыта.',
   photo: 'https://ui-avatars.com/api/?name=Анна+И&size=300&background=6366f1&color=fff&bold=true'
 });
 
@@ -51,33 +51,22 @@ const loadSiteSettings = async () => {
     console.log('📡 Данные из API:', data);
 
     if (data && Object.keys(data).length > 0) {
-      // Обновляем репетитора
-      tutor.value = {
-        name: data.tutor_name || tutor.value.name,
-        bio: data.tutor_bio || tutor.value.bio,
-        photo: data.tutor_photo || tutor.value.photo
-      };
+      // Репетитор
+      if (data.tutor_name) tutor.value.name = data.tutor_name;
+      if (data.tutor_bio) tutor.value.bio = data.tutor_bio;
+      if (data.tutor_photo) tutor.value.photo = data.tutor_photo;
 
-      // Обновляем контакты
-      contacts.value = {
-        telegram: data.tg || contacts.value.telegram,
-        whatsapp: data.wa || contacts.value.whatsapp
-      };
+      // Контакты
+      if (data.tg) contacts.value.telegram = data.tg;
+      if (data.wa) contacts.value.whatsapp = data.wa;
 
-      // Обновляем услуги
+      // Услуги
       if (data.services && Array.isArray(data.services) && data.services.length > 0) {
-        services.value = data.services.map(s => ({
-          title: s.title || s.name || '',
-          name: s.title || s.name || '',
-          desc: s.desc || '',
-          price: s.price || 'По договорённости',
-          duration: s.duration || '60 минут',
-          icon: s.icon || '📦',
-          popular: s.popular || false
-        }));
+        services.value = [...data.services];
+        console.log('✅ Услуги загружены:', services.value);
       }
 
-      // Обновляем отзывы
+      // Отзывы
       if (data.reviews && Array.isArray(data.reviews) && data.reviews.length > 0) {
         testimonials.value = data.reviews.map(r => ({
           name: r.name || 'Ученик',
@@ -86,25 +75,14 @@ const loadSiteSettings = async () => {
           role: r.role || 'Ученик',
           avatar: r.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name || 'U')}&background=6366f1&color=fff`
         }));
+        console.log('✅ Отзывы загружены:', testimonials.value);
       }
 
-      // Обновляем FAQ
+      // FAQ
       if (data.faqs && Array.isArray(data.faqs) && data.faqs.length > 0) {
-        faqs.value = data.faqs.map(f => ({
-          q: f.q || '',
-          a: f.a || ''
-        }));
+        faqs.value = [...data.faqs];
+        console.log('✅ FAQ загружены:', faqs.value);
       }
-
-      console.log('✅ Данные обновлены:', {
-        tutor: tutor.value,
-        contacts: contacts.value,
-        services: services.value.length,
-        reviews: testimonials.value.length,
-        faqs: faqs.value.length
-      });
-    } else {
-      console.log('⚠️ API вернул пустые данные, используем значения по умолчанию');
     }
   } catch (e) {
     console.log('⚠️ API недоступен, используем значения по умолчанию');
