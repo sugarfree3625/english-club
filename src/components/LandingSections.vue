@@ -27,8 +27,8 @@ const loaded = ref(false);
 
 // Данные по умолчанию (если API не ответит)
 const tutor = ref({
-  name: 'Анна Иванова',
-  bio: 'Репетитор английского языка. 10+ лет опыта.',
+  name: 'Лиана Кудина',
+  bio: 'Репетитор английского языка. 5 лет опыта.',
   photo: 'https://ui-avatars.com/api/?name=Анна+И&size=300&background=6366f1&color=fff&bold=true'
 });
 
