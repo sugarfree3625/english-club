@@ -9,7 +9,7 @@
       </div>
       <div class="se-header-right">
         <button class="btn btn-p btn-sm" @click="saveAll" :disabled="saving">💾 Сохранить всё</button>
-        <button class="btn btn-o btn-sm" @click="window.open('/', '_blank')">👁 Смотреть сайт</button>
+        <a class="btn btn-o btn-sm" href="/" target="_blank">👁 Смотреть сайт</a>
         <button class="btn btn-o btn-sm" @click="$router.push('/dashboard')">← Дашборд</button>
       </div>
     </div>
