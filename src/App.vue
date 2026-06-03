@@ -96,8 +96,6 @@ import WelcomeModal from './components/WelcomeModal.vue';
 import PricingModal from './components/PricingModal.vue';
 import ParticlesBackground from './components/ParticlesBackground.vue';
 import CustomCursor from './components/CustomCursor.vue';
-import OnlineWidget from './components/OnlineWidget.vue';
-import AIAssistant from './components/AIAssistant.vue';
 import XPFloating from './components/XPFloating.vue';
 import { useI18n } from './composables/useI18n';
 import { playClick, playSuccess, playError } from './composables/useSound';
