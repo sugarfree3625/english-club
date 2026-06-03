@@ -233,5 +233,24 @@ const send = () => {
 .ai-slide-enter-active, .ai-slide-leave-active { transition: all 0.3s ease; }
 .ai-slide-enter-from, .ai-slide-leave-to { opacity: 0; transform: translateY(20px) scale(0.95); }
 
-@media (max-width: 480px) { .ai-panel { width: 310px; } .ai-suggestions-grid { grid-template-columns: repeat(2, 1fr); } }
+/* МОБИЛЬНЫЕ СТИЛИ */
+@media (max-width: 768px) {
+  .ai-assistant { 
+    bottom: 90px !important;
+    left: 12px !important; 
+    z-index: 9999 !important; 
+  }
+  .ai-toggle {
+    width: 48px !important;
+    height: 48px !important;
+    font-size: 1.2rem !important;
+  }
+  .ai-panel { 
+    width: 290px !important; 
+    max-height: 400px !important;
+    bottom: 56px !important;
+  }
+  .ai-messages { max-height: 250px !important; }
+  .ai-suggestions-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
 </style>
