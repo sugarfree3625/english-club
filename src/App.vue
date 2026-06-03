@@ -1,8 +1,7 @@
 <template>
   <div id="app-root" @keydown="handleGlobalKeydown">
-    <!-- 🔥 ФОН И КУРСОР -->
+    <!-- 🔥 ФОН -->
     <ParticlesBackground />
-    <CustomCursor />
     
     <header class="header">
       <div class="header-inner">
@@ -57,9 +56,6 @@
     </router-view>
     <ScrollToTop />
 
-    <!-- 🔥 ВИДЖЕТЫ -->
-    <OnlineWidget />
-    <AIAssistant />
     <XPFloating ref="xpFloating" />
 
     <div class="modal-overlay" v-if="showGlobalSearch" @click.self="showGlobalSearch = false">
@@ -95,14 +91,13 @@ import ScrollToTop from './components/ScrollToTop.vue';
 import WelcomeModal from './components/WelcomeModal.vue';
 import PricingModal from './components/PricingModal.vue';
 import ParticlesBackground from './components/ParticlesBackground.vue';
-import CustomCursor from './components/CustomCursor.vue';
 import XPFloating from './components/XPFloating.vue';
 import { useI18n } from './composables/useI18n';
 import { playClick, playSuccess, playError } from './composables/useSound';
 
 export default {
   name: 'App',
-  components: { ScrollToTop, WelcomeModal, PricingModal, ParticlesBackground, CustomCursor, OnlineWidget, AIAssistant, XPFloating },
+  components: { ScrollToTop, WelcomeModal, PricingModal, ParticlesBackground, XPFloating },
   setup() {
     const { locale, t, toggleLocale } = useI18n();
     return { locale, t, toggleLocale };
