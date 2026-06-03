@@ -28,7 +28,6 @@ module.exports = (app, supabase) => {
       const { data: earned } = await supabase.from('user_achievements').select('achievement_id').eq('user_id', uid);
       const earnedIds = (earned || []).map(e => e.achievement_id);
       
-      // Проверяем новые достижения
       let newAchievements = [];
       for (const a of (all || [])) {
         if (earnedIds.includes(a.id)) continue;
@@ -45,9 +44,8 @@ module.exports = (app, supabase) => {
           if (!error) {
             earnedIds.push(a.id);
             newAchievements.push(a);
-            // Начисляем XP за достижение
             const xpReward = a.rarity === 'platinum' ? 500 : a.rarity === 'gold' ? 250 : a.rarity === 'silver' ? 100 : 50;
-            await addXP(supabase, uid, xpReward, `achievement_earned`);
+            await addXP(supabase, uid, xpReward, 'achievement_earned');
           }
         }
       }
@@ -123,7 +121,6 @@ module.exports = (app, supabase) => {
 
 // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 
-// Начислить XP и обновить уровень
 async function addXP(supabase, userId, amount, action) {
   const { data: user } = await supabase.from('users').select('rating, level').eq('id', userId).single();
   if (!user) return { success: false, error: 'User not found' };
@@ -136,13 +133,12 @@ async function addXP(supabase, userId, amount, action) {
     level: newLevel 
   }).eq('id', userId);
   
-  // Сохраняем в историю XP
   await supabase.from('xp_history').insert({
     user_id: userId,
     amount: amount,
     action: action || 'other',
     created_at: new Date().toISOString()
-  });
+  }).select().maybeSingle();
   
   const leveledUp = newLevel !== user.level;
   
@@ -157,7 +153,6 @@ async function addXP(supabase, userId, amount, action) {
   };
 }
 
-// Определить уровень по XP
 function getLevel(rating) {
   if (rating >= 5000) return 'C2';
   if (rating >= 3000) return 'C1';
@@ -167,11 +162,8 @@ function getLevel(rating) {
   return 'A1';
 }
 
-// Сколько XP осталось до следующего уровня
 function getXPToNext(rating, level) {
   const thresholds = { 'A1': 200, 'A2': 500, 'B1': 1500, 'B2': 3000, 'C1': 5000, 'C2': Infinity };
   const next = thresholds[level] || 200;
   return Math.max(0, next - rating);
 }
-
-module.exports = { addXP, getLevel, getXPToNext };
