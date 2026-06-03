@@ -21,7 +21,7 @@
           <ProfileTabInfo v-if="tab === 'info'" :user="user" />
           <ProfileTabAchievements v-if="tab === 'achievements'" :achievements="allAchievements" :earned="earnedCount" :total="totalCount" :percent="completionPercent" />
           <ProfileTabSchedule v-if="tab === 'myschedule'" :upcoming="myUpcomingSlots" :past="myPastSlots" :showStudent="isParent" @export="exportMyICS" />
-          <ProfileTabWords v-if="tab === 'words'" :words="words" :loading="wordsLoading" @add-word="addWord" @delete-word="delWord" @update-word-status="updateWordStatus" />
+          <ProfileTabWords v-if="tab === 'words'" :words="words" :loading="wordsLoading" :user="user" @add-word="addWord" @delete-word="delWord" @update-word-status="updateWordStatus" />
           <ProfileTabNotes v-if="tab === 'notes'" :note="note" @update-note="updateNote" />
           <ProgressDashboard v-if="tab === 'progress'" />
           <GamesHub v-if="tab === 'games'" />
@@ -138,17 +138,43 @@ export default {
   },
   async mounted() { await this.loadInitialData(); this.loadAchievements(); this.restoreTab(); },
   methods: {
+    // 🔥 ЗАГРУЗКА ДАННЫХ (с правильным URL для слов)
     async loadInitialData() {
       try {
-        const [w, n, b] = await Promise.all([axios.get('/api/words'), axios.get('/api/notes'), axios.get('/api/myb')]);
-        this.words = w.data || []; this.note = n.data.note || ''; this.allBookings = b.data || [];
+        const [w, n, b] = await Promise.all([
+          axios.get('/api/words?sort=created_at&order=desc'),
+          axios.get('/api/notes'),
+          axios.get('/api/myb')
+        ]);
+        this.words = w.data || [];
+        this.note = n.data.note || '';
+        this.allBookings = b.data || [];
       } catch (e) {}
     },
+
+    // 🔥 ПЕРЕЗАГРУЗКА СЛОВ (для админа при смене ученика)
+    async reloadWords() {
+      try {
+        const { data } = await axios.get('/api/words?sort=created_at&order=desc');
+        this.words = data || [];
+      } catch(e) {}
+    },
+
     restoreTab() {
       const s = localStorage.getItem('profile_tab');
-      if (s) { this.tab = s; localStorage.removeItem('profile_tab'); if (s === 'feedbacks') this.loadFeedbacks(); if (s === 'achievements') this.loadAchievements(); }
+      if (s) {
+        this.tab = s;
+        localStorage.removeItem('profile_tab');
+        if (s === 'feedbacks') this.loadFeedbacks();
+        if (s === 'achievements') this.loadAchievements();
+        if (s === 'words') this.reloadWords();
+      }
     },
-    switchTab(btn) { this.tab = btn.tab; if (btn.load) this[btn.load](); },
+    switchTab(btn) {
+      this.tab = btn.tab;
+      if (btn.load) this[btn.load]();
+      if (btn.tab === 'words') this.reloadWords();
+    },
 
     async loadProgress() {},
     async loadGames() {},
@@ -159,10 +185,9 @@ export default {
       try {
         const r = await axios.post('/api/words', data);
         if (r.status === 201 || r.status === 200) {
-          this.words = (await axios.get('/api/words')).data || [];
+          await this.reloadWords();
           this.addToast('Слово добавлено! 📚', 'success');
           
-          // 🔥 Начисляем XP
           const xpResult = await addXP('word_added');
           if (xpResult?.leveled_up) {
             this.addToast(`🎉 Уровень повышен до ${xpResult.level}!`, 'success');
@@ -177,8 +202,22 @@ export default {
         this.wordsLoading = false;
       }
     },
-    async updateWordStatus(u) { try { await axios.put(`/api/words/${u.id}`, u); const w = this.words.find(x => x.id === u.id); if (w) Object.assign(w, u); } catch(e) {} },
-    async delWord(id) { try { await axios.delete(`/api/words/${id}`); this.words = this.words.filter(w => w.id !== id); this.addToast('Удалено', 'success'); } catch { this.addToast('Ошибка удаления', 'error'); } },
+    async updateWordStatus(u) {
+      try {
+        await axios.put(`/api/words/${u.id}`, u);
+        const w = this.words.find(x => x.id === u.id);
+        if (w) Object.assign(w, u);
+      } catch(e) {}
+    },
+    async delWord(id) {
+      try {
+        await axios.delete(`/api/words/${id}`);
+        this.words = this.words.filter(w => w.id !== id);
+        this.addToast('Удалено', 'success');
+      } catch {
+        this.addToast('Ошибка удаления', 'error');
+      }
+    },
 
     updateNote(v) { this.note = v; clearTimeout(this._t); this._t = setTimeout(() => axios.put('/api/notes', { note: this.note }).catch(() => {}), 500); },
 
@@ -192,7 +231,6 @@ export default {
           this._shown = true;
           this.newAchievement = unlocked[0];
           this.showConfetti = true;
-          // 🔥 XP за новое достижение
           const xpResult = await addXP('achievement_earned');
           if (xpResult) {
             this.showXP?.(xpResult.xp_added, window.innerWidth / 2, window.innerHeight / 2);
@@ -220,36 +258,24 @@ export default {
       catch(e) { this.addToast(e.response?.data?.error || 'Ошибка', 'error'); }
     },
 
-    // 🔥 ОТПРАВКА ДОМАШКИ С XP
     async submitHomeworkAnswer({ answer }) {
       try {
         await axios.put(`/api/homework/${this.selectedHomework.id}`, { student_answer: answer, status: 'submitted' });
         this.selectedHomework = null;
         this.addToast('Отправлено! 📤', 'success');
-        
-        // 🔥 Начисляем XP
         const xpResult = await addXP('homework_submitted');
-        if (xpResult?.leveled_up) {
-          this.addToast(`🎉 Уровень повышен до ${xpResult.level}!`, 'success');
-        }
-        if (xpResult) {
-          this.showXP?.(xpResult.xp_added, window.innerWidth / 2, window.innerHeight / 2);
-        }
+        if (xpResult?.leveled_up) this.addToast(`🎉 Уровень повышен до ${xpResult.level}!`, 'success');
+        if (xpResult) this.showXP?.(xpResult.xp_added, window.innerWidth / 2, window.innerHeight / 2);
       } catch { this.addToast('Ошибка', 'error'); }
     },
 
-    // 🔥 ОЦЕНКА ДОМАШКИ С XP
     async submitHomeworkGrade({ grade, comment }) {
       try {
         await axios.put(`/api/homework/${this.selectedHomework.id}`, { grade, teacher_comment: comment, status: 'completed' });
         this.selectedHomework = null;
         this.addToast('Оценено! ⭐', 'success');
-        
-        // 🔥 Начисляем XP
         const xpResult = await addXP('homework_graded');
-        if (xpResult) {
-          this.showXP?.(xpResult.xp_added, window.innerWidth / 2, window.innerHeight / 2);
-        }
+        if (xpResult) this.showXP?.(xpResult.xp_added, window.innerWidth / 2, window.innerHeight / 2);
       } catch { this.addToast('Ошибка', 'error'); }
     },
     async changeHomeworkStatus({ status }) { try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { status }); this.selectedHomework = null; this.addToast('Обновлён! ✅', 'success'); } catch { this.addToast('Ошибка', 'error'); } },
