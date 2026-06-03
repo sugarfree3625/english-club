@@ -35,6 +35,17 @@
       </div>
     </div>
 
+    <!-- ВЫБОР УЧЕНИКА (для админа) -->
+    <div v-if="isAdmin" class="student-select-row">
+      <label>👤 Ученик:</label>
+      <select v-model="selectedStudent" class="student-select" @change="loadWords">
+        <option :value="null">Все ученики</option>
+        <option v-for="s in studentsList" :key="s.id" :value="s.id">
+          {{ s.username }} ({{ s.level || '—' }})
+        </option>
+      </select>
+    </div>
+
     <!-- КНОПКИ ДЕЙСТВИЙ -->
     <div class="actions-row">
       <button class="btn btn-p btn-sm" @click="showAddForm = !showAddForm">
@@ -46,11 +57,24 @@
       <button class="btn btn-o btn-sm" @click="startQuiz" :disabled="!words.length">
         🎯 Тест
       </button>
+      <select v-model="sortOrder" class="sort-select" @change="loadWords">
+        <option value="desc">🆕 Сначала новые</option>
+        <option value="asc">📅 Сначала старые</option>
+      </select>
     </div>
 
-    <!-- ФОРМА ДОБАВЛЕНИЯ (расширенная) -->
+    <!-- ФОРМА ДОБАВЛЕНИЯ -->
     <transition name="slide-fade">
       <div v-if="showAddForm" class="add-form">
+        <!-- Выбор ученика для админа -->
+        <div v-if="isAdmin" class="form-row">
+          <select v-model="addForStudent" class="input">
+            <option :value="null">👤 Для кого (себе)</option>
+            <option v-for="s in studentsList" :key="s.id" :value="s.id">
+              {{ s.username }}
+            </option>
+          </select>
+        </div>
         <div class="form-row">
           <input class="input" v-model="wordEn" placeholder="Слово на английском" @keyup.enter="addWord" :disabled="loading" />
           <input class="input" v-model="wordRu" placeholder="Перевод" @keyup.enter="addWord" :disabled="loading" />
@@ -78,7 +102,7 @@
       </div>
     </transition>
 
-    <!-- ВКЛАДКИ: Список / Карточки / Тест -->
+    <!-- ВКЛАДКИ -->
     <div class="tabs">
       <button class="tab" :class="{ active: currentTab === 'list' }" @click="currentTab = 'list'">📋 Список</button>
       <button class="tab" :class="{ active: currentTab === 'flashcards' }" @click="startFlashcards" :disabled="!words.length">🃏 Карточки</button>
@@ -87,7 +111,7 @@
 
     <!-- СПИСОК СЛОВ -->
     <div v-if="currentTab === 'list' && !loading">
-      <!-- Фильтры -->
+      <!-- ФИЛЬТРЫ -->
       <div class="filter-row">
         <button class="filter-btn" :class="{ active: filterStatus === 'all' }" @click="filterStatus = 'all'">Все</button>
         <button class="filter-btn" :class="{ active: filterStatus === 'new' }" @click="filterStatus = 'new'">🆕 Новые</button>
@@ -98,6 +122,14 @@
           <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
         </select>
       </div>
+      
+      <!-- ФИЛЬТР ПО ДАТЕ -->
+      <div class="date-filter-row">
+        <input type="date" v-model="dateFrom" class="date-input" title="С даты" @change="loadWords" />
+        <span class="date-sep">—</span>
+        <input type="date" v-model="dateTo" class="date-input" title="По дату" @change="loadWords" />
+        <button v-if="dateFrom || dateTo" class="date-clear" @click="dateFrom = ''; dateTo = ''; loadWords()">✕ Сбросить</button>
+      </div>
 
       <TransitionGroup name="word-list" tag="div">
         <div class="word-card" v-for="w in filteredWords" :key="w.id" @click="selectedWord = w">
@@ -106,11 +138,16 @@
             <div class="word-main">
               <strong>{{ w.en }}</strong>
               <span v-if="w.transcription" class="transcription">{{ w.transcription }}</span>
+              <!-- Метка ученика -->
+              <span v-if="isAdmin && w._student_name" class="student-tag" :title="w._student_name">
+                👤 {{ w._student_name?.substring(0, 2) }}
+              </span>
             </div>
             <div class="word-translation">{{ w.ru }}</div>
             <div class="word-meta" v-if="w.part_of_speech || w.category">
               <span v-if="w.part_of_speech" class="pos-badge">{{ posLabel(w.part_of_speech) }}</span>
               <span v-if="w.category" class="cat-badge">{{ w.category }}</span>
+              <span class="date-badge">📅 {{ formatDate(w.created_at) }}</span>
             </div>
             <div class="word-stats">
               <span class="stat-good">✅ {{ w.correct_count || 0 }}</span>
@@ -121,7 +158,7 @@
             <button class="action-btn" @click.stop="updateStatus(w, 'studying')" v-if="w.status === 'new'" title="В изучение">📖</button>
             <button class="action-btn" @click.stop="updateStatus(w, 'learned')" v-if="w.status !== 'learned'" title="Выучено">✅</button>
             <button class="action-btn" @click.stop="updateStatus(w, 'new')" v-if="w.status === 'learned'" title="Вернуть">🔄</button>
-            <button class="remove-btn" @click.stop="$emit('delete-word', w.id)" title="Удалить">✕</button>
+            <button class="remove-btn" @click.stop="delWord(w.id)" title="Удалить">✕</button>
           </div>
         </div>
       </TransitionGroup>
@@ -130,7 +167,7 @@
       </p>
     </div>
 
-    <!-- КАРТОЧКИ (FLASHCARDS) -->
+    <!-- КАРТОЧКИ -->
     <div v-if="currentTab === 'flashcards'" class="flashcards-area">
       <div class="flashcard-counter">{{ currentFlashcard + 1 }} / {{ reviewWords.length }}</div>
       <div class="flashcard" :class="{ flipped: isFlipped }" @click="flipCard">
@@ -157,7 +194,7 @@
       <button class="btn btn-o btn-sm w-100 mt-2" @click="currentTab = 'list'">Вернуться к списку</button>
     </div>
 
-    <!-- ТЕСТ (QUIZ) -->
+    <!-- ТЕСТ -->
     <div v-if="currentTab === 'quiz'" class="quiz-area">
       <div class="quiz-progress">
         <div class="quiz-counter">Вопрос {{ quizCurrent + 1 }} / {{ quizQuestions.length }}</div>
@@ -166,20 +203,9 @@
       <div class="quiz-card" v-if="quizQuestions[quizCurrent]">
         <div class="quiz-question">Как переводится: <strong>{{ quizQuestions[quizCurrent].en }}</strong>?</div>
         <div class="quiz-options">
-          <button
-            v-for="(opt, i) in quizQuestions[quizCurrent].options"
-            :key="i"
-            class="quiz-option"
-            :class="{
-              correct: quizAnswered && opt === quizQuestions[quizCurrent].ru,
-              wrong: quizAnswered && opt === quizSelected && opt !== quizQuestions[quizCurrent].ru,
-              selected: opt === quizSelected
-            }"
-            @click="answerQuiz(opt)"
-            :disabled="quizAnswered"
-          >
-            {{ opt }}
-          </button>
+          <button v-for="(opt, i) in quizQuestions[quizCurrent].options" :key="i" class="quiz-option"
+            :class="{ correct: quizAnswered && opt === quizQuestions[quizCurrent].ru, wrong: quizAnswered && opt === quizSelected && opt !== quizQuestions[quizCurrent].ru, selected: opt === quizSelected }"
+            @click="answerQuiz(opt)" :disabled="quizAnswered">{{ opt }}</button>
         </div>
         <button v-if="quizAnswered" class="btn btn-p btn-sm w-100 mt-2" @click="nextQuiz">
           {{ quizCurrent + 1 < quizQuestions.length ? 'Далее →' : 'Завершить' }}
@@ -195,7 +221,7 @@
       <button v-if="!quizFinished" class="btn btn-o btn-sm w-100 mt-2" @click="currentTab = 'list'">Выйти из теста</button>
     </div>
 
-    <!-- МОДАЛКА ДЕТАЛЕЙ СЛОВА -->
+    <!-- МОДАЛКА ДЕТАЛЕЙ -->
     <Teleport to="body">
       <transition name="modal-fade">
         <div v-if="selectedWord" class="modal-overlay" @click.self="selectedWord = null">
@@ -206,6 +232,8 @@
             <div v-if="selectedWord.part_of_speech" class="modal-detail">📌 {{ posLabel(selectedWord.part_of_speech) }}</div>
             <div v-if="selectedWord.category" class="modal-detail">📂 {{ selectedWord.category }}</div>
             <div v-if="selectedWord.example" class="modal-detail">💬 {{ selectedWord.example }}</div>
+            <div v-if="selectedWord._student_name" class="modal-detail">👤 {{ selectedWord._student_name }}</div>
+            <div class="modal-detail">📅 {{ formatDate(selectedWord.created_at) }}</div>
             <div class="modal-stats">
               <span>✅ {{ selectedWord.correct_count || 0 }}</span>
               <span>❌ {{ selectedWord.wrong_count || 0 }}</span>
@@ -220,13 +248,17 @@
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
   name: 'ProfileTabWords',
   props: {
     words: { type: Array, default: () => [] },
-    loading: { type: Boolean, default: false }
+    loading: { type: Boolean, default: false },
+    user: Object
   },
   emits: ['add-word', 'delete-word', 'update-word-status'],
+  inject: ['addToast', 'showXP'],
   data() {
     return {
       wordEn: '', wordRu: '', wordTranscription: '', wordPartOfSpeech: '', wordCategory: '', wordExample: '',
@@ -235,21 +267,18 @@ export default {
       filterStatus: 'all',
       filterCategory: '',
       selectedWord: null,
-      // Flashcards
-      reviewWords: [],
-      currentFlashcard: 0,
-      isFlipped: false,
-      // Quiz
-      quizQuestions: [],
-      quizCurrent: 0,
-      quizSelected: null,
-      quizAnswered: false,
-      quizScore: 0,
-      quizTotal: 0,
-      quizFinished: false
+      reviewWords: [], currentFlashcard: 0, isFlipped: false,
+      quizQuestions: [], quizCurrent: 0, quizSelected: null, quizAnswered: false, quizScore: 0, quizTotal: 0, quizFinished: false,
+      selectedStudent: null,
+      studentsList: [],
+      addForStudent: null,
+      sortOrder: 'desc',
+      dateFrom: '',
+      dateTo: ''
     };
   },
   computed: {
+    isAdmin() { return this.user?.role === 'admin' || this.user?.role === 'host'; },
     learnedCount() { return this.words.filter(w => w.status === 'learned').length; },
     studyingCount() { return this.words.filter(w => w.status === 'studying').length; },
     newCount() { return this.words.filter(w => !w.status || w.status === 'new').length; },
@@ -263,118 +292,118 @@ export default {
       return list;
     }
   },
+  async mounted() {
+    if (this.isAdmin) {
+      await this.loadStudents();
+    }
+  },
   methods: {
     posLabel(pos) {
       const map = { noun: 'Сущ.', verb: 'Глаг.', adjective: 'Прил.', adverb: 'Нар.', phrase: 'Фраза' };
       return map[pos] || pos;
     },
-    
-    addWord() {
+    formatDate(ts) {
+      if (!ts) return '';
+      return new Date(ts).toLocaleDateString('ru', { day: 'numeric', month: 'short' });
+    },
+
+    async loadStudents() {
+      try {
+        const { data } = await axios.get('/api/students-list');
+        this.studentsList = data || [];
+      } catch(e) {}
+    },
+
+    async loadWords() {
+      let url = '/api/words?sort=created_at&order=' + this.sortOrder;
+      if (this.selectedStudent) url += '&user_id=' + this.selectedStudent;
+      if (this.dateFrom) url += '&date_from=' + this.dateFrom;
+      if (this.dateTo) url += '&date_to=' + this.dateTo;
+      try {
+        const { data } = await axios.get(url);
+        this.$emit('update:words', data || []);
+      } catch(e) {}
+    },
+
+    async addWord() {
       if (!this.wordEn.trim() || !this.wordRu.trim()) return;
-      this.$emit('add-word', {
+      const payload = {
         en: this.wordEn.trim(),
         ru: this.wordRu.trim(),
         transcription: this.wordTranscription.trim(),
         part_of_speech: this.wordPartOfSpeech,
         category: this.wordCategory.trim(),
         example: this.wordExample.trim()
-      });
+      };
+      if (this.addForStudent) payload.user_id = this.addForStudent;
+
+      this.$emit('add-word', payload);
+      
+      // XP
+      try {
+        const { data: xpData } = await axios.post('/api/xp/add', { action: 'word_added' });
+        if (xpData) {
+          this.showXP?.(xpData.xp_added, window.innerWidth / 2, window.innerHeight / 2);
+        }
+      } catch(e) {}
+      
       this.wordEn = ''; this.wordRu = ''; this.wordTranscription = '';
       this.wordPartOfSpeech = ''; this.wordCategory = ''; this.wordExample = '';
       this.showAddForm = false;
     },
-    
+
     updateStatus(word, status) {
       this.$emit('update-word-status', { id: word.id, status });
     },
-    
+    delWord(id) {
+      this.$emit('delete-word', id);
+    },
+
     startFlashcards() {
       this.reviewWords = [...this.words].filter(w => w.status !== 'learned').sort(() => Math.random() - 0.5);
-      if (!this.reviewWords.length) {
-        this.reviewWords = [...this.words].sort(() => Math.random() - 0.5);
-      }
-      this.currentFlashcard = 0;
-      this.isFlipped = false;
-      this.currentTab = 'flashcards';
+      if (!this.reviewWords.length) this.reviewWords = [...this.words].sort(() => Math.random() - 0.5);
+      this.currentFlashcard = 0; this.isFlipped = false; this.currentTab = 'flashcards';
     },
-    
     startReview() {
       this.reviewWords = [...this.words].filter(w => !w.next_review || new Date(w.next_review) <= new Date()).sort(() => Math.random() - 0.5);
-      if (!this.reviewWords.length) {
-        this.reviewWords = [...this.words].sort(() => Math.random() - 0.5);
-      }
-      this.currentFlashcard = 0;
-      this.isFlipped = false;
-      this.currentTab = 'flashcards';
+      if (!this.reviewWords.length) this.reviewWords = [...this.words].sort(() => Math.random() - 0.5);
+      this.currentFlashcard = 0; this.isFlipped = false; this.currentTab = 'flashcards';
     },
-    
     flipCard() { this.isFlipped = !this.isFlipped; },
-    
     cardResult(type) {
       const word = this.reviewWords[this.currentFlashcard];
       const intervals = { wrong: 1, hard: 3, good: 7, easy: 30 };
       const days = intervals[type];
-      const nextReview = new Date();
-      nextReview.setDate(nextReview.getDate() + days);
-      
+      const nextReview = new Date(); nextReview.setDate(nextReview.getDate() + days);
       let newStatus = word.status || 'new';
-      if (type === 'easy' || type === 'good') {
-        newStatus = word.repeat_count >= 3 ? 'learned' : 'studying';
-      } else {
-        newStatus = 'studying';
-      }
-      
+      if (type === 'easy' || type === 'good') newStatus = word.repeat_count >= 3 ? 'learned' : 'studying';
+      else newStatus = 'studying';
       this.$emit('update-word-status', {
-        id: word.id,
-        status: newStatus,
-        next_review: nextReview.toISOString(),
+        id: word.id, status: newStatus, next_review: nextReview.toISOString(),
         repeat_count: (word.repeat_count || 0) + 1,
         correct_count: (word.correct_count || 0) + (type === 'easy' || type === 'good' ? 1 : 0),
         wrong_count: (word.wrong_count || 0) + (type === 'wrong' || type === 'hard' ? 1 : 0)
       });
-      
-      if (this.currentFlashcard < this.reviewWords.length - 1) {
-        this.currentFlashcard++;
-        this.isFlipped = false;
-      } else {
-        this.currentTab = 'list';
-        this.$emit('add-word', { toast: '🎉 Все карточки просмотрены!' });
-      }
+      if (this.currentFlashcard < this.reviewWords.length - 1) { this.currentFlashcard++; this.isFlipped = false; }
+      else { this.currentTab = 'list'; this.addToast?.('🎉 Все карточки просмотрены!', 'success'); }
     },
-    
     startQuiz() {
       const pool = [...this.words].sort(() => Math.random() - 0.5).slice(0, 10);
       this.quizQuestions = pool.map(w => {
         const wrong = this.words.filter(x => x.id !== w.id).sort(() => Math.random() - 0.5).slice(0, 3).map(x => x.ru);
-        const options = [...wrong, w.ru].sort(() => Math.random() - 0.5);
-        return { ...w, options };
+        return { ...w, options: [...wrong, w.ru].sort(() => Math.random() - 0.5) };
       });
-      this.quizCurrent = 0;
-      this.quizScore = 0;
-      this.quizTotal = this.quizQuestions.length;
-      this.quizAnswered = false;
-      this.quizSelected = null;
-      this.quizFinished = false;
-      this.currentTab = 'quiz';
+      this.quizCurrent = 0; this.quizScore = 0; this.quizTotal = this.quizQuestions.length;
+      this.quizAnswered = false; this.quizSelected = null; this.quizFinished = false; this.currentTab = 'quiz';
     },
-    
     answerQuiz(opt) {
       if (this.quizAnswered) return;
-      this.quizSelected = opt;
-      this.quizAnswered = true;
-      if (opt === this.quizQuestions[this.quizCurrent].ru) {
-        this.quizScore++;
-      }
+      this.quizSelected = opt; this.quizAnswered = true;
+      if (opt === this.quizQuestions[this.quizCurrent].ru) this.quizScore++;
     },
-    
     nextQuiz() {
-      if (this.quizCurrent + 1 < this.quizQuestions.length) {
-        this.quizCurrent++;
-        this.quizAnswered = false;
-        this.quizSelected = null;
-      } else {
-        this.quizFinished = true;
-      }
+      if (this.quizCurrent + 1 < this.quizQuestions.length) { this.quizCurrent++; this.quizAnswered = false; this.quizSelected = null; }
+      else { this.quizFinished = true; }
     }
   }
 };
@@ -383,7 +412,6 @@ export default {
 <style scoped>
 .dictionary-app { display: flex; flex-direction: column; gap: 16px; }
 
-/* Статистика */
 .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 @media (max-width: 768px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
 .stat-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px; text-align: center; }
@@ -394,14 +422,19 @@ export default {
 .stat-value { font-size: 1.4rem; font-weight: 700; color: #fff; font-family: 'Space Grotesk', sans-serif; }
 .stat-label { font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; margin-top: 2px; }
 
-/* Прогресс */
 .progress-section { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px 16px; }
 .progress-header { display: flex; justify-content: space-between; font-size: 0.8rem; color: #94a3b8; margin-bottom: 8px; }
 .progress-bar { height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
 .progress-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #2dd4bf); border-radius: 4px; transition: width 0.6s ease; }
 
-/* Кнопки */
-.actions-row { display: flex; gap: 8px; flex-wrap: wrap; }
+/* Выбор ученика */
+.student-select-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+.student-select-row label { font-size: 0.8rem; color: #94a3b8; font-weight: 600; white-space: nowrap; }
+.student-select { flex: 1; padding: 8px 12px; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; background: rgba(255,255,255,0.04); color: #fff; font-size: 0.82rem; cursor: pointer; font-family: inherit; outline: none; }
+
+.actions-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.sort-select { padding: 6px 10px; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; background: rgba(255,255,255,0.04); color: #fff; font-size: 0.78rem; cursor: pointer; font-family: inherit; margin-left: auto; }
+
 .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 50px; font-weight: 600; font-size: 0.8rem; cursor: pointer; border: none; font-family: inherit; transition: all 0.2s; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn-p { background: linear-gradient(135deg, #6366f1, #2dd4bf); color: #fff; }
@@ -410,26 +443,29 @@ export default {
 .w-100 { width: 100%; justify-content: center; }
 .mt-2 { margin-top: 10px; }
 
-/* Форма */
 .add-form { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
 .form-row { display: flex; gap: 8px; }
 .input { padding: 9px 12px; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; font-family: inherit; font-size: 0.82rem; background: rgba(255,255,255,0.04); color: #fff; outline: none; flex: 1; }
 .input:focus { border-color: #6366f1; }
 select.input { cursor: pointer; }
 
-/* Вкладки */
 .tabs { display: flex; gap: 4px; background: rgba(255,255,255,0.03); border-radius: 12px; padding: 4px; }
 .tab { flex: 1; padding: 8px; border: none; background: transparent; color: #94a3b8; cursor: pointer; border-radius: 10px; font-size: 0.8rem; font-weight: 500; transition: all 0.2s; font-family: inherit; }
 .tab.active { background: rgba(99,102,241,0.2); color: #fff; }
 .tab:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* Фильтры */
-.filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
 .filter-btn { padding: 4px 10px; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: transparent; color: #94a3b8; cursor: pointer; font-size: 0.7rem; font-family: inherit; transition: all 0.2s; }
 .filter-btn.active { background: rgba(99,102,241,0.2); border-color: rgba(99,102,241,0.5); color: #fff; }
 .filter-select { padding: 4px 8px; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.04); color: #fff; font-size: 0.7rem; cursor: pointer; font-family: inherit; }
 
-/* Список слов */
+/* Фильтр по дате */
+.date-filter-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.date-input { padding: 6px 10px; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.04); color: #fff; font-size: 0.75rem; font-family: inherit; outline: none; }
+.date-input:focus { border-color: #6366f1; }
+.date-sep { color: #94a3b8; }
+.date-clear { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 0.7rem; padding: 4px 8px; }
+
 .word-card { display: flex; align-items: center; gap: 10px; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 12px; margin-bottom: 4px; cursor: pointer; transition: all 0.2s; border: 1px solid transparent; }
 .word-card:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.08); }
 .word-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -440,11 +476,13 @@ select.input { cursor: pointer; }
 .word-main { display: flex; align-items: center; gap: 8px; }
 .word-main strong { color: #fff; font-size: 0.9rem; }
 .transcription { color: #94a3b8; font-size: 0.75rem; font-style: italic; }
+.student-tag { font-size: 0.65rem; background: rgba(99,102,241,0.15); color: #818cf8; padding: 1px 6px; border-radius: 6px; }
 .word-translation { color: #cbd5e1; font-size: 0.8rem; margin-top: 2px; }
-.word-meta { display: flex; gap: 4px; margin-top: 4px; }
-.pos-badge, .cat-badge { font-size: 0.6rem; padding: 1px 6px; border-radius: 6px; }
+.word-meta { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; align-items: center; }
+.pos-badge, .cat-badge, .date-badge { font-size: 0.6rem; padding: 1px 6px; border-radius: 6px; }
 .pos-badge { background: rgba(99,102,241,0.15); color: #818cf8; }
 .cat-badge { background: rgba(16,185,129,0.1); color: #10b981; }
+.date-badge { background: rgba(148,163,184,0.1); color: #94a3b8; }
 .word-stats { display: flex; gap: 8px; font-size: 0.7rem; color: #94a3b8; margin-top: 4px; }
 .word-actions { display: flex; gap: 4px; }
 .action-btn { background: none; border: none; cursor: pointer; font-size: 1rem; padding: 4px; border-radius: 6px; }
@@ -452,10 +490,9 @@ select.input { cursor: pointer; }
 .remove-btn { color: #ef4444; background: none; border: none; cursor: pointer; font-size: 1rem; padding: 4px 6px; border-radius: 6px; }
 .remove-btn:hover { background: rgba(239,68,68,0.15); }
 
-/* Карточки */
 .flashcards-area { display: flex; flex-direction: column; align-items: center; gap: 16px; }
 .flashcard-counter { color: #94a3b8; font-size: 0.8rem; }
-.flashcard { width: 100%; max-width: 400px; height: 220px; perspective: 1000px; cursor: pointer; }
+.flashcard { width: 100%; max-width: 400px; height: 220px; perspective: 1000px; cursor: pointer; position: relative; }
 .flashcard-front, .flashcard-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 20px; padding: 24px; text-align: center; transition: transform 0.6s; }
 .flashcard-front { background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(45,212,191,0.1)); border: 1px solid rgba(99,102,241,0.3); transform: rotateY(0deg); }
 .flashcard-back { background: linear-gradient(135deg, rgba(45,212,191,0.2), rgba(99,102,241,0.1)); border: 1px solid rgba(45,212,191,0.3); transform: rotateY(180deg); }
@@ -473,11 +510,8 @@ select.input { cursor: pointer; }
 .flashcard-btn.good { background: rgba(99,102,241,0.15); color: #818cf8; }
 .flashcard-btn.easy { background: rgba(16,185,129,0.15); color: #10b981; }
 
-/* Тест */
 .quiz-area { display: flex; flex-direction: column; gap: 14px; }
 .quiz-progress { display: flex; justify-content: space-between; align-items: center; }
-.quiz-counter, .quiz-score { font-size: 0.85rem; color: #94a3b8; }
-.quiz-score { font-weight: 700; color: #fbbf24; }
 .quiz-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; padding: 24px; text-align: center; }
 .quiz-question { color: #fff; font-size: 1.1rem; margin-bottom: 16px; }
 .quiz-question strong { color: #818cf8; }
@@ -494,7 +528,6 @@ select.input { cursor: pointer; }
 .quiz-result-text { font-size: 1.1rem; color: #fff; margin-top: 8px; }
 .quiz-result-percent { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, #6366f1, #2dd4bf); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-family: 'Space Grotesk', sans-serif; }
 
-/* Модалка */
 .modal-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; }
 .modal-card { background: rgba(20,20,40,0.95); border: 1px solid rgba(255,255,255,0.12); border-radius: 24px; padding: 32px; max-width: 400px; width: 90%; color: #fff; animation: modalPop 0.3s ease; }
 @keyframes modalPop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -505,7 +538,6 @@ select.input { cursor: pointer; }
 
 .empty-text { text-align: center; color: #64748b; padding: 40px; }
 
-/* Анимации */
 .fade-in { animation: fadeIn 0.4s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .slide-fade-enter-active, .slide-fade-leave-active { transition: all 0.3s ease; }
