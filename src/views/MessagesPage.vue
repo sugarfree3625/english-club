@@ -44,7 +44,6 @@
         </div>
       </div>
 
-      <!-- Jitsi Meet -->
       <div v-if="jitsiActive" class="jitsi-container">
         <button class="jitsi-close" @click="closeVideoCall">✕ Завершить звонок</button>
         <iframe :src="jitsiUrl" allow="camera; microphone; fullscreen; display-capture" class="jitsi-frame"></iframe>
@@ -56,11 +55,8 @@
       </div>
 
       <div class="chat-messages" ref="msgContainer">
-        <!-- Группировка по датам -->
         <template v-for="(group, gIdx) in groupedMessages" :key="'g-'+gIdx">
-          <div class="date-divider">
-            <span>{{ group.label }}</span>
-          </div>
+          <div class="date-divider"><span>{{ group.label }}</span></div>
           <transition-group name="msg-pop">
             <div v-for="(m, idx) in group.messages" :key="m.id || m.ts || idx" class="msg" :class="{ mine: m.sender_id === currentUserId || m.from === currentUserId }">
               <div v-if="m.reply_to" class="reply-preview">↩ {{ m.reply_to?.substring(0, 60) }}</div>
@@ -77,14 +73,9 @@
                   <a v-else :href="proxifyUrl(f.url)" target="_blank" class="file-link" :download="f.name || 'file'">📎 {{ f.name || 'Файл' }}</a>
                 </div>
               </div>
-
-              <!-- 🔥 РЕАКЦИИ -->
               <div v-if="m.reactions && Object.keys(m.reactions).length" class="msg-reactions">
-                <span v-for="(count, emoji) in m.reactions" :key="emoji" class="reaction-badge" @click="toggleReaction(m, emoji)">
-                  {{ emoji }} {{ count }}
-                </span>
+                <span v-for="(count, emoji) in m.reactions" :key="emoji" class="reaction-badge" @click="toggleReaction(m, emoji)">{{ emoji }} {{ count }}</span>
               </div>
-
               <small class="msg-time">{{ formatTime(m.ts) }}</small>
               <div class="msg-actions">
                 <button @click="replyTo(m)" title="Ответить" class="interactive-btn">↩</button>
@@ -92,8 +83,6 @@
                 <button @click="translateMsg(m)" title="Перевести" class="interactive-btn">🌐</button>
                 <button v-if="m.sender_id === currentUserId || m.from === currentUserId" @click="deleteMsg(m.id)" title="Удалить" class="interactive-btn">🗑</button>
               </div>
-
-              <!-- 🔥 ПИКЕР РЕАКЦИЙ -->
               <div v-if="reactionPickerId === (m.id || m.ts)" class="reaction-picker">
                 <span v-for="e in reactionEmojis" :key="e" @click="addReaction(m, e)" class="reaction-emoji">{{ e }}</span>
               </div>
@@ -102,11 +91,8 @@
         </template>
       </div>
 
-      <!-- Индикатор "печатает..." -->
       <div v-if="partnerTyping" class="typing-indicator">
-        <div class="typing-dots">
-          <span></span><span></span><span></span>
-        </div>
+        <div class="typing-dots"><span></span><span></span><span></span></div>
         <span class="typing-text">{{ activeChatName }} печатает...</span>
       </div>
 
@@ -152,15 +138,17 @@ import { useSocket } from '../composables/useSocket.js';
 import { useDebounce } from '../composables/useDebounce.js';
 import { translateWord } from '../composables/useTranslator.js';
 import { sendNotification, playNotificationSound } from '../composables/useNotifications.js';
+import { useXP } from '../composables/useXP';
 import AppAvatar from '../components/AppAvatar.vue';
 
 const { uploadFile, getFileType, getFileIcon, proxifyUrl } = useFiles();
+const { addXP } = useXP();
 
 export default {
   name: 'MessagesPage',
   components: { AppAvatar },
   props: ['user'],
-  inject: ['addToast'],
+  inject: ['addToast', 'showXP'],
   data() {
     return {
       dialogs: [], messages: [], filteredMessages: [], activeChat: null,
@@ -172,12 +160,9 @@ export default {
       translating: false, recordingTime: 0, recordingTimer: null, soundEnabled: false,
       emojis: ['😀','😂','🤣','😍','🥰','😘','😎','🤩','😇','🤔','😴','🥳','❤️','🔥','🎉','⭐','✅','💯','🙏','💪','🚀','🌈'],
       reactionEmojis: ['👍','❤️','😂','😮','😢','😡','🔥','👏','🎉','💯'],
-      reactionPickerId: null,
-      jitsiActive: false,
-      jitsiUrl: '',
-      partnerTyping: false,
-      typingTimer: null,
-      typingEmitTimer: null
+      reactionPickerId: null, jitsiActive: false, jitsiUrl: '',
+      partnerTyping: false, typingTimer: null, typingEmitTimer: null,
+      xpMessageCount: 0
     };
   },
   computed: {
@@ -186,24 +171,20 @@ export default {
       if (this.partnerTyping) return '✍️ Печатает...';
       return this.isPartnerOnline ? '🟢 Онлайн' : '⚫ Оффлайн';
     },
-    // 🔥 Группировка сообщений по датам
     groupedMessages() {
       const groups = [];
       const today = new Date().toDateString();
       const yesterday = new Date(Date.now() - 86400000).toDateString();
-      
       this.filteredMessages.forEach(m => {
         const date = new Date(m.ts).toDateString();
         let label;
         if (date === today) label = 'Сегодня';
         else if (date === yesterday) label = 'Вчера';
         else label = new Date(m.ts).toLocaleDateString('ru', { day: 'numeric', month: 'long' });
-        
         let group = groups.find(g => g.label === label);
         if (!group) { group = { label, messages: [] }; groups.push(group); }
         group.messages.push(m);
       });
-      
       return groups;
     }
   },
@@ -234,61 +215,24 @@ export default {
     clearTimeout(this.typingEmitTimer);
   },
   methods: {
-    proxifyUrl,
-    fileIcon: getFileIcon,
-
-    // 🔥 РЕАКЦИИ
-    openReactionPicker(m) {
-      this.reactionPickerId = this.reactionPickerId === (m.id || m.ts) ? null : (m.id || m.ts);
-    },
-    addReaction(m, emoji) {
-      if (!m.reactions) m.reactions = {};
-      if (m.reactions[emoji]) {
-        m.reactions[emoji]++;
-      } else {
-        m.reactions[emoji] = 1;
-      }
-      this.reactionPickerId = null;
-      this.socket?.emit('reaction', { messageId: m.id || m.ts, emoji, to: this.activeChat });
-    },
-    toggleReaction(m, emoji) {
-      this.addReaction(m, emoji);
-    },
-
-    // 🔥 ИНДИКАТОР "ПЕЧАТАЕТ..."
-    emitTyping() {
-      if (!this.socket?.connected || !this.activeChat) return;
-      clearTimeout(this.typingEmitTimer);
-      this.socket.emit('typing', { to: this.activeChat });
-      this.typingEmitTimer = setTimeout(() => {}, 1000);
-    },
-
-    startVideoCall() {
-      const roomName = `english-club-${this.currentUserId}-${this.activeChat}`;
-      this.jitsiUrl = `https://meet.jit.si/${roomName}`;
-      this.jitsiActive = true;
-      this.addToast('Видеозвонок начат! 📹', 'info');
-    },
-    closeVideoCall() {
-      this.jitsiActive = false;
-      this.jitsiUrl = '';
-    },
-
+    proxifyUrl, fileIcon: getFileIcon,
+    openReactionPicker(m) { this.reactionPickerId = this.reactionPickerId === (m.id || m.ts) ? null : (m.id || m.ts); },
+    addReaction(m, emoji) { if (!m.reactions) m.reactions = {}; m.reactions[emoji] = (m.reactions[emoji] || 0) + 1; this.reactionPickerId = null; this.socket?.emit('reaction', { messageId: m.id || m.ts, emoji, to: this.activeChat }); },
+    toggleReaction(m, emoji) { this.addReaction(m, emoji); },
+    emitTyping() { if (!this.socket?.connected || !this.activeChat) return; clearTimeout(this.typingEmitTimer); this.socket.emit('typing', { to: this.activeChat }); },
+    startVideoCall() { const roomName = `english-club-${this.currentUserId}-${this.activeChat}`; this.jitsiUrl = `https://meet.jit.si/${roomName}`; this.jitsiActive = true; this.addToast('Видеозвонок начат! 📹', 'info'); },
+    closeVideoCall() { this.jitsiActive = false; this.jitsiUrl = ''; },
     handleIncomingMessage(msg) {
       if (typeof msg.files === 'string') { try { msg.files = JSON.parse(msg.files); } catch(e) { msg.files = null; } }
       if (msg.from === this.currentUserId) { this.loadDialogs(); return; }
       if (this.activeChat === msg.from) {
-        if (!this.messages.find(m => m.id === msg.id)) {
-          this.messages.push(msg); this.filterMessages(); this.$nextTick(() => this.scrollToBottom());
-        }
+        if (!this.messages.find(m => m.id === msg.id)) { this.messages.push(msg); this.filterMessages(); this.$nextTick(() => this.scrollToBottom()); }
       }
-      if (document.hidden && msg.from !== this.currentUserId) {
-        sendNotification(`💬 ${msg.fn || 'Новое сообщение'}`, msg.msg || msg.message || '📎 Файл');
-        playNotificationSound();
-      }
+      if (document.hidden && msg.from !== this.currentUserId) { sendNotification(`💬 ${msg.fn || 'Новое сообщение'}`, msg.msg || msg.message || '📎 Файл'); playNotificationSound(); }
       this.loadDialogs();
     },
 
+    // 🔥 ОТПРАВКА СООБЩЕНИЯ С XP
     async sendMsg() {
       const text = this.msgText.trim();
       if ((!text && !this.pendingFiles.length) || !this.activeChat || !this.socket?.connected) return;
@@ -311,56 +255,38 @@ export default {
       }
       this.playSendSound(); this.msgText = ''; this.pendingFiles = []; this.$nextTick(() => this.scrollToBottom());
       this.partnerTyping = false;
+
+      // 🔥 НАЧИСЛЯЕМ XP ЗА СООБЩЕНИЕ
+      this.xpMessageCount++;
+      const xpResult = await addXP('message_sent');
+      if (xpResult) {
+        this.showXP?.(xpResult.xp_added, window.innerWidth / 2, window.innerHeight / 2);
+        if (xpResult.leveled_up) {
+          this.addToast(`🎉 Уровень повышен до ${xpResult.level}!`, 'success');
+        }
+      }
     },
 
     handleFiles(e) {
-      if (e.target.files?.length) {
-        for (const file of e.target.files) {
-          if (file.type.startsWith('image/')) file.preview = URL.createObjectURL(file);
-          this.pendingFiles.push(file);
-        }
-      }
+      if (e.target.files?.length) { for (const file of e.target.files) { if (file.type.startsWith('image/')) file.preview = URL.createObjectURL(file); this.pendingFiles.push(file); } }
       e.target.value = '';
     },
-
     toggleAudio(e, url) {
-      const btn = e.target;
-      const existing = document.querySelector('audio.voice-audio');
-      if (existing) { existing.pause(); existing.remove(); }
+      const btn = e.target; const existing = document.querySelector('audio.voice-audio'); if (existing) { existing.pause(); existing.remove(); }
       if (btn.dataset.playing === 'true') { btn.dataset.playing = 'false'; btn.textContent = '▶️'; return; }
       const audio = new Audio(url); audio.classList.add('voice-audio'); audio.preload = 'auto';
       btn.dataset.playing = 'true'; btn.textContent = '⏳';
-      audio.oncanplaythrough = () => {
-        audio.play().then(() => { btn.textContent = '⏸️'; }).catch(() => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; });
-      };
+      audio.oncanplaythrough = () => { audio.play().then(() => { btn.textContent = '⏸️'; }).catch(() => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; }); };
       audio.onended = () => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; audio.remove(); };
       audio.onerror = () => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; audio.remove(); };
       document.body.appendChild(audio); audio.load();
     },
-
     async startRecord() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        this.recording = true; this.recordingTime = 0;
-        this.recordingTimer = setInterval(() => this.recordingTime++, 1000);
-        this.mediaRecorder = new MediaRecorder(stream); this.chunks = [];
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); this.recording = true; this.recordingTime = 0;
+        this.recordingTimer = setInterval(() => this.recordingTime++, 1000); this.mediaRecorder = new MediaRecorder(stream); this.chunks = [];
         this.mediaRecorder.ondataavailable = e => this.chunks.push(e.data);
-        this.mediaRecorder.onstop = async () => {
-          clearInterval(this.recordingTimer);
-          const blob = new Blob(this.chunks, { type: 'audio/webm' });
-          const form = new FormData(); form.append('img', blob, 'voice.webm');
-          try {
-            const r = await axios.post('/api/nimg', form);
-            if (r.data?.url) {
-              this.messages.push({ id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }], ts: new Date().toISOString(), reactions: {} });
-              this.filterMessages();
-              this.socket.emit('dm', { to: this.activeChat, msg: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }] });
-            }
-          } catch(e) {}
-          stream.getTracks().forEach(t => t.stop());
-          this.recording = false; this.recordingTime = 0;
-          this.$nextTick(() => this.scrollToBottom());
-        };
+        this.mediaRecorder.onstop = async () => { clearInterval(this.recordingTimer); const blob = new Blob(this.chunks, { type: 'audio/webm' }); const form = new FormData(); form.append('img', blob, 'voice.webm'); try { const r = await axios.post('/api/nimg', form); if (r.data?.url) { this.messages.push({ id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }], ts: new Date().toISOString(), reactions: {} }); this.filterMessages(); this.socket.emit('dm', { to: this.activeChat, msg: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }] }); } } catch(e) {} stream.getTracks().forEach(t => t.stop()); this.recording = false; this.recordingTime = 0; this.$nextTick(() => this.scrollToBottom()); };
         this.mediaRecorder.start();
       } catch(e) { this.recording = false; this.addToast('Нет доступа к микрофону 🎤', 'error'); }
     },
@@ -391,10 +317,10 @@ export default {
 .unread-badge { background: var(--p); color: #fff; padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; }
 .pulse-badge { animation: pulse 2s infinite; }
 .search-box { position: relative; padding: 12px; }
-.search-input { width: 100%; padding: 11px 16px; border: 2px solid var(--b); border-radius: 14px; font-family: inherit; font-size: 0.85rem; background: var(--bg); color: var(--t); outline: none; transition: all 0.2s; }
+.search-input { width: 100%; padding: 11px 16px; border: 2px solid var(--b); border-radius: 14px; font-family: inherit; font-size: 0.85rem; background: var(--bg); color: var(--t); outline: none; }
 .search-input:focus { border-color: var(--p); }
 .search-results { position: absolute; top: 100%; left: 12px; right: 12px; background: var(--surface); border: 1px solid var(--b); border-radius: 14px; max-height: 220px; overflow-y: auto; z-index: 100; box-shadow: var(--shadow-lg); }
-.search-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; transition: background 0.2s; }
+.search-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; }
 .search-item:hover { background: rgba(99,102,241,0.04); }
 .dialog-list { flex: 1; overflow-y: auto; padding: 8px 12px; }
 .dialog-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; cursor: pointer; margin-bottom: 3px; transition: all 0.2s; }
@@ -411,106 +337,23 @@ export default {
 .tilt-avatar:hover { transform: scale(1.1) rotate(-3deg); }
 .chat-header small { font-size: 0.75rem; color: var(--t2); }
 .chat-header small.online { color: #22c55e; }
-
-/* 🔥 ИНДИКАТОР "ПЕЧАТАЕТ..." */
-.typing-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 22px;
-  background: var(--surface);
-  border-top: 1px solid var(--b);
-}
-.typing-dots {
-  display: flex;
-  gap: 3px;
-}
-.typing-dots span {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--p);
-  animation: typingBounce 1.4s infinite ease-in-out both;
-}
+.typing-indicator { display: flex; align-items: center; gap: 8px; padding: 8px 22px; background: var(--surface); border-top: 1px solid var(--b); }
+.typing-dots { display: flex; gap: 3px; }
+.typing-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--p); animation: typingBounce 1.4s infinite ease-in-out both; }
 .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
 .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
 .typing-dots span:nth-child(3) { animation-delay: 0s; }
-@keyframes typingBounce {
-  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-  40% { transform: scale(1); opacity: 1; }
-}
-.typing-text {
-  font-size: 0.8rem;
-  color: var(--t2);
-  font-style: italic;
-}
-
-/* 🔥 ДАТЫ-РАЗДЕЛИТЕЛИ */
-.date-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-}
-.date-divider::before,
-.date-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--b);
-}
-.date-divider span {
-  font-size: 0.7rem;
-  color: var(--t2);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-/* 🔥 РЕАКЦИИ */
-.msg-reactions {
-  display: flex;
-  gap: 4px;
-  margin-top: 4px;
-}
-.reaction-badge {
-  padding: 2px 8px;
-  background: rgba(99,102,241,0.1);
-  border: 1px solid rgba(99,102,241,0.2);
-  border-radius: 10px;
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.reaction-badge:hover {
-  background: rgba(99,102,241,0.2);
-  transform: scale(1.1);
-}
-.reaction-picker {
-  position: absolute;
-  bottom: -40px;
-  right: 0;
-  display: flex;
-  gap: 4px;
-  padding: 6px 10px;
-  background: var(--surface);
-  border: 1px solid var(--b);
-  border-radius: 12px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-  z-index: 50;
-}
-.reaction-emoji {
-  cursor: pointer;
-  font-size: 1.1rem;
-  padding: 4px;
-  border-radius: 6px;
-  transition: all 0.2s;
-}
-.reaction-emoji:hover {
-  background: rgba(99,102,241,0.1);
-  transform: scale(1.3);
-}
-
+@keyframes typingBounce { 0%,80%,100%{transform:scale(0.6);opacity:0.4} 40%{transform:scale(1);opacity:1} }
+.typing-text { font-size: 0.8rem; color: var(--t2); font-style: italic; }
+.date-divider { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+.date-divider::before,.date-divider::after { content: ''; flex: 1; height: 1px; background: var(--b); }
+.date-divider span { font-size: 0.7rem; color: var(--t2); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+.msg-reactions { display: flex; gap: 4px; margin-top: 4px; }
+.reaction-badge { padding: 2px 8px; background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.2); border-radius: 10px; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; }
+.reaction-badge:hover { background: rgba(99,102,241,0.2); transform: scale(1.1); }
+.reaction-picker { position: absolute; bottom: -40px; right: 0; display: flex; gap: 4px; padding: 6px 10px; background: var(--surface); border: 1px solid var(--b); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); z-index: 50; }
+.reaction-emoji { cursor: pointer; font-size: 1.1rem; padding: 4px; border-radius: 6px; transition: all 0.2s; }
+.reaction-emoji:hover { background: rgba(99,102,241,0.1); transform: scale(1.3); }
 .jitsi-container { position: relative; width: 100%; height: 500px; margin-bottom: 8px; }
 .jitsi-frame { width: 100%; height: 100%; border: none; border-radius: 16px; }
 .jitsi-close { position: absolute; top: 8px; right: 8px; z-index: 10; padding: 8px 16px; background: #ef4444; color: #fff; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; }
@@ -521,7 +364,7 @@ export default {
 .msg:hover .msg-actions { display: flex; }
 .msg-actions { display: none; position: absolute; top: -10px; right: 6px; gap: 3px; }
 .msg.mine .msg-actions { right: auto; left: 6px; }
-.msg-actions button { background: var(--surface); border: 1px solid var(--b); border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 0.6rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+.msg-actions button { background: var(--surface); border: 1px solid var(--b); border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 0.6rem; display: flex; align-items: center; justify-content: center; }
 .msg-actions button:hover { background: var(--p); color: #fff; border-color: var(--p); }
 .reply-preview { border-left: 3px solid var(--p); padding: 4px 10px; margin-bottom: 6px; font-size: 0.8rem; opacity: 0.7; }
 .msg-text { font-size: 0.9rem; line-height: 1.55; word-break: break-word; }
@@ -553,7 +396,7 @@ export default {
 .voice-btn { width: 44px; height: 44px; padding: 0 !important; justify-content: center; border-radius: 50% !important; font-size: 1.2rem; }
 .voice-btn.recording { background: #ef4444; color: #fff; border-color: #ef4444; animation: pulse 0.8s infinite; }
 .recording-time { color: #ef4444; font-weight: 700; font-size: 0.85rem; min-width: 35px; }
-.translate-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--surface); border: 2px solid var(--p); border-radius: 16px; padding: 14px 18px; min-width: 200px; box-shadow: 0 12px 40px rgba(0,0,0,0.2); z-index: 9999; text-align: center; }
+.translate-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: var(--surface); border: 2px solid var(--p); border-radius: 16px; padding: 14px 18px; min-width: 200px; box-shadow: 0 12px 40px rgba(0,0,0,0.2); z-index: 9999; text-align: center; }
 .translate-word { font-weight: 700; font-size: 0.9rem; color: var(--p); margin-bottom: 6px; }
 .translate-result { font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; }
 .translate-loading { color: var(--t2); font-size: 0.85rem; margin-bottom: 8px; }
@@ -566,14 +409,13 @@ export default {
 .btn-sm { padding: 7px 16px; font-size: 0.8rem; }
 .w-100 { width: 100%; }
 .mobile-back { display: none; }
-.interactive-btn { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+.interactive-btn { transition: all 0.2s; }
 .interactive-btn:hover { transform: translateY(-1px); }
-.interactive-btn:active { transform: scale(0.95); }
-.msg-pop-enter-active { animation: msgIn 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.msg-pop-enter-active { animation: msgIn 0.3s ease; }
 @keyframes msgIn { from { opacity: 0; transform: translateY(10px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
-.fade-in-up { animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.fade-in-up { animation: fadeInUp 0.4s ease both; }
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.08); } }
-@keyframes wave { 0%, 100% { height: 4px; } 50% { height: 16px; } }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.7;transform:scale(1.08)} }
+@keyframes wave { 0%,100%{height:4px} 50%{height:16px} }
 @media (max-width: 768px) { .chat-sidebar { width: 100%; position: absolute; inset: 0; z-index: 10; } .chat-sidebar.mobile-hidden { display: none; } .chat-main { display: none; width: 100%; } .chat-main.mobile-show { display: flex; } .empty-chat { display: flex; } .mobile-back { display: block; padding: 14px 22px; background: var(--surface); border-bottom: 1px solid var(--b); font-weight: 600; cursor: pointer; border: none; width: 100%; text-align: left; color: var(--t); font-family: inherit; } .msg { max-width: 85%; } .emoji-picker { width: 260px; } .jitsi-container { height: 350px; } }
 </style>
