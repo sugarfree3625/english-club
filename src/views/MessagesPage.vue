@@ -231,8 +231,6 @@ export default {
       if (document.hidden && msg.from !== this.currentUserId) { sendNotification(`💬 ${msg.fn || 'Новое сообщение'}`, msg.msg || msg.message || '📎 Файл'); playNotificationSound(); }
       this.loadDialogs();
     },
-
-    // 🔥 ОТПРАВКА СООБЩЕНИЯ С XP
     async sendMsg() {
       const text = this.msgText.trim();
       if ((!text && !this.pendingFiles.length) || !this.activeChat || !this.socket?.connected) return;
@@ -255,41 +253,13 @@ export default {
       }
       this.playSendSound(); this.msgText = ''; this.pendingFiles = []; this.$nextTick(() => this.scrollToBottom());
       this.partnerTyping = false;
-
-      // 🔥 НАЧИСЛЯЕМ XP ЗА СООБЩЕНИЕ
       this.xpMessageCount++;
       const xpResult = await addXP('message_sent');
-      if (xpResult) {
-        this.showXP?.(xpResult.xp_added, window.innerWidth / 2, window.innerHeight / 2);
-        if (xpResult.leveled_up) {
-          this.addToast(`🎉 Уровень повышен до ${xpResult.level}!`, 'success');
-        }
-      }
+      if (xpResult) { this.showXP?.(xpResult.xp_added, window.innerWidth / 2, window.innerHeight / 2); if (xpResult.leveled_up) { this.addToast(`🎉 Уровень повышен до ${xpResult.level}!`, 'success'); } }
     },
-
-    handleFiles(e) {
-      if (e.target.files?.length) { for (const file of e.target.files) { if (file.type.startsWith('image/')) file.preview = URL.createObjectURL(file); this.pendingFiles.push(file); } }
-      e.target.value = '';
-    },
-    toggleAudio(e, url) {
-      const btn = e.target; const existing = document.querySelector('audio.voice-audio'); if (existing) { existing.pause(); existing.remove(); }
-      if (btn.dataset.playing === 'true') { btn.dataset.playing = 'false'; btn.textContent = '▶️'; return; }
-      const audio = new Audio(url); audio.classList.add('voice-audio'); audio.preload = 'auto';
-      btn.dataset.playing = 'true'; btn.textContent = '⏳';
-      audio.oncanplaythrough = () => { audio.play().then(() => { btn.textContent = '⏸️'; }).catch(() => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; }); };
-      audio.onended = () => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; audio.remove(); };
-      audio.onerror = () => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; audio.remove(); };
-      document.body.appendChild(audio); audio.load();
-    },
-    async startRecord() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); this.recording = true; this.recordingTime = 0;
-        this.recordingTimer = setInterval(() => this.recordingTime++, 1000); this.mediaRecorder = new MediaRecorder(stream); this.chunks = [];
-        this.mediaRecorder.ondataavailable = e => this.chunks.push(e.data);
-        this.mediaRecorder.onstop = async () => { clearInterval(this.recordingTimer); const blob = new Blob(this.chunks, { type: 'audio/webm' }); const form = new FormData(); form.append('img', blob, 'voice.webm'); try { const r = await axios.post('/api/nimg', form); if (r.data?.url) { this.messages.push({ id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }], ts: new Date().toISOString(), reactions: {} }); this.filterMessages(); this.socket.emit('dm', { to: this.activeChat, msg: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }] }); } } catch(e) {} stream.getTracks().forEach(t => t.stop()); this.recording = false; this.recordingTime = 0; this.$nextTick(() => this.scrollToBottom()); };
-        this.mediaRecorder.start();
-      } catch(e) { this.recording = false; this.addToast('Нет доступа к микрофону 🎤', 'error'); }
-    },
+    handleFiles(e) { if (e.target.files?.length) { for (const file of e.target.files) { if (file.type.startsWith('image/')) file.preview = URL.createObjectURL(file); this.pendingFiles.push(file); } } e.target.value = ''; },
+    toggleAudio(e, url) { const btn = e.target; const existing = document.querySelector('audio.voice-audio'); if (existing) { existing.pause(); existing.remove(); } if (btn.dataset.playing === 'true') { btn.dataset.playing = 'false'; btn.textContent = '▶️'; return; } const audio = new Audio(url); audio.classList.add('voice-audio'); audio.preload = 'auto'; btn.dataset.playing = 'true'; btn.textContent = '⏳'; audio.oncanplaythrough = () => { audio.play().then(() => { btn.textContent = '⏸️'; }).catch(() => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; }); }; audio.onended = () => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; audio.remove(); }; audio.onerror = () => { btn.dataset.playing = 'false'; btn.textContent = '▶️'; audio.remove(); }; document.body.appendChild(audio); audio.load(); },
+    async startRecord() { try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); this.recording = true; this.recordingTime = 0; this.recordingTimer = setInterval(() => this.recordingTime++, 1000); this.mediaRecorder = new MediaRecorder(stream); this.chunks = []; this.mediaRecorder.ondataavailable = e => this.chunks.push(e.data); this.mediaRecorder.onstop = async () => { clearInterval(this.recordingTimer); const blob = new Blob(this.chunks, { type: 'audio/webm' }); const form = new FormData(); form.append('img', blob, 'voice.webm'); try { const r = await axios.post('/api/nimg', form); if (r.data?.url) { this.messages.push({ id: Date.now(), from: this.currentUserId, sender_id: this.currentUserId, message: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }], ts: new Date().toISOString(), reactions: {} }); this.filterMessages(); this.socket.emit('dm', { to: this.activeChat, msg: '🎤 Голосовое', files: [{ url: r.data.url, type: 'audio', name: 'Голосовое' }] }); } } catch(e) {} stream.getTracks().forEach(t => t.stop()); this.recording = false; this.recordingTime = 0; this.$nextTick(() => this.scrollToBottom()); }; this.mediaRecorder.start(); } catch(e) { this.recording = false; this.addToast('Нет доступа к микрофону 🎤', 'error'); } },
     stopRecord() { if (this.mediaRecorder?.state === 'recording') this.mediaRecorder.stop(); },
     async loadDialogs() { if (!this.currentUserId) return; try { const r = await axios.get('/api/dialogs'); this.dialogs = Array.isArray(r.data) ? r.data : []; } catch(e) {} },
     async startChat(u) { Object.assign(this, { activeChat: u.id, activeChatName: u.username, partnerAvatar: u.avatar_url, searchQuery: '', searchResults: [], showSidebar: false, partnerTyping: false }); await this.loadMessages(u.id); this.loadDialogs(); },
@@ -417,5 +387,39 @@ export default {
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.7;transform:scale(1.08)} }
 @keyframes wave { 0%,100%{height:4px} 50%{height:16px} }
-@media (max-width: 768px) { .chat-sidebar { width: 100%; position: absolute; inset: 0; z-index: 10; } .chat-sidebar.mobile-hidden { display: none; } .chat-main { display: none; width: 100%; } .chat-main.mobile-show { display: flex; } .empty-chat { display: flex; } .mobile-back { display: block; padding: 14px 22px; background: var(--surface); border-bottom: 1px solid var(--b); font-weight: 600; cursor: pointer; border: none; width: 100%; text-align: left; color: var(--t); font-family: inherit; } .msg { max-width: 85%; } .emoji-picker { width: 260px; } .jitsi-container { height: 350px; } }
+
+/* МОБИЛЬНАЯ АДАПТАЦИЯ */
+@media (max-width: 768px) {
+  .chat-container { height: calc(100vh - 50px); flex-direction: column; position: relative; }
+  .chat-sidebar { width: 100%; height: 100%; position: absolute; inset: 0; z-index: 100; border-right: none; }
+  .chat-sidebar.mobile-hidden { display: none; }
+  .sidebar-header { padding: 12px 16px; }
+  .sidebar-header h3 { font-size: 1rem; }
+  .search-box { padding: 8px 12px; }
+  .search-input { padding: 10px 14px; font-size: 0.8rem; }
+  .dialog-list { padding: 4px 8px; }
+  .dialog-item { padding: 10px 12px; }
+  .dialog-avatar { width: 40px; height: 40px; }
+  .dialog-info strong { font-size: 0.82rem; }
+  .chat-main { display: none; width: 100%; height: 100%; }
+  .chat-main.mobile-show { display: flex; }
+  .empty-chat { display: flex; }
+  .mobile-back { display: block; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--b); font-weight: 600; cursor: pointer; border: none; width: 100%; text-align: left; color: var(--t); font-family: inherit; font-size: 0.9rem; }
+  .chat-header { padding: 10px 14px; }
+  .chat-header strong { font-size: 0.9rem; }
+  .chat-avatar { width: 34px; height: 34px; }
+  .chat-messages { padding: 14px; gap: 10px; }
+  .msg { max-width: 85%; padding: 10px 14px; }
+  .msg-text { font-size: 0.82rem; }
+  .msg-img { max-width: 220px; }
+  .chat-input { padding: 10px 12px; gap: 6px; }
+  .chat-input textarea { padding: 10px 12px; font-size: 0.82rem; }
+  .send-btn { width: 38px; height: 38px; }
+  .voice-btn { width: 38px; height: 38px; }
+  .emoji-picker { width: 260px; }
+  .jitsi-container { height: 250px; }
+  .msg-search { padding: 8px 14px; }
+  .typing-indicator { padding: 6px 14px; }
+  .btn-sm { padding: 6px 12px; font-size: 0.75rem; }
+}
 </style>
