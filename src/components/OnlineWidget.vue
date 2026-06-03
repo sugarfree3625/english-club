@@ -22,25 +22,45 @@ onBeforeUnmount(() => clearInterval(timer));
 
 <style scoped>
 .online-widget {
-  position: fixed; bottom: 100px; left: 24px;
-  display: flex; align-items: center; gap: 8px;
+  position: fixed; 
+  bottom: 100px; 
+  left: 24px;
+  display: flex; 
+  align-items: center; 
+  gap: 8px;
   padding: 8px 16px;
   background: rgba(15,15,30,0.9);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(16,185,129,0.3);
   border-radius: 20px;
-  color: #10b981; font-size: 0.8rem;
-  font-weight: 600; z-index: 100;
+  color: #10b981; 
+  font-size: 0.8rem;
+  font-weight: 600; 
+  z-index: 9998;
 }
 
 .online-dot {
-  width: 8px; height: 8px;
-  background: #10b981; border-radius: 50%;
+  width: 8px; 
+  height: 8px;
+  background: #10b981; 
+  border-radius: 50%;
   animation: onlinePulse 2s infinite;
 }
 
 @keyframes onlinePulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.5); }
   50% { box-shadow: 0 0 0 8px rgba(16,185,129,0); }
+}
+
+/* МОБИЛЬНЫЕ СТИЛИ */
+@media (max-width: 768px) {
+  .online-widget {
+    bottom: 90px !important;
+    left: 68px !important;
+    z-index: 9998 !important;
+    padding: 6px 10px !important;
+    font-size: 0.7rem !important;
+    gap: 5px !important;
+  }
 }
 </style>
