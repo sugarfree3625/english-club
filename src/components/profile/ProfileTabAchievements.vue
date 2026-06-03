@@ -38,6 +38,16 @@
       </div>
     </div>
 
+    <!-- ПОИСК И СОРТИРОВКА -->
+    <div class="search-sort-row">
+      <input v-model="searchQuery" placeholder="🔍 Поиск достижений..." class="search-input" />
+      <select v-model="sortBy" class="sort-select">
+        <option value="default">По умолчанию</option>
+        <option value="rarity">По редкости</option>
+        <option value="progress">По прогрессу</option>
+      </select>
+    </div>
+
     <!-- ФИЛЬТРЫ -->
     <div class="filters-row">
       <button v-for="cat in categories" :key="cat.key" 
@@ -50,10 +60,10 @@
     </div>
 
     <!-- СЕТКА ДОСТИЖЕНИЙ -->
-    <div class="achievements-grid" v-if="filteredAchievements.length">
-      <div v-for="ach in filteredAchievements" :key="ach.code"
+    <div class="achievements-grid" v-if="sortedAchievements.length">
+      <div v-for="ach in sortedAchievements" :key="ach.code"
            class="ach-card" :class="[ach.rarity || 'bronze', { 'ach-earned': ach.earned }]"
-           @click="selected = ach">
+           @click="selectAchievement(ach)">
         
         <!-- Иконка -->
         <div class="ach-icon-wrap" :class="{ locked: !ach.earned }">
@@ -144,7 +154,12 @@
               <p class="motivation-text">Продолжай в том же духе! 🚀</p>
             </div>
 
-            <button class="modal-close-btn" @click="selected = null">Закрыть</button>
+            <div class="modal-actions">
+              <button class="modal-close-btn" @click="selected = null">Закрыть</button>
+              <button class="modal-share-btn" @click="shareAchievement">
+                <i class="fas fa-share-alt"></i> Поделиться
+              </button>
+            </div>
           </div>
         </div>
       </Transition>
@@ -154,6 +169,7 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue';
+import { playClick } from '../composables/useSound';
 
 export default {
   name: 'ProfileTabAchievements',
@@ -162,6 +178,8 @@ export default {
     const selected = ref(null);
     const animatedPercent = ref(0);
     const activeCategory = ref('all');
+    const sortBy = ref('default');
+    const searchQuery = ref('');
 
     const categories = computed(() => {
       const list = props.achievements || [];
@@ -176,8 +194,31 @@ export default {
     });
 
     const filteredAchievements = computed(() => {
-      if (activeCategory.value === 'all') return props.achievements || [];
-      return (props.achievements || []).filter(a => a.condition_field === activeCategory.value);
+      let list = props.achievements || [];
+      if (activeCategory.value !== 'all') {
+        list = list.filter(a => a.condition_field === activeCategory.value);
+      }
+      return list;
+    });
+
+    const sortedAchievements = computed(() => {
+      let list = [...filteredAchievements.value];
+      
+      // Поиск
+      if (searchQuery.value.trim()) {
+        const q = searchQuery.value.toLowerCase();
+        list = list.filter(a => a.name?.toLowerCase().includes(q) || a.description?.toLowerCase().includes(q));
+      }
+      
+      // Сортировка
+      if (sortBy.value === 'rarity') {
+        const order = { platinum: 4, gold: 3, silver: 2, bronze: 1 };
+        list.sort((a, b) => (order[b.rarity] || 0) - (order[a.rarity] || 0));
+      } else if (sortBy.value === 'progress') {
+        list.sort((a, b) => (b.progressPercent || 0) - (a.progressPercent || 0));
+      }
+      
+      return list;
     });
 
     const rareCount = computed(() => 
@@ -187,6 +228,20 @@ export default {
     onMounted(() => { 
       setTimeout(() => { animatedPercent.value = props.percent; }, 200); 
     });
+
+    function selectAchievement(ach) {
+      playClick();
+      selected.value = ach;
+    }
+
+    function shareAchievement() {
+      const text = `🏆 Я получил достижение "${selected.value?.name}" в English Club!`;
+      if (navigator.share) {
+        navigator.share({ title: 'Моё достижение', text, url: window.location.origin });
+      } else {
+        navigator.clipboard?.writeText(text + ' ' + window.location.origin);
+      }
+    }
 
     function getIconEmoji(name) {
       const map = { 'message-circle':'💬','messages-square':'💭','mic':'🎤','flame':'🔥','user-plus':'👥',
@@ -208,7 +263,7 @@ export default {
       return units[f] || '';
     }
 
-    return { selected, animatedPercent, activeCategory, categories, filteredAchievements, rareCount, getIconEmoji, formatDate, rarityLabel, unitLabel };
+    return { selected, animatedPercent, activeCategory, sortBy, searchQuery, categories, filteredAchievements, sortedAchievements, rareCount, selectAchievement, shareAchievement, getIconEmoji, formatDate, rarityLabel, unitLabel };
   }
 };
 </script>
@@ -235,6 +290,12 @@ export default {
 .info-badge.rare i { color: #f59e0b; }
 .badge-num { font-family: 'Space Grotesk', sans-serif; font-size: 1rem; font-weight: 700; }
 .badge-label { font-size: 0.7rem; color: #94a3b8; }
+
+/* ПОИСК И СОРТИРОВКА */
+.search-sort-row { display: flex; gap: 10px; }
+.search-input { flex: 1; padding: 10px 14px; border: 2px solid rgba(255,255,255,0.08); border-radius: 12px; background: rgba(255,255,255,0.03); color: #fff; font-size: 0.85rem; outline: none; font-family: inherit; }
+.search-input:focus { border-color: #6366f1; }
+.sort-select { padding: 10px 14px; border: 2px solid rgba(255,255,255,0.08); border-radius: 12px; background: rgba(255,255,255,0.03); color: #fff; font-size: 0.85rem; outline: none; cursor: pointer; font-family: inherit; }
 
 /* ФИЛЬТРЫ */
 .filters-row { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -338,8 +399,11 @@ export default {
 .remaining-text { color: #94a3b8; font-size: 0.9rem; margin: 12px 0 4px; }
 .motivation-text { color: #f59e0b; font-size: 0.85rem; font-weight: 600; }
 
-.modal-close-btn { width: 100%; padding: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: #fff; cursor: pointer; font-size: 0.85rem; margin-top: 20px; font-family: inherit; }
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+.modal-close-btn { flex: 1; padding: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: #fff; cursor: pointer; font-size: 0.85rem; font-family: inherit; }
 .modal-close-btn:hover { background: rgba(255,255,255,0.1); }
+.modal-share-btn { flex: 1; padding: 10px; background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3); border-radius: 12px; color: #818cf8; cursor: pointer; font-size: 0.85rem; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.modal-share-btn:hover { background: rgba(99,102,241,0.2); }
 
 .modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.3s ease; }
 .modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
