@@ -5,18 +5,18 @@
     <div class="container">
       <div class="profile-page">
         <ProfileSidebar
-  :user="user"
-  :currentTab="tab"
-  :isStudent="isStudent"
-  :isParent="isParent"
-  :isTutor="isTutor"
-  :streak="streak"
-  :unreadMessages="unreadMessages"
-  @switch-tab="switchTab"
-  @upload-avatar="uploadAvatar"
-  @link-telegram="linkTelegram"
-  @export-pdf="exportPDF"
-/>
+          :user="user"
+          :currentTab="tab"
+          :isStudent="isStudent"
+          :isParent="isParent"
+          :isTutor="isTutor"
+          :streak="streak"
+          :unreadMessages="unreadMessages"
+          @switch-tab="switchTab"
+          @upload-avatar="uploadAvatar"
+          @link-telegram="linkTelegram"
+          @export-pdf="exportPDF"
+        />
         <div class="profile-main">
           <ProfileTabInfo v-if="tab === 'info'" :user="user" />
           <ProfileTabAchievements v-if="tab === 'achievements'" :achievements="allAchievements" :earned="earnedCount" :total="totalCount" :percent="completionPercent" />
@@ -89,41 +89,44 @@ import HomeworkModal from '../components/profile/HomeworkModal.vue';
 import ProfileModals from '../components/profile/ProfileModals.vue';
 import AchievementUnlock from '../components/AchievementUnlock.vue';
 import { exportProgressPDF } from '../composables/useExportPDF.js';
+import { useXP } from '../composables/useXP';
+
+const { addXP } = useXP();
 
 export default {
   name: 'ProfilePage',
   components: { ConfettiExplosion, ProfileSidebar, ProfileTabInfo, ProfileTabAchievements, ProgressDashboard, GamesHub, ProfileTabSchedule, ProfileTabStudents, ProfileTabWords, ProfileTabNotes, ProfileTabFeedbacks, ProfileTabAllFeedbacks, ProfileTabHomework, TeacherHomework, StudentHomework, ParentHomework, HomeworkModal, ProfileModals, AchievementUnlock },
   props: ['user'],
-  inject: ['addToast'],
+  inject: ['addToast', 'showXP'],
   data() {
-  return {
-    tab: 'info',
-    words: [],
-    wordsLoading: false,
-    note: '',
-    allBookings: [],
-    allAchievements: [],
-    earnedCount: 0,
-    totalCount: 50,
-    showConfetti: false,
-    allHomework: [],
-    homeworkLoading: false,
-    selectedHomework: null,
-    myStudents: [],
-    allStudents: [],
-    viewingStudent: null,
-    mySlots: [],
-    showBindParent: false,
-    bindStudentId: null,
-    parentResults: [],
-    showFeedback: false,
-    fbStudentId: null,
-    newAchievement: null,
-    feedbacks: [],
-    streak: 0,           
-    unreadMessages: 0, 
-  };
-},
+    return {
+      tab: 'info',
+      words: [],
+      wordsLoading: false,
+      note: '',
+      allBookings: [],
+      allAchievements: [],
+      earnedCount: 0,
+      totalCount: 50,
+      showConfetti: false,
+      allHomework: [],
+      homeworkLoading: false,
+      selectedHomework: null,
+      myStudents: [],
+      allStudents: [],
+      viewingStudent: null,
+      mySlots: [],
+      showBindParent: false,
+      bindStudentId: null,
+      parentResults: [],
+      showFeedback: false,
+      fbStudentId: null,
+      newAchievement: null,
+      feedbacks: [],
+      streak: 0,
+      unreadMessages: 0,
+    };
+  },
   computed: {
     isStudent() { return !this.user?.role || this.user.role === 'user' || this.user.role === 'student'; },
     isParent() { return this.user?.role === 'parent'; },
@@ -150,11 +153,29 @@ export default {
     async loadProgress() {},
     async loadGames() {},
 
+    // 🔥 ДОБАВЛЕНИЕ СЛОВА С XP
     async addWord(data) {
       this.wordsLoading = true;
-      try { const r = await axios.post('/api/words', data); if (r.status === 201 || r.status === 200) { this.words = (await axios.get('/api/words')).data || []; this.addToast('Слово добавлено! 📚', 'success'); } }
-      catch (err) { this.addToast(err.response?.data?.error || 'Ошибка', 'error'); }
-      finally { this.wordsLoading = false; }
+      try {
+        const r = await axios.post('/api/words', data);
+        if (r.status === 201 || r.status === 200) {
+          this.words = (await axios.get('/api/words')).data || [];
+          this.addToast('Слово добавлено! 📚', 'success');
+          
+          // 🔥 Начисляем XP
+          const xpResult = await addXP('word_added');
+          if (xpResult?.leveled_up) {
+            this.addToast(`🎉 Уровень повышен до ${xpResult.level}!`, 'success');
+          }
+          if (xpResult) {
+            this.showXP?.(xpResult.xp_added, window.innerWidth / 2, window.innerHeight / 2);
+          }
+        }
+      } catch (err) {
+        this.addToast(err.response?.data?.error || 'Ошибка', 'error');
+      } finally {
+        this.wordsLoading = false;
+      }
     },
     async updateWordStatus(u) { try { await axios.put(`/api/words/${u.id}`, u); const w = this.words.find(x => x.id === u.id); if (w) Object.assign(w, u); } catch(e) {} },
     async delWord(id) { try { await axios.delete(`/api/words/${id}`); this.words = this.words.filter(w => w.id !== id); this.addToast('Удалено', 'success'); } catch { this.addToast('Ошибка удаления', 'error'); } },
@@ -167,7 +188,16 @@ export default {
         const d = (r.data || []).map(a => ({ ...a, progressPercent: a.progressPercent || a.progress_percent || (a.earned ? 100 : 0) }));
         const unlocked = d.filter(a => { const o = this.allAchievements.find(x => x.code === a.code); return o && !o.earned && a.earned; });
         this.allAchievements = d; this.totalCount = d.length; this.earnedCount = d.filter(a => a.earned).length;
-        if (unlocked.length && !this._shown) { this._shown = true; this.newAchievement = unlocked[0]; this.showConfetti = true; }
+        if (unlocked.length && !this._shown) {
+          this._shown = true;
+          this.newAchievement = unlocked[0];
+          this.showConfetti = true;
+          // 🔥 XP за новое достижение
+          const xpResult = await addXP('achievement_earned');
+          if (xpResult) {
+            this.showXP?.(xpResult.xp_added, window.innerWidth / 2, window.innerHeight / 2);
+          }
+        }
       } catch (e) {}
     },
 
@@ -189,8 +219,39 @@ export default {
       try { await axios.post('/api/homework', formData, { headers: { 'Content-Type': 'multipart/form-data' } }); this.addToast('Задание создано! 📝', 'success'); await this.loadMyHomework(); }
       catch(e) { this.addToast(e.response?.data?.error || 'Ошибка', 'error'); }
     },
-    async submitHomeworkAnswer({ answer }) { try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { student_answer: answer, status: 'submitted' }); this.selectedHomework = null; this.addToast('Отправлено! 📤', 'success'); } catch { this.addToast('Ошибка', 'error'); } },
-    async submitHomeworkGrade({ grade, comment }) { try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { grade, teacher_comment: comment, status: 'completed' }); this.selectedHomework = null; this.addToast('Оценено! ⭐', 'success'); } catch { this.addToast('Ошибка', 'error'); } },
+
+    // 🔥 ОТПРАВКА ДОМАШКИ С XP
+    async submitHomeworkAnswer({ answer }) {
+      try {
+        await axios.put(`/api/homework/${this.selectedHomework.id}`, { student_answer: answer, status: 'submitted' });
+        this.selectedHomework = null;
+        this.addToast('Отправлено! 📤', 'success');
+        
+        // 🔥 Начисляем XP
+        const xpResult = await addXP('homework_submitted');
+        if (xpResult?.leveled_up) {
+          this.addToast(`🎉 Уровень повышен до ${xpResult.level}!`, 'success');
+        }
+        if (xpResult) {
+          this.showXP?.(xpResult.xp_added, window.innerWidth / 2, window.innerHeight / 2);
+        }
+      } catch { this.addToast('Ошибка', 'error'); }
+    },
+
+    // 🔥 ОЦЕНКА ДОМАШКИ С XP
+    async submitHomeworkGrade({ grade, comment }) {
+      try {
+        await axios.put(`/api/homework/${this.selectedHomework.id}`, { grade, teacher_comment: comment, status: 'completed' });
+        this.selectedHomework = null;
+        this.addToast('Оценено! ⭐', 'success');
+        
+        // 🔥 Начисляем XP
+        const xpResult = await addXP('homework_graded');
+        if (xpResult) {
+          this.showXP?.(xpResult.xp_added, window.innerWidth / 2, window.innerHeight / 2);
+        }
+      } catch { this.addToast('Ошибка', 'error'); }
+    },
     async changeHomeworkStatus({ status }) { try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { status }); this.selectedHomework = null; this.addToast('Обновлён! ✅', 'success'); } catch { this.addToast('Ошибка', 'error'); } },
     async returnHomework({ comment }) {
       try { await axios.put(`/api/homework/${this.selectedHomework.id}`, { teacher_comment: comment || 'Требуется доработка', status: 'in_progress' }); this.selectedHomework = null; this.addToast('🔄 Возвращено. Фидбек создан!', 'info'); await this.loadMyHomework(); }
