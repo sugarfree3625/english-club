@@ -138,22 +138,15 @@ export default {
       else playClick();
       setTimeout(() => this.removeToast(id), d);
     },
-    showXP(amount, x, y) {
-      this.$refs.xpFloating?.showXP(amount, x, y);
-    },
+    showXP(amount, x, y) { this.$refs.xpFloating?.showXP(amount, x, y); },
     removeToast(id) { this.toasts = this.toasts.filter(t => t.id !== id); },
-    goHome() {
-      if (this.user) this.$router.push('/dashboard');
-      else this.$router.push('/');
-    },
+    goHome() { if (this.user) this.$router.push('/dashboard'); else this.$router.push('/'); },
     toggleTheme() { 
-      this.themeAnimating = true;
-      this.isDark = !this.isDark; 
+      this.themeAnimating = true; this.isDark = !this.isDark; 
       document.body.classList.toggle('dark', this.isDark);
       document.body.classList.toggle('light', !this.isDark);
       localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
-      playClick();
-      setTimeout(() => { this.themeAnimating = false; }, 500);
+      playClick(); setTimeout(() => { this.themeAnimating = false; }, 500);
     },
     async globalSearch() { if(this.globalSearchQuery.length<2){this.globalResults={posts:[],sessions:[]};return;} try{const r=await axios.get(`/api/search?q=${this.globalSearchQuery}`);this.globalResults=r.data;}catch(e){this.globalResults={posts:[],sessions:[]};} },
     handleGlobalKeydown(e) { if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();this.showGlobalSearch=true;this.$nextTick(()=>this.$refs.globalSearchInput?.focus());} if(e.key==='Escape'){this.showGlobalSearch=false;this.menuOpen=false;} },
@@ -163,30 +156,9 @@ export default {
     async login() { 
       try {
         const r = await axios.post('/api/login', { email: this.loginEmail, password: this.loginPassword });
-        if (r.data.token) {
-          localStorage.setItem('token', r.data.token);
-          localStorage.setItem('user', JSON.stringify(r.data.user));
-          this.user = r.data.user;
-          this.showLogin = false;
-          this.loginEmail = '';
-          this.loginPassword = '';
-          this.addToast('Добро пожаловать! 👋', 'success');
-          this.$router.push('/dashboard');
-          this.checkOnboarding();
-          this.checkWelcome();
-        } else if (r.data.success) {
-          this.user = r.data.user;
-          this.showLogin = false;
-          this.loginEmail = '';
-          this.loginPassword = '';
-          this.addToast('Добро пожаловать! 👋', 'success');
-          this.$router.push('/dashboard');
-          this.checkOnboarding();
-          this.checkWelcome();
-        }
-      } catch(e) {
-        this.addToast(e.response?.data?.error || 'Ошибка входа', 'error');
-      } 
+        if (r.data.token) { localStorage.setItem('token', r.data.token); localStorage.setItem('user', JSON.stringify(r.data.user)); this.user = r.data.user; this.showLogin = false; this.loginEmail = ''; this.loginPassword = ''; this.addToast('Добро пожаловать! 👋', 'success'); this.$router.push('/dashboard'); this.checkOnboarding(); this.checkWelcome(); }
+        else if (r.data.success) { this.user = r.data.user; this.showLogin = false; this.loginEmail = ''; this.loginPassword = ''; this.addToast('Добро пожаловать! 👋', 'success'); this.$router.push('/dashboard'); this.checkOnboarding(); this.checkWelcome(); }
+      } catch(e) { this.addToast(e.response?.data?.error || 'Ошибка входа', 'error'); } 
     },
     async register() { try{const r=await axios.post('/api/reg',{username:this.regUsername,email:this.regEmail,password:this.regPassword,level:this.regLevel});if(r.data.success){this.showReg=false;this.showLogin=true;this.addToast('Регистрация успешна! ✨','success');}}catch(e){this.addToast(e.response?.data?.error||'Ошибка регистрации','error');} },
     async logout() { if(!confirm('Выйти из аккаунта?'))return; try{await axios.post('/api/out');this.addToast('До встречи! 👋','info'); localStorage.removeItem('welcome_dismissed'); }catch(e){} this.user=null;this.menuOpen=false;this.$router.push('/'); }
@@ -199,71 +171,41 @@ export default {
     else if (saved === 'light') { this.isDark = false; document.body.classList.add('light'); }
     else if (window.matchMedia('(prefers-color-scheme: dark)').matches) { this.isDark = true; document.body.classList.add('dark'); }
   },
-  provide() { 
-    return { 
-      addToast: this.addToast,
-      showXP: this.showXP
-    }; 
-  }
+  provide() { return { addToast: this.addToast, showXP: this.showXP }; }
 };
 </script>
 
 <style>
-:root {
-  --bg: #f8fafc;
-  --surface: #ffffff;
-  --t: #1e293b;
-  --t2: #64748b;
-  --b: #e2e8f0;
-  --p: #6366f1;
-  --p2: #2dd4bf;
-}
-
-body.dark {
-  --bg: #0b1120;
-  --surface: rgba(15,15,30,0.95);
-  --t: #e2e8f0;
-  --t2: #94a3b8;
-  --b: rgba(255,255,255,0.08);
-}
-
-body {
-  background: var(--bg);
-  color: var(--t);
-  font-family: 'Inter', 'Plus Jakarta Sans', sans-serif;
-  margin: 0;
-  transition: background-color 0.4s ease, color 0.4s ease;
-}
-
+:root { --bg: #f8fafc; --surface: #ffffff; --t: #1e293b; --t2: #64748b; --b: #e2e8f0; --p: #6366f1; --p2: #2dd4bf; }
+body.dark { --bg: #0b1120; --surface: rgba(15,15,30,0.95); --t: #e2e8f0; --t2: #94a3b8; --b: rgba(255,255,255,0.08); }
+body { background: var(--bg); color: var(--t); font-family: 'Inter', 'Plus Jakarta Sans', sans-serif; margin: 0; transition: background-color 0.4s ease, color 0.4s ease; }
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius: 3px; }
-
 .page-fade-enter-active, .page-fade-leave-active { transition: opacity 0.25s ease, transform 0.25s ease; }
 .page-fade-enter-from { opacity: 0; transform: translateY(8px); }
 .page-fade-leave-to { opacity: 0; transform: translateY(-8px); }
-
 .toast-list-enter-active { animation: slideInRight 0.3s ease; }
 .toast-list-leave-active { animation: slideOutRight 0.3s ease; }
 @keyframes slideInRight { from { opacity: 0; transform: translateX(100px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes slideOutRight { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(100px); } }
-
 .dropdown-fade-enter-active { animation: dropdownIn 0.2s ease; }
 .dropdown-fade-leave-active { animation: dropdownOut 0.2s ease; }
 @keyframes dropdownIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes dropdownOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-8px); } }
-
 .lang-btn { font-size: 1.1rem; padding: 6px 10px !important; }
 .lang-flag { transition: transform 0.3s ease; }
 .lang-btn:hover .lang-flag { transform: scale(1.2); }
-
 .theme-btn { position: relative; overflow: hidden; }
 .theme-icon-wrapper { display: inline-block; transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
 .theme-icon-wrapper.rotating { animation: themeSpin 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
-@keyframes themeSpin {
-  0% { transform: rotate(0deg) scale(1); }
-  50% { transform: rotate(180deg) scale(1.3); }
-  100% { transform: rotate(360deg) scale(1); }
+@keyframes themeSpin { 0% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(180deg) scale(1.3); } 100% { transform: rotate(360deg) scale(1); } }
+
+/* МОБИЛЬНЫЕ ФИКСЫ */
+@media (max-width: 768px) {
+  .ai-assistant { bottom: 16px !important; left: 16px !important; z-index: 9999 !important; }
+  .online-widget { bottom: 80px !important; left: 16px !important; z-index: 9998 !important; }
+  .ai-panel { width: 290px !important; max-height: 400px !important; }
 }
 </style>
 
