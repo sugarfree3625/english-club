@@ -1,5 +1,9 @@
 <template>
   <div id="app-root" @keydown="handleGlobalKeydown">
+    <!-- 🔥 ФОН И КУРСОР -->
+    <ParticlesBackground />
+    <CustomCursor />
+    
     <header class="header">
       <div class="header-inner">
         <div class="logo" @click="goHome">
@@ -11,12 +15,10 @@
             <span class="search-shortcut">Ctrl+K</span>
           </button>
           
-          <!-- Кнопка языка -->
           <button class="btn btn-o btn-sm lang-btn" @click="toggleLocale" :title="locale === 'ru' ? 'Switch to English' : 'Переключить на русский'">
             <span class="lang-flag">{{ locale === 'ru' ? '🇷🇺' : '🇬🇧' }}</span>
           </button>
           
-          <!-- Кнопка темы -->
           <button class="btn btn-o btn-sm theme-btn" @click="toggleTheme" :title="isDark ? 'Светлая тема' : 'Тёмная тема'">
             <span class="theme-icon-wrapper" :class="{ rotating: themeAnimating }">
               <span class="theme-icon">{{ isDark ? '☀️' : '🌙' }}</span>
@@ -55,6 +57,10 @@
     </router-view>
     <ScrollToTop />
 
+    <!-- 🔥 ВИДЖЕТЫ -->
+    <OnlineWidget />
+    <AIAssistant />
+
     <div class="modal-overlay" v-if="showGlobalSearch" @click.self="showGlobalSearch = false">
       <div class="global-search-modal">
         <div class="global-search-header"><i class="fas fa-search"></i><input ref="globalSearchInput" v-model="globalSearchQuery" @input="globalSearch" placeholder="Поиск по сайту... (Esc для закрытия)" class="global-search-input" @keydown.esc="showGlobalSearch = false"><span class="search-shortcut-badge">ESC</span></div>
@@ -87,12 +93,19 @@ import axios from 'axios';
 import ScrollToTop from './components/ScrollToTop.vue';
 import WelcomeModal from './components/WelcomeModal.vue';
 import PricingModal from './components/PricingModal.vue';
+import ParticlesBackground from './components/ParticlesBackground.vue';
+import CustomCursor from './components/CustomCursor.vue';
+import OnlineWidget from './components/OnlineWidget.vue';
+import AIAssistant from './components/AIAssistant.vue';
 import { useI18n } from './composables/useI18n';
 import { playClick, playSuccess, playError } from './composables/useSound';
 
 export default {
   name: 'App',
-  components: { ScrollToTop, WelcomeModal, PricingModal },
+  components: { 
+    ScrollToTop, WelcomeModal, PricingModal,
+    ParticlesBackground, CustomCursor, OnlineWidget, AIAssistant
+  },
   setup() {
     const { locale, t, toggleLocale } = useI18n();
     return { locale, t, toggleLocale };
@@ -186,7 +199,6 @@ export default {
 </script>
 
 <style>
-/* ГЛОБАЛЬНЫЕ СТИЛИ */
 :root {
   --bg: #f8fafc;
   --surface: #ffffff;
@@ -195,9 +207,6 @@ export default {
   --b: #e2e8f0;
   --p: #6366f1;
   --p2: #2dd4bf;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
-  --shadow-md: 0 4px 15px rgba(0,0,0,0.08);
-  --shadow-lg: 0 10px 30px rgba(0,0,0,0.12);
 }
 
 body.dark {
@@ -206,11 +215,6 @@ body.dark {
   --t: #e2e8f0;
   --t2: #94a3b8;
   --b: rgba(255,255,255,0.08);
-  --p: #6366f1;
-  --p2: #2dd4bf;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
-  --shadow-md: 0 4px 15px rgba(0,0,0,0.4);
-  --shadow-lg: 0 10px 30px rgba(0,0,0,0.5);
 }
 
 body {
@@ -221,54 +225,10 @@ body {
   transition: background-color 0.4s ease, color 0.4s ease;
 }
 
-* {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
-}
-
-/* КНОПКА ЯЗЫКА */
-.lang-btn {
-  position: relative;
-  overflow: hidden;
-  font-size: 1.1rem;
-  padding: 6px 10px !important;
-}
-
-.lang-flag {
-  transition: transform 0.3s ease;
-}
-
-.lang-btn:hover .lang-flag {
-  transform: scale(1.2);
-}
-
-/* АНИМАЦИЯ КНОПКИ ТЕМЫ */
-.theme-btn {
-  position: relative;
-  overflow: hidden;
-}
-
-.theme-icon-wrapper {
-  display: inline-block;
-  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.theme-icon-wrapper.rotating {
-  animation: themeSpin 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-@keyframes themeSpin {
-  0% { transform: rotate(0deg) scale(1); }
-  50% { transform: rotate(180deg) scale(1.3); }
-  100% { transform: rotate(360deg) scale(1); }
-}
-
-/* СКРОЛЛБАР */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,0.5); }
 
-/* АНИМАЦИИ */
 .page-fade-enter-active, .page-fade-leave-active { transition: opacity 0.25s ease, transform 0.25s ease; }
 .page-fade-enter-from { opacity: 0; transform: translateY(8px); }
 .page-fade-leave-to { opacity: 0; transform: translateY(-8px); }
@@ -282,6 +242,19 @@ body {
 .dropdown-fade-leave-active { animation: dropdownOut 0.2s ease; }
 @keyframes dropdownIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes dropdownOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-8px); } }
+
+.lang-btn { font-size: 1.1rem; padding: 6px 10px !important; }
+.lang-flag { transition: transform 0.3s ease; }
+.lang-btn:hover .lang-flag { transform: scale(1.2); }
+
+.theme-btn { position: relative; overflow: hidden; }
+.theme-icon-wrapper { display: inline-block; transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+.theme-icon-wrapper.rotating { animation: themeSpin 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+@keyframes themeSpin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.3); }
+  100% { transform: rotate(360deg) scale(1); }
+}
 </style>
 
 <style scoped>
