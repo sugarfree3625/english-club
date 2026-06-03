@@ -4,17 +4,17 @@ const { getLevel } = require('../utils/helpers');
 
 module.exports = (app, supabase) => {
   
-  // ==================== ПОЛУЧИТЬ СЛОВА (с правами) ====================
+  // ==================== ПОЛУЧИТЬ СЛОВА (с правами + имена учеников) ====================
   app.get('/api/words', auth, async (req, res) => {
     try {
       const uid = req.session.userId;
       const role = req.session.role;
       
-      let query = supabase.from('words').select('*');
+      // JOIN с users для получения имени ученика
+      let query = supabase.from('words').select('*, users!words_user_id_fkey(username)');
       
       // Админ видит ВСЕ слова
       if (role === 'admin' || role === 'host') {
-        // Все слова всех пользователей
         if (req.query.user_id) {
           query = query.eq('user_id', req.query.user_id);
         }
@@ -27,7 +27,7 @@ module.exports = (app, supabase) => {
           .eq('parent_id', uid);
         
         const childIds = (children || []).map(c => c.student_id);
-        childIds.push(uid); // И свои тоже
+        childIds.push(uid);
         
         query = query.in('user_id', childIds);
         
@@ -40,7 +40,7 @@ module.exports = (app, supabase) => {
         query = query.eq('user_id', uid);
       }
       
-      // Поиск по дате (от и до)
+      // Поиск по дате
       if (req.query.date_from) {
         query = query.gte('created_at', req.query.date_from);
       }
@@ -56,7 +56,13 @@ module.exports = (app, supabase) => {
       const { data, error } = await query;
       if (error) throw error;
       
-      res.json(data || []);
+      // Добавляем _student_name из JOIN
+      const result = (data || []).map(w => ({
+        ...w,
+        _student_name: w.users?.username || null
+      }));
+      
+      res.json(result);
     } catch (err) {
       console.error('GET /api/words error:', err);
       res.status(500).json({ error: 'Ошибка загрузки словаря' });
@@ -72,7 +78,6 @@ module.exports = (app, supabase) => {
         return res.status(400).json({ error: 'Заполните оба поля' });
       }
       
-      // Определяем для кого добавляем
       let targetUserId = req.session.userId;
       
       // Админ может добавлять слова другим ученикам
@@ -120,12 +125,10 @@ module.exports = (app, supabase) => {
       
       if (error) throw error;
       
-      // Начисляем XP за слово
-      try {
-        await updateRating(supabase, targetUserId, 3, getLevel);
-      } catch(e) {}
+      // Начисляем XP
+      try { await updateRating(supabase, targetUserId, 3, getLevel); } catch(e) {}
       
-      // Проверяем достижения за слова
+      // Проверяем достижения
       const { count } = await supabase
         .from('words')
         .select('*', { count: 'exact', head: true })
@@ -173,18 +176,15 @@ module.exports = (app, supabase) => {
       const uid = req.session.userId;
       const role = req.session.role;
       
-      // Проверяем права на слово
       const { data: word } = await supabase
         .from('words')
         .select('user_id')
         .eq('id', req.params.id)
         .single();
       
-      if (!word) {
-        return res.status(404).json({ error: 'Слово не найдено' });
-      }
+      if (!word) return res.status(404).json({ error: 'Слово не найдено' });
       
-      // Только владелец, админ или родитель могут редактировать
+      // Права на редактирование
       if (word.user_id !== uid && role !== 'admin' && role !== 'host') {
         if (role === 'parent') {
           const { data: child } = await supabase
@@ -193,10 +193,7 @@ module.exports = (app, supabase) => {
             .eq('parent_id', uid)
             .eq('student_id', word.user_id)
             .maybeSingle();
-          
-          if (!child) {
-            return res.status(403).json({ error: 'Нет доступа' });
-          }
+          if (!child) return res.status(403).json({ error: 'Нет доступа' });
         } else {
           return res.status(403).json({ error: 'Нет доступа' });
         }
@@ -207,16 +204,11 @@ module.exports = (app, supabase) => {
         if (req.body[k] !== undefined) u[k] = req.body[k];
       });
       
-      if (Object.keys(u).length === 0) {
-        return res.json({ success: true });
-      }
+      if (Object.keys(u).length === 0) return res.json({ success: true });
       
-      const { error } = await supabase
-        .from('words')
-        .update(u)
-        .eq('id', req.params.id);
-      
+      const { error } = await supabase.from('words').update(u).eq('id', req.params.id);
       if (error) throw error;
+      
       res.json({ success: true });
     } catch (err) {
       console.error('PUT /api/words error:', err);
@@ -230,28 +222,21 @@ module.exports = (app, supabase) => {
       const uid = req.session.userId;
       const role = req.session.role;
       
-      // Проверяем права на удаление
       const { data: word } = await supabase
         .from('words')
         .select('user_id')
         .eq('id', req.params.id)
         .single();
       
-      if (!word) {
-        return res.status(404).json({ error: 'Слово не найдено' });
-      }
+      if (!word) return res.status(404).json({ error: 'Слово не найдено' });
       
-      // Только владелец или админ может удалить
       if (word.user_id !== uid && role !== 'admin' && role !== 'host') {
         return res.status(403).json({ error: 'Нет доступа' });
       }
       
-      const { error } = await supabase
-        .from('words')
-        .delete()
-        .eq('id', req.params.id);
-      
+      const { error } = await supabase.from('words').delete().eq('id', req.params.id);
       if (error) throw error;
+      
       res.json({ success: true });
     } catch (err) {
       console.error('DELETE /api/words error:', err);
@@ -263,7 +248,6 @@ module.exports = (app, supabase) => {
   app.get('/api/students-list', auth, async (req, res) => {
     try {
       const role = req.session.role;
-      
       if (role !== 'admin' && role !== 'host') {
         return res.status(403).json({ error: 'Только для админа' });
       }
