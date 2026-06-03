@@ -15,10 +15,7 @@
     <div class="nb-toolbar">
       <button class="tool-btn" @click="addNote" title="Новая заметка"><i class="fas fa-plus"></i> Новая</button>
       <button class="tool-btn" @click="showFolders = !showFolders" :class="{ active: showFolders }"><i class="fas fa-folder"></i> Папки</button>
-      <div class="search-wrap">
-        <i class="fas fa-search search-icon"></i>
-        <input class="search-input" v-model="searchQuery" placeholder="Поиск по заметкам..." />
-      </div>
+      <div class="search-wrap"><i class="fas fa-search search-icon"></i><input class="search-input" v-model="searchQuery" placeholder="Поиск по заметкам..." /></div>
       <button class="tool-btn" @click="exportNotes" title="Экспорт"><i class="fas fa-download"></i></button>
     </div>
 
@@ -35,10 +32,7 @@
     <!-- СПИСОК ЗАМЕТОК -->
     <div class="notes-grid" v-if="!editingNote">
       <div v-for="note in filteredNotes" :key="note.id" class="note-card" :style="{ borderLeftColor: note.color || '#6366f1' }" :draggable="true" @dragstart="dragNote = note" @dragend="dragNote = null; dragOverFolder = null" @click="editNote(note)">
-        <div class="note-card-header">
-          <h4>{{ note.title || 'Без названия' }}</h4>
-          <span class="note-date">{{ formatDate(note.updated_at || note.created_at) }}</span>
-        </div>
+        <div class="note-card-header"><h4>{{ note.title || 'Без названия' }}</h4><span class="note-date">{{ formatDate(note.updated_at || note.created_at) }}</span></div>
         <p class="note-preview">{{ getPreview(note.content) }}</p>
         <div class="note-card-footer">
           <div class="note-tags"><span v-for="tag in note.tags" :key="tag" class="note-tag">#{{ tag }}</span></div>
@@ -49,11 +43,7 @@
         </div>
         <button class="note-delete" @click.stop="deleteNote(note.id)" title="Удалить"><i class="fas fa-trash"></i></button>
       </div>
-      <div v-if="!filteredNotes.length" class="empty-notes">
-        <div class="empty-icon">📝</div>
-        <p>{{ searchQuery ? 'Ничего не найдено' : 'Нет заметок. Создайте первую!' }}</p>
-        <button class="btn btn-p" @click="addNote" v-if="!searchQuery">+ Новая заметка</button>
-      </div>
+      <div v-if="!filteredNotes.length" class="empty-notes"><div class="empty-icon">📝</div><p>{{ searchQuery ? 'Ничего не найдено' : 'Нет заметок. Создайте первую!' }}</p><button class="btn btn-p" @click="addNote" v-if="!searchQuery">+ Новая заметка</button></div>
     </div>
 
     <!-- РЕДАКТОР -->
@@ -68,35 +58,24 @@
       </div>
       <input class="title-input" v-model="currentNote.title" placeholder="Название заметки..." />
       <div class="tags-input-wrap">
-        <i class="fas fa-tags"></i>
-        <input class="tags-input" v-model="tagInput" @keydown.enter="addTag" placeholder="Добавить тег (Enter)..." />
+        <i class="fas fa-tags"></i><input class="tags-input" v-model="tagInput" @keydown.enter="addTag" placeholder="Добавить тег (Enter)..." />
         <span v-for="tag in currentNote.tags" :key="tag" class="tag-badge">#{{ tag }} <button class="tag-remove" @click="removeTag(tag)">×</button></span>
       </div>
-
       <div class="attachments-section" v-if="currentNote.attachments?.length">
         <div class="attachments-label">📎 Прикреплённые файлы ({{ currentNote.attachments.length }})</div>
         <div class="attachments-grid">
           <div v-for="(file, fi) in currentNote.attachments" :key="fi" class="attachment-item">
             <img v-if="isImage(file.url)" :src="file.url" class="attachment-image" @click="openFullscreen(file.url)" />
-            <div v-else class="attachment-file">
-              <span class="file-icon">{{ getFileIcon(file.type) }}</span>
-              <span class="file-name" :title="file.name">{{ file.name }}</span>
-              <a :href="file.url" target="_blank" class="file-download"><i class="fas fa-download"></i></a>
-            </div>
+            <div v-else class="attachment-file"><span class="file-icon">{{ getFileIcon(file.type) }}</span><span class="file-name" :title="file.name">{{ file.name }}</span><a :href="file.url" target="_blank" class="file-download"><i class="fas fa-download"></i></a></div>
             <button class="attachment-remove" @click="removeAttachment(fi)">×</button>
           </div>
         </div>
       </div>
-
       <div class="upload-section">
         <input type="file" ref="fileInput" @change="uploadFile" class="file-input-hidden" accept="image/*,.pdf,.doc,.docx,.mp3,.mp4,.zip" multiple />
-        <button class="upload-btn" @click="$refs.fileInput.click()" :disabled="uploading">
-          <i class="fas fa-cloud-upload-alt"></i> {{ uploading ? 'Загрузка...' : 'Прикрепить файл' }}
-        </button>
+        <button class="upload-btn" @click="$refs.fileInput.click()" :disabled="uploading"><i class="fas fa-cloud-upload-alt"></i> {{ uploading ? 'Загрузка...' : 'Прикрепить файл' }}</button>
       </div>
-
       <div ref="quillEditor" class="quill-editor-wrapper"></div>
-
       <div class="editor-footer">
         <span class="auto-save" v-if="saving">💾 Сохраняю...</span>
         <span class="auto-save saved" v-else-if="lastSaved">✅ Сохранено {{ lastSaved }}</span>
@@ -105,10 +84,7 @@
     </div>
 
     <Teleport to="body">
-      <div v-if="fullscreenImage" class="fullscreen-overlay" @click="fullscreenImage = null">
-        <img :src="fullscreenImage" class="fullscreen-image" />
-        <button class="fullscreen-close">✕</button>
-      </div>
+      <div v-if="fullscreenImage" class="fullscreen-overlay" @click="fullscreenImage = null"><img :src="fullscreenImage" class="fullscreen-image" /><button class="fullscreen-close">✕</button></div>
     </Teleport>
   </div>
 </template>
@@ -142,142 +118,129 @@ export default {
       if (this.searchQuery) { const q = this.searchQuery.toLowerCase(); list = list.filter(n => (n.title||'').toLowerCase().includes(q) || (n.content||'').toLowerCase().includes(q) || (n.tags||[]).some(t => t.toLowerCase().includes(q))); }
       return list.sort((a,b) => new Date(b.updated_at||b.created_at) - new Date(a.updated_at||a.created_at));
     },
-    wordCount() {
-      if (this.quillInstance) return this.quillInstance.getText().trim().split(/\s+/).filter(w => w).length;
-      return 0;
-    }
+    wordCount() { return this.quillInstance ? this.quillInstance.getText().trim().split(/\s+/).filter(w=>w).length : 0; }
   },
   mounted() { this.loadNotes(); if (this.note) this.currentNote.content = this.note; },
   methods: {
-    // ==================== ЗАМЕТКИ ====================
-    loadNotes() { const s = localStorage.getItem('notebook_notes'); if (s) { try { this.notes = JSON.parse(s); } catch(e) { this.notes = []; } } const c = localStorage.getItem('notebook_colors'); if (c) { try { this.folderColors = JSON.parse(c); } catch(e) {} } },
+    loadNotes() { const s=localStorage.getItem('notebook_notes'); if(s){try{this.notes=JSON.parse(s);}catch(e){this.notes=[];}} const c=localStorage.getItem('notebook_colors'); if(c){try{this.folderColors=JSON.parse(c);}catch(e){}} },
     saveNotes() { localStorage.setItem('notebook_notes', JSON.stringify(this.notes)); localStorage.setItem('notebook_colors', JSON.stringify(this.folderColors)); },
-    addNote() { const n = { id: Date.now(), title: 'Новая заметка', content: '', tags: [], folder: this.activeFolder || '', color: this.colors[Math.floor(Math.random()*this.colors.length)], attachments: [], created_at: new Date().toISOString(), updated_at: new Date().toISOString() }; this.notes.push(n); this.saveNotes(); this.editNote(n); },
-    editNote(note) { this.currentNote = { ...note, tags: [...note.tags], attachments: [...(note.attachments||[])] }; this.editingNote = true; this.$nextTick(() => this.initQuill()); },
-    deleteNote(id) { if (!confirm('Удалить заметку?')) return; this.notes = this.notes.filter(n => n.id !== id); this.saveNotes(); },
+    addNote() { const n={id:Date.now(),title:'Новая заметка',content:'',tags:[],folder:this.activeFolder||'',color:this.colors[Math.floor(Math.random()*this.colors.length)],attachments:[],created_at:new Date().toISOString(),updated_at:new Date().toISOString()}; this.notes.push(n); this.saveNotes(); this.editNote(n); },
+    editNote(note) { this.currentNote={...note,tags:[...note.tags],attachments:[...(note.attachments||[])]}; this.editingNote=true; this.$nextTick(()=>this.initQuill()); },
+    deleteNote(id) { if(!confirm('Удалить заметку?'))return; this.notes=this.notes.filter(n=>n.id!==id); this.saveNotes(); },
 
-    // ==================== QUILL ====================
+    // QUILL
     initQuill() {
-      if (this.quillInstance) { this.quillInstance.off('text-change'); this.quillInstance = null; }
-      if (this.$refs.quillEditor) this.$refs.quillEditor.innerHTML = '';
-      this.$nextTick(() => {
-        this.quillInstance = new Quill(this.$refs.quillEditor, {
-          theme: 'snow',
-          modules: { toolbar: [ [{'header':[1,2,3,false]}], ['bold','italic','underline','strike'], [{'color':[]},{'background':[]}], [{'list':'ordered'},{'list':'bullet'},{'list':'check'}], [{'indent':'-1'},{'indent':'+1'}], ['blockquote','code-block'], ['link','image','video'], ['clean'] ] },
-          placeholder: 'Пишите здесь...'
-        });
-        if (this.currentNote.content) this.quillInstance.root.innerHTML = this.currentNote.content;
-        this.quillInstance.on('text-change', () => { this.currentNote.content = this.quillInstance.root.innerHTML; this.autoSave(); });
-        this.setupQuillDragDrop();
-        setTimeout(() => this.setupImageControls(), 300);
+      if(this.quillInstance){this.quillInstance.off('text-change');this.quillInstance=null;}
+      if(this.$refs.quillEditor)this.$refs.quillEditor.innerHTML='';
+      this.$nextTick(()=>{
+        this.quillInstance=new Quill(this.$refs.quillEditor,{theme:'snow',modules:{toolbar:[['bold','italic','underline','strike'],[{'header':[1,2,3,false]}],[{'color':[]},{'background':[]}],[{'list':'ordered'},{'list':'bullet'}],['blockquote','code-block'],['link','image'],['clean']]},placeholder:'Пишите здесь...'});
+        if(this.currentNote.content)this.quillInstance.root.innerHTML=this.currentNote.content;
+        this.quillInstance.on('text-change',()=>{this.currentNote.content=this.quillInstance.root.innerHTML;this.autoSave();});
+        this.setupDragDrop();
+        setTimeout(()=>this.setupImageControls(),300);
       });
     },
 
-    // ==================== DRAG & DROP ====================
-    setupQuillDragDrop() {
-      if (!this.quillInstance) return;
-      const el = this.quillInstance.root;
-      el.addEventListener('dragover', e => { e.preventDefault(); el.style.borderColor = '#6366f1'; });
-      el.addEventListener('dragleave', () => { el.style.borderColor = ''; });
-      el.addEventListener('drop', async e => { e.preventDefault(); el.style.borderColor = ''; for (const f of e.dataTransfer.files) await this.uploadFileToNote(f); });
-      el.addEventListener('paste', async e => { for (const item of e.clipboardData?.items||[]) { if (item.type.startsWith('image/')) { e.preventDefault(); await this.uploadFileToNote(item.getAsFile()); } } });
+    // DRAG & DROP
+    setupDragDrop() {
+      if(!this.quillInstance)return;
+      const el=this.quillInstance.root;
+      el.addEventListener('dragover',e=>{e.preventDefault();el.style.borderColor='#6366f1';});
+      el.addEventListener('dragleave',()=>{el.style.borderColor='';});
+      el.addEventListener('drop',async e=>{e.preventDefault();el.style.borderColor='';for(const f of e.dataTransfer.files)await this.uploadFileToNote(f);});
+      el.addEventListener('paste',async e=>{for(const item of e.clipboardData?.items||[]){if(item.type.startsWith('image/')){e.preventDefault();await this.uploadFileToNote(item.getAsFile());}}});
     },
 
-    // ==================== КАРТИНКИ ====================
+    // КАРТИНКИ
     setupImageControls() {
-      if (!this.quillInstance) return;
-      this.quillInstance.root.addEventListener('click', e => {
-        if (e.target.tagName === 'IMG') {
-          this.quillInstance.root.querySelectorAll('img.selected').forEach(img => { if (img !== e.target) { img.classList.remove('selected'); this.removeDeleteBtn(img); this.removeResize(img); } });
-          e.target.classList.add('selected');
-          this.addDeleteBtn(e.target);
-          this.makeResizable(e.target);
-          e.stopPropagation();
-        } else {
-          this.quillInstance.root.querySelectorAll('img.selected').forEach(img => { img.classList.remove('selected'); this.removeDeleteBtn(img); this.removeResize(img); });
-        }
+      if(!this.quillInstance)return;
+      this.quillInstance.root.addEventListener('click',e=>{
+        if(e.target.tagName==='IMG'){
+          this.quillInstance.root.querySelectorAll('img.selected').forEach(img=>{if(img!==e.target){img.classList.remove('selected');this.removeDeleteBtn(img);this.removeResize(img);}});
+          e.target.classList.add('selected');this.addDeleteBtn(e.target);this.makeResizable(e.target);e.stopPropagation();
+        }else{this.quillInstance.root.querySelectorAll('img.selected').forEach(img=>{img.classList.remove('selected');this.removeDeleteBtn(img);this.removeResize(img);});}
       });
-      this.quillInstance.root.querySelectorAll('img').forEach(img => this.makeResizable(img));
+      try{this.quillInstance.root.querySelectorAll('img').forEach(img=>this.makeResizable(img));}catch(e){}
     },
-
-    addDeleteBtn(img) {
-      if (!img?.parentNode) return;
-      this.removeDeleteBtn(img);
-      const btn = document.createElement('button'); btn.innerHTML = '×'; btn.className = 'img-delete-btn';
-      btn.onclick = (e) => { e.stopPropagation(); this.removeResize(img); img.remove(); this.currentNote.content = this.quillInstance.root.innerHTML; this.autoSave(); };
-      (img.parentNode.closest('.img-resize-wrapper') || img.parentNode).appendChild(btn);
-    },
-    removeDeleteBtn(img) { const btn = (img?.parentNode?.closest('.img-resize-wrapper') || img?.parentNode)?.querySelector('.img-delete-btn'); if (btn) btn.remove(); },
+    addDeleteBtn(img){if(!img?.parentNode)return;this.removeDeleteBtn(img);const btn=document.createElement('button');btn.innerHTML='×';btn.className='img-delete-btn';btn.onclick=(e)=>{e.stopPropagation();this.removeResize(img);img.remove();if(this.quillInstance){this.currentNote.content=this.quillInstance.root.innerHTML;this.autoSave();}};(img.parentNode.closest('.img-resize-wrapper')||img.parentNode).appendChild(btn);},
+    removeDeleteBtn(img){const btn=(img?.parentNode?.closest('.img-resize-wrapper')||img?.parentNode)?.querySelector('.img-delete-btn');if(btn)btn.remove();},
 
     makeResizable(img) {
-      if (!img?.parentNode || !document.body.contains(img) || img._resizeHandler) return;
+      if(!img||!img.parentNode||!document.body.contains(img)||img._resizeHandler)return;
       this.removeResize(img);
-      const wrapper = document.createElement('div'); wrapper.className = 'img-resize-wrapper';
-      img.parentNode.insertBefore(wrapper, img); wrapper.appendChild(img);
-      const handle = document.createElement('div'); handle.className = 'img-resize-handle'; handle.innerHTML = '◢'; wrapper.appendChild(handle);
-      let sx, sy, sw, sh;
-      const onDown = (e) => { e.preventDefault(); e.stopPropagation(); sx = e.clientX; sy = e.clientY; sw = img.offsetWidth; sh = img.offsetHeight; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp); };
-      const onMove = (e) => { let w = sw + (e.clientX - sx); if (w < 50) w = 50; const max = (this.quillInstance?.root?.offsetWidth || 500) - 40; if (w > max) w = max; img.style.width = w + 'px'; img.style.height = 'auto'; };
-      const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); if (this.quillInstance) { this.currentNote.content = this.quillInstance.root.innerHTML; this.autoSave(); } };
-      handle.addEventListener('mousedown', onDown);
-      img._resizeHandler = { handle, onDown, onUp, onMove, wrapper };
+      try{
+        const wrapper=document.createElement('div');wrapper.className='img-resize-wrapper';
+        img.parentNode.insertBefore(wrapper,img);wrapper.appendChild(img);
+        const handle=document.createElement('div');handle.className='img-resize-handle';handle.innerHTML='◢';wrapper.appendChild(handle);
+        let sx,sy,sw;
+        const onDown=(e)=>{e.preventDefault();e.stopPropagation();sx=e.clientX;sy=e.clientY;sw=img.offsetWidth;document.addEventListener('mousemove',onMove);document.addEventListener('mouseup',onUp);};
+        const onMove=(e)=>{let w=sw+(e.clientX-sx);if(w<50)w=50;const max=(this.quillInstance?.root?.offsetWidth||500)-40;if(w>max)w=max;img.style.width=w+'px';img.style.height='auto';};
+        const onUp=()=>{document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);if(this.quillInstance&&this.quillInstance.root){this.currentNote.content=this.quillInstance.root.innerHTML;this.autoSave();}};
+        handle.addEventListener('mousedown',onDown);
+        img._resizeHandler={handle,onDown,onUp,onMove,wrapper};
+      }catch(e){}
     },
 
     removeResize(img) {
-      if (!img?._resizeHandler) return;
-      const { handle, wrapper, onDown } = img._resizeHandler;
-      if (handle) handle.removeEventListener('mousedown', onDown);
-      if (wrapper?.parentNode && img.parentNode === wrapper) { wrapper.parentNode.insertBefore(img, wrapper); wrapper.remove(); }
-      delete img._resizeHandler;
+      if(!img?._resizeHandler)return;
+      try{
+        const{handle,wrapper,onDown}=img._resizeHandler;
+        if(handle)handle.removeEventListener('mousedown',onDown);
+        if(wrapper?.parentNode&&img.parentNode===wrapper){wrapper.parentNode.insertBefore(img,wrapper);wrapper.remove();}
+        delete img._resizeHandler;
+      }catch(e){}
     },
 
-    // ==================== ФАЙЛЫ ====================
+    // ФАЙЛЫ
     async uploadFileToNote(file) {
-      if (file.size > 10*1024*1024) { alert('Файл больше 10MB'); return; }
-      this.uploading = true;
-      try {
-        const fd = new FormData(); fd.append('file', file);
-        const { data } = await axios.post('/api/notes/upload', fd, { headers: {'Content-Type':'multipart/form-data'} });
-        if (!this.currentNote.attachments) this.currentNote.attachments = [];
-        this.currentNote.attachments.push({ url: data.url, name: data.name, type: data.type, size: data.size });
-        if (data.type.startsWith('image/')) { this.quillInstance.insertEmbed(this.quillInstance.getSelection(true).index, 'image', data.url); this.$nextTick(() => setTimeout(() => { const imgs = this.quillInstance.root.querySelectorAll('img'); if (imgs.length) this.makeResizable(imgs[imgs.length-1]); }, 200)); }
-        const idx = this.notes.findIndex(n => n.id === this.currentNote.id);
-        if (idx >= 0) { this.currentNote.updated_at = new Date().toISOString(); this.notes[idx] = { ...this.currentNote }; this.saveNotes(); }
-      } catch(e) {} finally { this.uploading = false; }
+      if(file.size>10*1024*1024){alert('Файл больше 10MB');return;}
+      this.uploading=true;
+      try{
+        const fd=new FormData();fd.append('file',file);
+        const{data}=await axios.post('/api/notes/upload',fd,{headers:{'Content-Type':'multipart/form-data'}});
+        if(!this.currentNote.attachments)this.currentNote.attachments=[];
+        this.currentNote.attachments.push({url:data.url,name:data.name,type:data.type,size:data.size});
+        if(data.type.startsWith('image/')&&this.quillInstance){
+          this.quillInstance.insertEmbed(this.quillInstance.getSelection(true).index,'image',data.url);
+          this.$nextTick(()=>{setTimeout(()=>{if(!this.quillInstance?.root)return;const imgs=this.quillInstance.root.querySelectorAll('img');const last=imgs[imgs.length-1];if(last&&document.body.contains(last))this.makeResizable(last);},300);});
+        }
+        const idx=this.notes.findIndex(n=>n.id===this.currentNote.id);
+        if(idx>=0){this.currentNote.updated_at=new Date().toISOString();this.notes[idx]={...this.currentNote};this.saveNotes();}
+      }catch(e){}finally{this.uploading=false;}
     },
-    uploadFile(e) { if (e.target.files[0]) { this.uploadFileToNote(e.target.files[0]); e.target.value = ''; } },
-    removeAttachment(i) { this.currentNote.attachments.splice(i, 1); const idx = this.notes.findIndex(n => n.id === this.currentNote.id); if (idx >= 0) { this.currentNote.updated_at = new Date().toISOString(); this.notes[idx] = { ...this.currentNote }; this.saveNotes(); } },
+    uploadFile(e){if(e.target.files[0]){this.uploadFileToNote(e.target.files[0]);e.target.value='';}},
+    removeAttachment(i){this.currentNote.attachments.splice(i,1);const idx=this.notes.findIndex(n=>n.id===this.currentNote.id);if(idx>=0){this.currentNote.updated_at=new Date().toISOString();this.notes[idx]={...this.currentNote};this.saveNotes();}},
 
-    // ==================== СОХРАНЕНИЕ ====================
-    async saveAndClose() {
-      this.saving = true;
-      if (this.quillInstance) { this.quillInstance.root.querySelectorAll('img.selected').forEach(img => { img.classList.remove('selected'); this.removeDeleteBtn(img); }); this.currentNote.content = this.quillInstance.root.innerHTML; }
-      const idx = this.notes.findIndex(n => n.id === this.currentNote.id);
-      if (idx >= 0) { this.currentNote.updated_at = new Date().toISOString(); this.notes[idx] = { ...this.currentNote }; }
+    // СОХРАНЕНИЕ
+    async saveAndClose(){
+      this.saving=true;
+      if(this.quillInstance){try{this.quillInstance.root.querySelectorAll('img.selected').forEach(img=>{img.classList.remove('selected');this.removeDeleteBtn(img);});}catch(e){}this.currentNote.content=this.quillInstance.root.innerHTML;}
+      const idx=this.notes.findIndex(n=>n.id===this.currentNote.id);
+      if(idx>=0){this.currentNote.updated_at=new Date().toISOString();this.notes[idx]={...this.currentNote};}
       this.saveNotes();
-      try { await axios.put('/api/notes', { note: this.currentNote.content, attachments: this.currentNote.attachments }); } catch(e) {}
-      this.lastSaved = `в ${new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}`;
-      this.editingNote = false; this.saving = false; this.quillInstance = null;
+      try{await axios.put('/api/notes',{note:this.currentNote.content,attachments:this.currentNote.attachments});}catch(e){}
+      this.lastSaved=`в ${new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}`;
+      this.editingNote=false;this.saving=false;this.quillInstance=null;
     },
-    autoSave() { clearTimeout(this._t); this._t = setTimeout(async () => { if (this.quillInstance) this.currentNote.content = this.quillInstance.root.innerHTML; const idx = this.notes.findIndex(n => n.id === this.currentNote.id); if (idx >= 0) { this.currentNote.updated_at = new Date().toISOString(); this.notes[idx] = { ...this.currentNote }; this.saveNotes(); } try { await axios.put('/api/notes', { note: this.currentNote.content, attachments: this.currentNote.attachments }); } catch(e) {} }, 2000); },
+    autoSave(){clearTimeout(this._t);this._t=setTimeout(async()=>{if(this.quillInstance)this.currentNote.content=this.quillInstance.root.innerHTML;const idx=this.notes.findIndex(n=>n.id===this.currentNote.id);if(idx>=0){this.currentNote.updated_at=new Date().toISOString();this.notes[idx]={...this.currentNote};this.saveNotes();}try{await axios.put('/api/notes',{note:this.currentNote.content,attachments:this.currentNote.attachments});}catch(e){}},2000);},
 
-    // ==================== ТЕГИ / ПАПКИ ====================
-    addTag() { const t = this.tagInput.trim().toLowerCase().replace(/\s+/g,'_'); if (t && !this.currentNote.tags.includes(t)) this.currentNote.tags.push(t); this.tagInput = ''; },
-    removeTag(t) { this.currentNote.tags = this.currentNote.tags.filter(x => x !== t); },
-    addFolder() { const n = prompt('Название папки:'); if (n?.trim()) { this.folderColors[n.trim()] = this.colors[Math.floor(Math.random()*this.colors.length)]; this.saveNotes(); this.$forceUpdate(); } },
-    deleteFolder(f) { if (!confirm(`Удалить "${f}"?`)) return; this.notes.forEach(n => { if (n.folder === f) n.folder = ''; }); delete this.folderColors[f]; if (this.activeFolder === f) this.activeFolder = null; this.saveNotes(); },
-    dropToFolder(f) { if (this.dragNote) { this.dragNote.folder = f; this.saveNotes(); } this.dragNote = null; this.dragOverFolder = null; },
-    getFolderCount(f) { return this.notes.filter(n => n.folder === f).length; },
+    // ТЕГИ/ПАПКИ
+    addTag(){const t=this.tagInput.trim().toLowerCase().replace(/\s+/g,'_');if(t&&!this.currentNote.tags.includes(t))this.currentNote.tags.push(t);this.tagInput='';},
+    removeTag(t){this.currentNote.tags=this.currentNote.tags.filter(x=>x!==t);},
+    addFolder(){const n=prompt('Название папки:');if(n?.trim()){this.folderColors[n.trim()]=this.colors[Math.floor(Math.random()*this.colors.length)];this.saveNotes();this.$forceUpdate();}},
+    deleteFolder(f){if(!confirm(`Удалить "${f}"?`))return;this.notes.forEach(n=>{if(n.folder===f)n.folder='';});delete this.folderColors[f];if(this.activeFolder===f)this.activeFolder=null;this.saveNotes();},
+    dropToFolder(f){if(this.dragNote){this.dragNote.folder=f;this.saveNotes();}this.dragNote=null;this.dragOverFolder=null;},
+    getFolderCount(f){return this.notes.filter(n=>n.folder===f).length;},
 
-    // ==================== УТИЛИТЫ ====================
-    getPreview(c) { const t = c ? c.replace(/<[^>]*>/g,'') : ''; return t ? t.substring(0,100) + (t.length>100?'...':'') : 'Пустая заметка'; },
-    exportNotes() { const t = this.notes.map(n => `# ${n.title}\n${n.folder?`📁 ${n.folder}\n`:''}${n.tags.length?n.tags.map(t=>'#'+t).join(' ')+'\n':''}\n${n.content.replace(/<[^>]*>/g,'')}\n---`).join('\n\n'); const b = new Blob([t]); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = 'заметки.txt'; a.click(); URL.revokeObjectURL(u); },
-    formatDate(ts) { return ts ? new Date(ts).toLocaleDateString('ru',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : ''; },
-    isImage(u) { return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(u); },
-    getFileIcon(t) { if (/image/.test(t)) return '🖼️'; if (/video/.test(t)) return '🎬'; if (/audio/.test(t)) return '🎵'; if (/pdf/.test(t)) return '📄'; if (/zip/.test(t)) return '📦'; return '📎'; },
-    openFullscreen(u) { this.fullscreenImage = u; }
+    // УТИЛИТЫ
+    getPreview(c){const t=c?c.replace(/<[^>]*>/g,''):'';return t?t.substring(0,100)+(t.length>100?'...':''):'Пустая заметка';},
+    exportNotes(){const t=this.notes.map(n=>`# ${n.title}\n${n.folder?`📁 ${n.folder}\n`:''}${n.tags.length?n.tags.map(t=>'#'+t).join(' ')+'\n':''}\n${n.content.replace(/<[^>]*>/g,'')}\n---`).join('\n\n');const b=new Blob([t]);const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='заметки.txt';a.click();URL.revokeObjectURL(u);},
+    formatDate(ts){return ts?new Date(ts).toLocaleDateString('ru',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';},
+    isImage(u){return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(u);},
+    getFileIcon(t){if(/image/.test(t))return'🖼️';if(/video/.test(t))return'🎬';if(/audio/.test(t))return'🎵';if(/pdf/.test(t))return'📄';if(/zip/.test(t))return'📦';return'📎';},
+    openFullscreen(u){this.fullscreenImage=u;}
   },
-  beforeUnmount() { clearTimeout(this._t); if (this.quillInstance) { this.quillInstance.root.querySelectorAll('img').forEach(img => { this.removeDeleteBtn(img); this.removeResize(img); }); this.quillInstance.off('text-change'); } }
+  beforeUnmount(){clearTimeout(this._t);if(this.quillInstance){try{this.quillInstance.root.querySelectorAll('img').forEach(img=>{this.removeDeleteBtn(img);this.removeResize(img);});}catch(e){}this.quillInstance.off('text-change');}}
 };
 </script>
 
