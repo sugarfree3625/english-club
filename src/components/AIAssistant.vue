@@ -15,9 +15,20 @@
         
         <div class="ai-messages" ref="msgContainer">
           <div class="ai-msg bot">
-            Привет! 👋 Я AI-помощник English Club. Спросите меня о:
+            Привет! 👋 Я AI-помощник English Club. Выберите команду или задайте вопрос:
             <div class="ai-suggestions">
-              <button v-for="s in suggestions" :key="s" class="ai-suggestion" @click="quickAsk(s)">{{ s }}</button>
+              <div class="ai-suggestions-title">⚡ Быстрые команды:</div>
+              <div class="ai-suggestions-grid">
+                <button 
+                  v-for="cmd in quickCommands" 
+                  :key="cmd.text" 
+                  class="ai-suggestion" 
+                  @click="quickAsk(cmd.text)"
+                >
+                  <span class="ai-cmd-icon">{{ cmd.icon }}</span>
+                  <span class="ai-cmd-text">{{ cmd.text }}</span>
+                </button>
+              </div>
             </div>
           </div>
           <div v-for="(m, i) in messages" :key="i" class="ai-msg" :class="m.type">
@@ -55,25 +66,32 @@ const messages = ref([]);
 const typing = ref(false);
 const msgContainer = ref(null);
 
-const suggestions = ['📅 Расписание', '📝 Записаться', '💰 Оплата', '📊 Мой уровень', '🏆 Достижения', '📚 Словарь'];
+const quickCommands = [
+  { icon: '📅', text: 'Расписание' },
+  { icon: '📝', text: 'Записаться' },
+  { icon: '💰', text: 'Цены' },
+  { icon: '📊', text: 'Мой уровень' },
+  { icon: '🏆', text: 'Достижения' },
+  { icon: '📚', text: 'Словарь' },
+  { icon: '💬', text: 'Чат' },
+  { icon: '👤', text: 'Профиль' },
+  { icon: '📞', text: 'Контакты' },
+  { icon: '❓', text: 'Помощь' },
+];
 
 const answers = {
   'расписание': '📅 Расписание доступно в разделе "Календарь". Там вы можете:\n• Посмотреть ближайшие занятия\n• Записаться на удобное время\n• Отменить запись\n\n👉 Перейти: /calendar',
   'записаться': '📝 Чтобы записаться на занятие:\n1️⃣ Зайдите в раздел "Календарь"\n2️⃣ Выберите свободный слот\n3️⃣ Нажмите "Записаться"\n\nИли напишите @anna_english в Telegram!',
-  'оплата': '💳 Способы оплаты:\n• Перевод на карту\n• Через Telegram @anna_english\n\nСтоимость:\n• Индивидуальное занятие: 1 500 ₽ / 60 мин\n• Подготовка к IELTS: 2 000 ₽ / 90 мин',
-  'оплат': '💳 Способы оплаты:\n• Перевод на карту\n• Через Telegram @anna_english\n\nСтоимость:\n• Индивидуальное занятие: 1 500 ₽ / 60 мин\n• Подготовка к IELTS: 2 000 ₽ / 90 мин',
-  'цена': '💰 Цены на занятия:\n• Индивидуальное: 1 500 ₽ / 60 мин\n• IELTS: 2 000 ₽ / 90 мин\n• Групповое: 800 ₽ / 90 мин',
-  'стоимость': '💰 Цены на занятия:\n• Индивидуальное: 1 500 ₽ / 60 мин\n• IELTS: 2 000 ₽ / 90 мин\n• Групповое: 800 ₽ / 90 мин',
-  'уровень': '📊 Уровни английского:\n🟢 A1 — Beginner (начинающий)\n🟢 A2 — Elementary\n🔵 B1 — Intermediate (средний)\n🔵 B2 — Upper-Intermediate\n🟣 C1 — Advanced (продвинутый)\n🟣 C2 — Proficient\n\nВаш уровень можно посмотреть в профиле (/profile)',
-  'привет': '👋 Привет! Я AI-помощник English Club.\n\nЯ могу:\n• Рассказать о расписании\n• Помочь с записью\n• Объяснить уровни\n• Подсказать по оплате\n• И многое другое!\n\nПросто спросите! 😊',
-  'помощь': '🤖 Я могу помочь с:\n\n📅 Расписанием\n📝 Записью на занятия\n💰 Оплатой и ценами\n📊 Уровнями английского\n🏆 Достижениями\n📚 Словарём\n💬 Чатом и сообщениями\n📅 Календарём\n👤 Профилем\n\nПросто напишите свой вопрос!',
-  'достижения': '🏆 Достижения — это награды за активность!\n\nКатегории:\n📚 Слова (добавляйте в словарь)\n📅 Встречи (посещайте занятия)\n💬 Сообщения (общайтесь в чате)\n⭐ Рейтинг (зарабатывайте XP)\n🔥 Стрик (занимайтесь без пропусков)\n\nСмотреть: /profile → Достижения',
-  'словарь': '📚 Словарь — ваш личный инструмент для запоминания слов.\n\n• Добавляйте новые слова\n• Отмечайте изученные\n• Следите за прогрессом\n\n👉 Смотреть: /profile → Словарь',
-  'чат': '💬 Чат доступен после входа:\n• Личные сообщения\n• Групповые чаты\n• Голосовые сообщения\n• Видеозвонки\n\n👉 Перейти: /messages',
-  'календарь': '📅 Календарь показывает все занятия:\n• Просмотр по месяцам и неделям\n• Запись в один клик\n• Цветные метки типов занятий\n\n👉 Перейти: /calendar',
-  'профиль': '👤 В профиле вы найдёте:\n• Личную информацию\n• Достижения\n• Расписание\n• Словарь\n• Блокнот\n• Задания\n• Прогресс\n\n👉 Перейти: /profile',
-  'как дела': '😊 У меня всё отлично! Я всегда готов помочь!\n\nА у вас как настроение? Готовы к новым знаниям? 🚀',
-  'спасибо': '🙏 Пожалуйста! Рад помочь!\n\nЕсли понадоблюсь — я всегда здесь, в правом нижнем углу 😊',
+  'цены': '💰 Цены на занятия:\n• Индивидуальное: 1 500 ₽ / 60 мин\n• IELTS: 2 000 ₽ / 90 мин\n• Групповое: 800 ₽ / 90 мин',
+  'оплата': '💳 Способы оплаты:\n• Перевод на карту\n• Через Telegram @anna_english',
+  'уровень': '📊 Уровни английского:\n🟢 A1 — Beginner\n🟢 A2 — Elementary\n🔵 B1 — Intermediate\n🔵 B2 — Upper-Intermediate\n🟣 C1 — Advanced\n🟣 C2 — Proficient\n\nВаш уровень в профиле: /profile',
+  'достижения': '🏆 Достижения — награды за активность!\n📚 Слова 📅 Встречи 💬 Сообщения ⭐ Рейтинг 🔥 Стрик\n\nСмотреть: /profile → Достижения',
+  'словарь': '📚 Словарь — личный инструмент для запоминания слов.\n• Добавляйте новые слова\n• Отмечайте изученные\n• Следите за прогрессом\n\n👉 /profile → Словарь',
+  'чат': '💬 Чат доступен после входа:\n• Личные сообщения\n• Групповые чаты\n• Голосовые сообщения\n\n👉 /messages',
+  'профиль': '👤 В профиле: информация, достижения, расписание, словарь, блокнот, задания, прогресс.\n\n👉 /profile',
+  'контакты': '📞 Связь с учителем:\n✈️ Telegram: @anna_english\n📱 WhatsApp: +7 (916) 123-45-67\n\nИли через сайт в разделе "Контакты"',
+  'помощь': '🤖 Я могу помочь с:\n📅 Расписанием\n📝 Записью\n💰 Оплатой\n📊 Уровнями\n🏆 Достижениями\n📚 Словарём\n💬 Чатом\n👤 Профилем\n📞 Контактами\n\nПросто нажмите на кнопку или напишите!',
+  'привет': '👋 Привет! Я AI-помощник English Club. Выберите команду из списка или задайте вопрос! 😊',
 };
 
 const toggleAssistant = () => {
@@ -102,21 +120,10 @@ const send = () => {
   typing.value = true;
   
   const q = input.value.toLowerCase();
-  let answer = '🤔 Хороший вопрос! Я пока учусь и не всё знаю.\n\nНапишите @anna_english в Telegram, и вам помогут! 💬';
+  let answer = '🤔 Хороший вопрос! Напишите @anna_english в Telegram для уточнения.';
   
-  // Поиск по ключевым словам
   for (const [key, val] of Object.entries(answers)) {
-    if (q.includes(key)) { 
-      answer = val; 
-      break; 
-    }
-  }
-  
-  // Умный поиск по нескольким словам
-  if (answer.includes('@anna_english')) {
-    if (q.includes('занят') || q.includes('урок') || q.includes('учител')) {
-      answer = answers['записаться'];
-    }
+    if (q.includes(key)) { answer = val; break; }
   }
   
   input.value = '';
@@ -156,7 +163,7 @@ const send = () => {
 }
 .ai-panel { 
   position: absolute; bottom: 70px; left: 0; 
-  width: 340px; max-height: 500px; 
+  width: 360px; max-height: 520px; 
   overflow: hidden; display: flex; flex-direction: column;
   box-shadow: 0 10px 40px rgba(0,0,0,0.5);
 }
@@ -174,11 +181,11 @@ const send = () => {
 .ai-messages { 
   flex: 1; overflow-y: auto; padding: 14px; 
   display: flex; flex-direction: column; gap: 8px; 
-  max-height: 350px;
+  max-height: 380px;
 }
 .ai-msg { 
   padding: 10px 14px; border-radius: 14px; 
-  font-size: 0.85rem; max-width: 90%; line-height: 1.5;
+  font-size: 0.85rem; max-width: 92%; line-height: 1.5;
   white-space: pre-line;
 }
 .ai-msg.bot { 
@@ -192,65 +199,39 @@ const send = () => {
   border-bottom-right-radius: 4px;
 }
 
-.ai-suggestions { 
-  display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; 
-}
+.ai-suggestions { margin-top: 10px; width: 100%; }
+.ai-suggestions-title { font-size: 0.7rem; color: #94a3b8; margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.ai-suggestions-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
 .ai-suggestion { 
-  padding: 4px 10px; border-radius: 12px; 
-  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
-  color: #94a3b8; cursor: pointer; font-size: 0.7rem; 
-  transition: all 0.2s; font-family: inherit;
+  display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 10px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  color: #cbd5e1; cursor: pointer; font-size: 0.72rem; transition: all 0.2s;
+  font-family: inherit; white-space: nowrap;
 }
 .ai-suggestion:hover { 
-  background: rgba(99,102,241,0.2); color: #fff; border-color: rgba(99,102,241,0.3); 
+  background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.3); 
+  color: #fff; transform: translateY(-1px);
 }
+.ai-cmd-icon { font-size: 0.9rem; flex-shrink: 0; }
+.ai-cmd-text { overflow: hidden; text-overflow: ellipsis; }
 
 .typing { display: flex; gap: 4px; align-items: center; padding: 14px 18px; }
-.typing-dot { 
-  width: 6px; height: 6px; border-radius: 50%; 
-  background: #94a3b8; 
-  animation: typingBounce 1.4s infinite ease-in-out both; 
-}
+.typing-dot { width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; animation: typingBounce 1.4s infinite ease-in-out both; }
 .typing-dot:nth-child(1) { animation-delay: -0.32s; }
 .typing-dot:nth-child(2) { animation-delay: -0.16s; }
 .typing-dot:nth-child(3) { animation-delay: 0s; }
-@keyframes typingBounce { 
-  0%,80%,100%{transform:scale(0.6);opacity:0.4} 
-  40%{transform:scale(1);opacity:1} 
-}
+@keyframes typingBounce { 0%,80%,100%{transform:scale(0.6);opacity:0.4} 40%{transform:scale(1);opacity:1} }
 
-.ai-input { 
-  display: flex; gap: 8px; padding: 12px; 
-  border-top: 1px solid rgba(255,255,255,0.06); 
-}
-.input { 
-  flex: 1; padding: 10px 14px; 
-  border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; 
-  background: rgba(255,255,255,0.03); color: #fff; 
-  font-size: 0.85rem; outline: none; font-family: inherit; 
-}
+.ai-input { display: flex; gap: 8px; padding: 12px; border-top: 1px solid rgba(255,255,255,0.06); }
+.input { flex: 1; padding: 10px 14px; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; background: rgba(255,255,255,0.03); color: #fff; font-size: 0.85rem; outline: none; font-family: inherit; }
 .input:focus { border-color: #6366f1; }
 .input:disabled { opacity: 0.5; }
-
-.btn { 
-  display: inline-flex; align-items: center; padding: 8px 14px; 
-  border-radius: 12px; border: none; cursor: pointer; 
-}
-.btn-p { 
-  background: linear-gradient(135deg, #6366f1, #2dd4bf); color: #fff; 
-}
+.btn { display: inline-flex; align-items: center; padding: 8px 14px; border-radius: 12px; border: none; cursor: pointer; }
+.btn-p { background: linear-gradient(135deg, #6366f1, #2dd4bf); color: #fff; }
 .btn-p:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-sm { padding: 8px 14px; font-size: 0.9rem; }
+.ai-slide-enter-active, .ai-slide-leave-active { transition: all 0.3s ease; }
+.ai-slide-enter-from, .ai-slide-leave-to { opacity: 0; transform: translateY(20px) scale(0.95); }
 
-.ai-slide-enter-active, .ai-slide-leave-active { 
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-}
-.ai-slide-enter-from, .ai-slide-leave-to { 
-  opacity: 0; transform: translateY(20px) scale(0.95); 
-}
-
-@media (max-width: 480px) {
-  .ai-panel { width: 290px; }
-  .ai-assistant { bottom: 16px; left: 16px; }
-}
+@media (max-width: 480px) { .ai-panel { width: 310px; } .ai-suggestions-grid { grid-template-columns: repeat(2, 1fr); } }
 </style>
