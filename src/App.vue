@@ -60,6 +60,7 @@
     <!-- 🔥 ВИДЖЕТЫ -->
     <OnlineWidget />
     <AIAssistant />
+    <XPFloating ref="xpFloating" />
 
     <div class="modal-overlay" v-if="showGlobalSearch" @click.self="showGlobalSearch = false">
       <div class="global-search-modal">
@@ -97,6 +98,7 @@ import ParticlesBackground from './components/ParticlesBackground.vue';
 import CustomCursor from './components/CustomCursor.vue';
 import OnlineWidget from './components/OnlineWidget.vue';
 import AIAssistant from './components/AIAssistant.vue';
+import XPFloating from './components/XPFloating.vue';
 import { useI18n } from './composables/useI18n';
 import { playClick, playSuccess, playError } from './composables/useSound';
 
@@ -104,7 +106,7 @@ export default {
   name: 'App',
   components: { 
     ScrollToTop, WelcomeModal, PricingModal,
-    ParticlesBackground, CustomCursor, OnlineWidget, AIAssistant
+    ParticlesBackground, CustomCursor, OnlineWidget, AIAssistant, XPFloating
   },
   setup() {
     const { locale, t, toggleLocale } = useI18n();
@@ -135,6 +137,9 @@ export default {
       else if (type === 'error') playError();
       else playClick();
       setTimeout(() => this.removeToast(id), d);
+    },
+    showXP(amount, x, y) {
+      this.$refs.xpFloating?.showXP(amount, x, y);
     },
     removeToast(id) { this.toasts = this.toasts.filter(t => t.id !== id); },
     goHome() {
@@ -194,7 +199,12 @@ export default {
     else if (saved === 'light') { this.isDark = false; document.body.classList.add('light'); }
     else if (window.matchMedia('(prefers-color-scheme: dark)').matches) { this.isDark = true; document.body.classList.add('dark'); }
   },
-  provide() { return { addToast:this.addToast }; }
+  provide() { 
+    return { 
+      addToast: this.addToast,
+      showXP: this.showXP
+    }; 
+  }
 };
 </script>
 
