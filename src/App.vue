@@ -69,8 +69,25 @@
       </div>
     </div>
 
+    <!-- 🎓 ОНБОРДИНГ ДЛЯ НОВИЧКОВ -->
     <div class="onboarding-overlay" v-if="showOnboarding">
-      <div class="onboarding-card"><div class="onboarding-icon">{{ onboardingSteps[currentOnboardingStep].icon }}</div><h2>{{ onboardingSteps[currentOnboardingStep].title }}</h2><p>{{ onboardingSteps[currentOnboardingStep].text }}</p><div class="onboarding-steps"><div v-for="(step, i) in onboardingSteps" :key="i" class="onboarding-step-dot" :class="{ active: i === currentOnboardingStep }"></div></div><div class="onboarding-actions"><button v-if="currentOnboardingStep > 0" class="btn btn-o btn-sm" @click="currentOnboardingStep--">← Назад</button><button class="btn btn-p btn-sm" @click="nextOnboardingStep">{{ currentOnboardingStep < onboardingSteps.length - 1 ? 'Далее →' : 'Понятно! 🎉' }}</button></div><button class="onboarding-skip" @click="showOnboarding = false">Пропустить</button></div>
+      <div class="onboarding-card">
+        <div class="onboarding-progress">
+          <div v-for="(step, i) in onboardingSteps" :key="i" class="onboarding-dot" :class="{ active: i === currentOnboardingStep, done: i < currentOnboardingStep }"></div>
+        </div>
+        <div class="onboarding-icon-wrap">
+          <span class="onboarding-icon">{{ onboardingSteps[currentOnboardingStep].icon }}</span>
+        </div>
+        <h2 class="onboarding-title">{{ onboardingSteps[currentOnboardingStep].title }}</h2>
+        <p class="onboarding-text">{{ onboardingSteps[currentOnboardingStep].text }}</p>
+        <div class="onboarding-actions">
+          <button v-if="currentOnboardingStep > 0" class="onboarding-btn secondary" @click="currentOnboardingStep--">← Назад</button>
+          <button class="onboarding-btn primary" @click="nextOnboardingStep">
+            {{ currentOnboardingStep < onboardingSteps.length - 1 ? 'Далее' : '🎉 Начать!' }}
+          </button>
+        </div>
+        <button class="onboarding-skip" @click="skipOnboarding">Пропустить</button>
+      </div>
     </div>
 
     <div class="toast-container">
@@ -111,11 +128,13 @@ export default {
       showGlobalSearch: false, globalSearchQuery: '', globalResults: { posts: [], sessions: [] },
       showOnboarding: false, currentOnboardingStep: 0,
       onboardingSteps: [
-        { icon: '🗣️', title: 'English Club', text: 'Погрузись в языковую среду.' },
-        { icon: '📅', title: 'Записывайся на встречи', text: 'Выбирай удобное время.' },
-        { icon: '💬', title: 'Общайся в чатах', text: 'Личные и групповые чаты.' },
-        { icon: '🏆', title: 'Получай достижения', text: 'Зарабатывай XP и повышай уровень.' },
-        { icon: '🚀', title: 'Ты готов!', text: 'Начни прямо сейчас!' }
+        { icon: '👋', title: 'Добро пожаловать!', text: 'English Club — разговорный клуб нового поколения. Здесь ты будешь практиковать английский с удовольствием.' },
+        { icon: '📅', title: 'Записывайся на занятия', text: 'Выбирай удобное время в календаре. Индивидуальные и групповые занятия с преподавателем.' },
+        { icon: '💬', title: 'Общайся в чатах', text: 'Личные сообщения, групповые чаты, голосовые и видеозвонки — всё для живого общения.' },
+        { icon: '📚', title: 'Пополняй словарь', text: 'Добавляй новые слова, учи их с помощью карточек и тестов. Отслеживай прогресс.' },
+        { icon: '📝', title: 'Выполняй задания', text: 'Получай домашние задания от преподавателя, отправляй ответы и получай оценки.' },
+        { icon: '🏆', title: 'Зарабатывай достижения', text: 'За активность ты получаешь XP, повышаешь уровень и открываешь крутые награды.' },
+        { icon: '🚀', title: 'Ты готов!', text: 'Запишись на первое занятие, добавь слова в словарь или напиши в чат. Удачи!' }
       ]
     }; 
   },
@@ -127,9 +146,15 @@ export default {
     toggleTheme() { this.themeAnimating = true; this.isDark = !this.isDark; document.body.classList.toggle('dark', this.isDark); document.body.classList.toggle('light', !this.isDark); localStorage.setItem('theme', this.isDark ? 'dark' : 'light'); playClick(); setTimeout(() => { this.themeAnimating = false; }, 500); },
     async globalSearch() { if(this.globalSearchQuery.length<2){this.globalResults={posts:[],sessions:[]};return;} try{const r=await axios.get(`/api/search?q=${this.globalSearchQuery}`);this.globalResults=r.data;}catch(e){this.globalResults={posts:[],sessions:[]};} },
     handleGlobalKeydown(e) { if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();this.showGlobalSearch=true;this.$nextTick(()=>this.$refs.globalSearchInput?.focus());} if(e.key==='Escape'){this.showGlobalSearch=false;this.menuOpen=false;} },
-    nextOnboardingStep() { if(this.currentOnboardingStep<this.onboardingSteps.length-1){this.currentOnboardingStep++;}else{this.showOnboarding=false;localStorage.setItem('onboarding_done','true');} },
-    checkOnboarding() { if(!localStorage.getItem('onboarding_done')&&this.user){setTimeout(()=>{this.showOnboarding=true;},1000);} },
-    checkWelcome() { if(this.user){ this.isNewUser=!localStorage.getItem('onboarding_done'); setTimeout(()=>{this.showWelcome=true;},800); } },
+    
+    // 🎓 ОНБОРДИНГ
+    checkOnboarding() { const done = localStorage.getItem('onboarding_done'); if (!done && this.user) { setTimeout(() => { this.showOnboarding = true; }, 800); } },
+    nextOnboardingStep() { if (this.currentOnboardingStep < this.onboardingSteps.length - 1) { this.currentOnboardingStep++; } else { this.showOnboarding = false; localStorage.setItem('onboarding_done', 'true'); } },
+    skipOnboarding() { this.showOnboarding = false; localStorage.setItem('onboarding_done', 'true'); },
+    
+    // 👋 WELCOME РАЗ В ДЕНЬ
+    checkWelcome() { if (!this.user) return; const today = new Date().toDateString(); const lastShown = localStorage.getItem('welcome_shown_date'); if (lastShown !== today) { this.isNewUser = !localStorage.getItem('onboarding_done'); setTimeout(() => { this.showWelcome = true; }, 600); localStorage.setItem('welcome_shown_date', today); } },
+    
     async login() { try { const r = await axios.post('/api/login', { email: this.loginEmail, password: this.loginPassword }); if (r.data.token) { localStorage.setItem('token', r.data.token); localStorage.setItem('user', JSON.stringify(r.data.user)); this.user = r.data.user; this.showLogin = false; this.loginEmail = ''; this.loginPassword = ''; this.addToast('Добро пожаловать! 👋', 'success'); this.$router.push('/dashboard'); this.checkOnboarding(); this.checkWelcome(); } else if (r.data.success) { this.user = r.data.user; this.showLogin = false; this.loginEmail = ''; this.loginPassword = ''; this.addToast('Добро пожаловать! 👋', 'success'); this.$router.push('/dashboard'); this.checkOnboarding(); this.checkWelcome(); } } catch(e) { this.addToast(e.response?.data?.error || 'Ошибка входа', 'error'); } },
     async register() { try{const r=await axios.post('/api/reg',{username:this.regUsername,email:this.regEmail,password:this.regPassword,level:this.regLevel});if(r.data.success){this.showReg=false;this.showLogin=true;this.addToast('Регистрация успешна! ✨','success');}}catch(e){this.addToast(e.response?.data?.error||'Ошибка регистрации','error');} },
     async logout() { if(!confirm('Выйти из аккаунта?'))return; try{await axios.post('/api/out');this.addToast('До встречи! 👋','info'); localStorage.removeItem('welcome_dismissed'); }catch(e){} this.user=null;this.menuOpen=false;this.$router.push('/'); }
@@ -163,6 +188,27 @@ body { background: var(--bg); color: var(--t); font-family: 'Inter', 'Plus Jakar
 .theme-btn { position: relative; overflow: hidden; } .theme-icon-wrapper { display: inline-block; transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
 .theme-icon-wrapper.rotating { animation: themeSpin 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
 @keyframes themeSpin { 0% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(180deg) scale(1.3); } 100% { transform: rotate(360deg) scale(1); } }
+
+/* 🎓 ОНБОРДИНГ */
+.onboarding-overlay { position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,0.85); backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: center; padding: 20px; }
+.onboarding-card { background: linear-gradient(145deg, rgba(20,20,50,0.98), rgba(15,15,35,0.98)); border: 1px solid rgba(99,102,241,0.3); border-radius: 28px; padding: 40px 32px; max-width: 420px; width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(99,102,241,0.1); animation: onboardIn 0.5s ease; }
+@keyframes onboardIn { from { opacity: 0; transform: scale(0.9) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+.onboarding-progress { display: flex; justify-content: center; gap: 6px; margin-bottom: 24px; }
+.onboarding-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.15); transition: all 0.3s; }
+.onboarding-dot.active { background: #6366f1; box-shadow: 0 0 10px rgba(99,102,241,0.6); width: 9px; height: 9px; }
+.onboarding-dot.done { background: #10b981; }
+.onboarding-icon-wrap { margin-bottom: 20px; }
+.onboarding-icon { font-size: 4rem; display: block; animation: iconFloat 2s ease-in-out infinite; }
+@keyframes iconFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+.onboarding-title { font-family: 'Space Grotesk', sans-serif; font-size: 1.4rem; font-weight: 700; color: #fff; margin: 0 0 10px; }
+.onboarding-text { color: #94a3b8; font-size: 0.9rem; line-height: 1.6; margin: 0 0 24px; }
+.onboarding-actions { display: flex; gap: 10px; justify-content: center; }
+.onboarding-btn { padding: 10px 24px; border-radius: 14px; font-weight: 600; font-size: 0.9rem; cursor: pointer; border: none; font-family: inherit; transition: all 0.2s; }
+.onboarding-btn.primary { background: linear-gradient(135deg, #6366f1, #2dd4bf); color: #fff; }
+.onboarding-btn.primary:hover { box-shadow: 0 8px 25px rgba(99,102,241,0.4); transform: translateY(-2px); }
+.onboarding-btn.secondary { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; }
+.onboarding-skip { background: none; border: none; color: #64748b; cursor: pointer; margin-top: 16px; font-size: 0.8rem; font-family: inherit; }
+.onboarding-skip:hover { color: #94a3b8; }
 </style>
 
 <style scoped>
