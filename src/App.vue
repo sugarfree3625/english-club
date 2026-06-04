@@ -1,7 +1,13 @@
 <template>
   <div id="app-root" @keydown="handleGlobalKeydown">
+    <!-- 🔄 ПРЕЛОАДЕР -->
+    <Preloader />
+    
     <!-- 🔥 ФОН -->
     <ParticlesBackground />
+    
+    <!-- 🔔 КОЛОКОЛЬЧИК УВЕДОМЛЕНИЙ -->
+    <NotificationBell v-if="user" />
     
     <header class="header">
       <div class="header-inner">
@@ -36,6 +42,7 @@
                 <a @click="$router.push('/messages');menuOpen=false"><i class="fas fa-comments"></i> {{ t('messages') }}</a>
                 <a @click="$router.push('/dashboard');menuOpen=false"><i class="fas fa-chart-line"></i> {{ t('dashboard') }}</a>
                 <a @click="$router.push('/profile');menuOpen=false"><i class="fas fa-user"></i> {{ t('profile') }}</a>
+                <a @click="$router.push('/about');menuOpen=false"><i class="fas fa-info-circle"></i> {{ t('about') || 'О нас' }}</a>
                 <a @click="showPricing = true; menuOpen=false" v-if="user?.role === 'admin'"><i class="fas fa-crown"></i> Тарифы</a>
                 <a @click="$router.push('/admin');menuOpen=false" v-if="user?.role === 'admin'"><i class="fas fa-sliders-h"></i> {{ t('admin') }}</a>
                 <a @click="logout();menuOpen=false"><i class="fas fa-sign-out-alt"></i> {{ t('logout') }}</a>
@@ -69,7 +76,7 @@
       </div>
     </div>
 
-    <!-- 🎓 ОНБОРДИНГ ДЛЯ НОВИЧКОВ -->
+    <!-- 🎓 ОНБОРДИНГ -->
     <div class="onboarding-overlay" v-if="showOnboarding">
       <div class="onboarding-card">
         <div class="onboarding-progress">
@@ -109,12 +116,14 @@ import WelcomeModal from './components/WelcomeModal.vue';
 import PricingModal from './components/PricingModal.vue';
 import ParticlesBackground from './components/ParticlesBackground.vue';
 import XPFloating from './components/XPFloating.vue';
+import Preloader from './components/Preloader.vue';
+import NotificationBell from './components/NotificationBell.vue';
 import { useI18n } from './composables/useI18n';
 import { playClick, playSuccess, playError } from './composables/useSound';
 
 export default {
   name: 'App',
-  components: { ScrollToTop, WelcomeModal, PricingModal, ParticlesBackground, XPFloating },
+  components: { ScrollToTop, WelcomeModal, PricingModal, ParticlesBackground, XPFloating, Preloader, NotificationBell },
   setup() {
     const { locale, t, toggleLocale } = useI18n();
     return { locale, t, toggleLocale };
@@ -128,13 +137,13 @@ export default {
       showGlobalSearch: false, globalSearchQuery: '', globalResults: { posts: [], sessions: [] },
       showOnboarding: false, currentOnboardingStep: 0,
       onboardingSteps: [
-        { icon: '👋', title: 'Добро пожаловать!', text: 'English Club — разговорный клуб нового поколения. Здесь ты будешь практиковать английский с удовольствием.' },
-        { icon: '📅', title: 'Записывайся на занятия', text: 'Выбирай удобное время в календаре. Индивидуальные и групповые занятия с преподавателем.' },
-        { icon: '💬', title: 'Общайся в чатах', text: 'Личные сообщения, групповые чаты, голосовые и видеозвонки — всё для живого общения.' },
-        { icon: '📚', title: 'Пополняй словарь', text: 'Добавляй новые слова, учи их с помощью карточек и тестов. Отслеживай прогресс.' },
-        { icon: '📝', title: 'Выполняй задания', text: 'Получай домашние задания от преподавателя, отправляй ответы и получай оценки.' },
-        { icon: '🏆', title: 'Зарабатывай достижения', text: 'За активность ты получаешь XP, повышаешь уровень и открываешь крутые награды.' },
-        { icon: '🚀', title: 'Ты готов!', text: 'Запишись на первое занятие, добавь слова в словарь или напиши в чат. Удачи!' }
+        { icon: '👋', title: 'Добро пожаловать!', text: 'English Club — разговорный клуб нового поколения.' },
+        { icon: '📅', title: 'Записывайся на занятия', text: 'Выбирай удобное время в календаре.' },
+        { icon: '💬', title: 'Общайся в чатах', text: 'Личные сообщения, групповые чаты, голосовые и видеозвонки.' },
+        { icon: '📚', title: 'Пополняй словарь', text: 'Добавляй новые слова, учи с помощью карточек и тестов.' },
+        { icon: '📝', title: 'Выполняй задания', text: 'Получай домашние задания и получай оценки.' },
+        { icon: '🏆', title: 'Зарабатывай достижения', text: 'Получай XP, повышай уровень и открывай награды.' },
+        { icon: '🚀', title: 'Ты готов!', text: 'Запишись на занятие, добавь слова или напиши в чат. Удачи!' }
       ]
     }; 
   },
@@ -146,15 +155,10 @@ export default {
     toggleTheme() { this.themeAnimating = true; this.isDark = !this.isDark; document.body.classList.toggle('dark', this.isDark); document.body.classList.toggle('light', !this.isDark); localStorage.setItem('theme', this.isDark ? 'dark' : 'light'); playClick(); setTimeout(() => { this.themeAnimating = false; }, 500); },
     async globalSearch() { if(this.globalSearchQuery.length<2){this.globalResults={posts:[],sessions:[]};return;} try{const r=await axios.get(`/api/search?q=${this.globalSearchQuery}`);this.globalResults=r.data;}catch(e){this.globalResults={posts:[],sessions:[]};} },
     handleGlobalKeydown(e) { if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();this.showGlobalSearch=true;this.$nextTick(()=>this.$refs.globalSearchInput?.focus());} if(e.key==='Escape'){this.showGlobalSearch=false;this.menuOpen=false;} },
-    
-    // 🎓 ОНБОРДИНГ
     checkOnboarding() { const done = localStorage.getItem('onboarding_done'); if (!done && this.user) { setTimeout(() => { this.showOnboarding = true; }, 800); } },
     nextOnboardingStep() { if (this.currentOnboardingStep < this.onboardingSteps.length - 1) { this.currentOnboardingStep++; } else { this.showOnboarding = false; localStorage.setItem('onboarding_done', 'true'); } },
     skipOnboarding() { this.showOnboarding = false; localStorage.setItem('onboarding_done', 'true'); },
-    
-    // 👋 WELCOME РАЗ В ДЕНЬ
     checkWelcome() { if (!this.user) return; const today = new Date().toDateString(); const lastShown = localStorage.getItem('welcome_shown_date'); if (lastShown !== today) { this.isNewUser = !localStorage.getItem('onboarding_done'); setTimeout(() => { this.showWelcome = true; }, 600); localStorage.setItem('welcome_shown_date', today); } },
-    
     async login() { try { const r = await axios.post('/api/login', { email: this.loginEmail, password: this.loginPassword }); if (r.data.token) { localStorage.setItem('token', r.data.token); localStorage.setItem('user', JSON.stringify(r.data.user)); this.user = r.data.user; this.showLogin = false; this.loginEmail = ''; this.loginPassword = ''; this.addToast('Добро пожаловать! 👋', 'success'); this.$router.push('/dashboard'); this.checkOnboarding(); this.checkWelcome(); } else if (r.data.success) { this.user = r.data.user; this.showLogin = false; this.loginEmail = ''; this.loginPassword = ''; this.addToast('Добро пожаловать! 👋', 'success'); this.$router.push('/dashboard'); this.checkOnboarding(); this.checkWelcome(); } } catch(e) { this.addToast(e.response?.data?.error || 'Ошибка входа', 'error'); } },
     async register() { try{const r=await axios.post('/api/reg',{username:this.regUsername,email:this.regEmail,password:this.regPassword,level:this.regLevel});if(r.data.success){this.showReg=false;this.showLogin=true;this.addToast('Регистрация успешна! ✨','success');}}catch(e){this.addToast(e.response?.data?.error||'Ошибка регистрации','error');} },
     async logout() { if(!confirm('Выйти из аккаунта?'))return; try{await axios.post('/api/out');this.addToast('До встречи! 👋','info'); localStorage.removeItem('welcome_dismissed'); }catch(e){} this.user=null;this.menuOpen=false;this.$router.push('/'); }
