@@ -149,40 +149,21 @@ export default {
   components: { AppAvatar },
   props: ['user'],
   inject: ['addToast', 'showXP'],
-  data() {
-    return {
-      dialogs: [], messages: [], filteredMessages: [], activeChat: null,
-      activeChatName: '', partnerAvatar: null, currentUserId: null, msgText: '',
-      unreadCount: 0, socket: null, lightbox: null, searchQuery: '', searchResults: [],
-      showEmoji: false, pendingFiles: [], recording: false, mediaRecorder: null,
-      isPartnerOnline: false, chunks: [], showSidebar: true, showMsgSearch: false,
-      msgSearchQuery: '', showTranslate: false, selectedWord: '', translatedText: '',
-      translating: false, recordingTime: 0, recordingTimer: null, soundEnabled: false,
-      emojis: ['😀','😂','🤣','😍','🥰','😘','😎','🤩','😇','🤔','😴','🥳','❤️','🔥','🎉','⭐','✅','💯','🙏','💪','🚀','🌈'],
-      reactionEmojis: ['👍','❤️','😂','😮','😢','😡','🔥','👏','🎉','💯'],
-      reactionPickerId: null, jitsiActive: false, jitsiUrl: '',
-      partnerTyping: false, typingTimer: null, typingEmitTimer: null,
-      xpMessageCount: 0
-    };
-  },
-  computed: {
-    isDark() { return document.body.classList.contains('dark'); },
-    partnerStatusText() { if (this.partnerTyping) return '✍️ Печатает...'; return this.isPartnerOnline ? '🟢 Онлайн' : '⚫ Оффлайн'; },
-    groupedMessages() { const groups=[]; const t=new Date().toDateString(), y=new Date(Date.now()-86400000).toDateString(); this.filteredMessages.forEach(m=>{const d=new Date(m.ts).toDateString();let l;if(d===t)l='Сегодня';else if(d===y)l='Вчера';else l=new Date(m.ts).toLocaleDateString('ru',{day:'numeric',month:'long'});let g=groups.find(x=>x.label===l);if(!g){g={label:l,messages:[]};groups.push(g);}g.messages.push(m);});return groups; }
-  },
-  async mounted() { if(!this.user?.id)return; this.currentUserId=this.user.id; await this.loadDialogs(); if('Notification' in window&&Notification.permission==='default')Notification.requestPermission(); this.socket=useSocket(this.currentUserId,this.user.username,this.user.role); this.socket.on('unread',({count})=>{this.unreadCount=count;}); this.socket.on('dm',(msg)=>this.handleIncomingMessage(msg)); this.socket.on('typing',({from})=>{if(from===this.activeChat){this.partnerTyping=true;clearTimeout(this.typingTimer);this.typingTimer=setTimeout(()=>{this.partnerTyping=false;},2000);}}); this.searchUsers=useDebounce(this.searchUsers,300); document.addEventListener('click',(e)=>{if(!e.target.closest('.translate-popup')&&!e.target.closest('.msg-actions'))this.showTranslate=false;if(!e.target.closest('.reaction-picker')&&!e.target.closest('.msg-actions'))this.reactionPickerId=null;}); },
-  beforeUnmount() { this.socket?.disconnect(); clearTimeout(this.typingTimer); clearTimeout(this.typingEmitTimer); },
-  methods: {
-    proxifyUrl, fileIcon: getFileIcon,
-    openReactionPicker(m) { this.reactionPickerId = this.reactionPickerId === (m.id || m.ts) ? null : (m.id || m.ts); },
-    addReaction(m, emoji) { if (!m.reactions) m.reactions = {}; m.reactions[emoji] = (m.reactions[emoji] || 0) + 1; this.reactionPickerId = null; this.socket?.emit('reaction', { messageId: m.id || m.ts, emoji, to: this.activeChat }); },
-    toggleReaction(m, emoji) { this.addReaction(m, emoji); },
-    emitTyping() { if (!this.socket?.connected || !this.activeChat) return; clearTimeout(this.typingEmitTimer); this.socket.emit('typing', { to: this.activeChat }); },
-    startVideoCall() { const roomName = `english-club-${this.currentUserId}-${this.activeChat}`; this.jitsiUrl = `https://meet.jit.si/${roomName}`; this.jitsiActive = true; this.addToast('Видеозвонок начат! 📹', 'info'); },
-    closeVideoCall() { this.jitsiActive = false; this.jitsiUrl = ''; },
-    handleIncomingMessage(msg) { if(typeof msg.files==='string'){try{msg.files=JSON.parse(msg.files);}catch(e){msg.files=null;}} if(msg.from===this.currentUserId){this.loadDialogs();return;} if(this.activeChat===msg.from){if(!this.messages.find(m=>m.id===msg.id)){this.messages.push(msg);this.filterMessages();this.$nextTick(()=>this.scrollToBottom());}} if(document.hidden&&msg.from!==this.currentUserId){sendNotification(`💬 ${msg.fn||'Новое сообщение'}`,msg.msg||msg.message||'📎 Файл');playNotificationSound();} this.loadDialogs(); },
-    async sendMsg() { const text=this.msgText.trim(); if((!text&&!this.pendingFiles.length)||!this.activeChat||!this.socket?.connected)return; const replyTo=text.startsWith('↩')?text.split('\n')[0]:null; const cleanText=replyTo?text.split('\n').slice(1).join('\n').trim():text; if(cleanText){this.messages.push({id:Date.now(),from:this.currentUserId,sender_id:this.currentUserId,message:cleanText,ts:new Date().toISOString(),reactions:{}});this.filterMessages();this.socket.emit('dm',{to:this.activeChat,msg:cleanText,replyTo});} for(const file of this.pendingFiles){const url=await uploadFile(file);if(url){const type=getFileType(file);const msgText=type==='audio'?`🎵 ${file.name}`:`${getFileIcon(type)} ${file.name}`;this.messages.push({id:Date.now(),from:this.currentUserId,sender_id:this.currentUserId,message:msgText,files:[{url,type,name:file.name}],ts:new Date().toISOString(),reactions:{}});this.filterMessages();this.socket.emit('dm',{to:this.activeChat,msg:msgText,files:[{url,type,name:file.name}]});}} this.playSendSound();this.msgText='';this.pendingFiles=[];this.$nextTick(()=>this.scrollToBottom());this.partnerTyping=false;this.xpMessageCount++;const xpResult=await addXP('message_sent');if(xpResult){this.showXP?.(xpResult.xp_added,window.innerWidth/2,window.innerHeight/2);if(xpResult.leveled_up){this.addToast(`🎉 Уровень повышен до ${xpResult.level}!`,'success');}} },
-    handleFiles(e) { if(e.target.files?.length){for(const file of e.target.files){if(file.type.startsWith('image/'))file.preview=URL.createObjectURL(file);this.pendingFiles.push(file);}} e.target.value=''; },
+  data() { return { dialogs:[],messages:[],filteredMessages:[],activeChat:null,activeChatName:'',partnerAvatar:null,currentUserId:null,msgText:'',unreadCount:0,socket:null,lightbox:null,searchQuery:'',searchResults:[],showEmoji:false,pendingFiles:[],recording:false,mediaRecorder:null,isPartnerOnline:false,chunks:[],showSidebar:true,showMsgSearch:false,msgSearchQuery:'',showTranslate:false,selectedWord:'',translatedText:'',translating:false,recordingTime:0,recordingTimer:null,soundEnabled:false,emojis:['😀','😂','🤣','😍','🥰','😘','😎','🤩','😇','🤔','😴','🥳','❤️','🔥','🎉','⭐','✅','💯','🙏','💪','🚀','🌈'],reactionEmojis:['👍','❤️','😂','😮','😢','😡','🔥','👏','🎉','💯'],reactionPickerId:null,jitsiActive:false,jitsiUrl:'',partnerTyping:false,typingTimer:null,typingEmitTimer:null,xpMessageCount:0 }; },
+  computed: { isDark(){return document.body.classList.contains('dark');},partnerStatusText(){if(this.partnerTyping)return'✍️ Печатает...';return this.isPartnerOnline?'🟢 Онлайн':'⚫ Оффлайн';},groupedMessages(){const groups=[],t=new Date().toDateString(),y=new Date(Date.now()-86400000).toDateString();this.filteredMessages.forEach(m=>{const d=new Date(m.ts).toDateString();let l;if(d===t)l='Сегодня';else if(d===y)l='Вчера';else l=new Date(m.ts).toLocaleDateString('ru',{day:'numeric',month:'long'});let g=groups.find(x=>x.label===l);if(!g){g={label:l,messages:[]};groups.push(g);}g.messages.push(m);});return groups;} },
+  async mounted(){if(!this.user?.id)return;this.currentUserId=this.user.id;await this.loadDialogs();if('Notification'in window&&Notification.permission==='default')Notification.requestPermission();this.socket=useSocket(this.currentUserId,this.user.username,this.user.role);this.socket.on('unread',({count})=>{this.unreadCount=count;});this.socket.on('dm',(msg)=>this.handleIncomingMessage(msg));this.socket.on('typing',({from})=>{if(from===this.activeChat){this.partnerTyping=true;clearTimeout(this.typingTimer);this.typingTimer=setTimeout(()=>{this.partnerTyping=false;},2000);}});this.searchUsers=useDebounce(this.searchUsers,300);document.addEventListener('click',(e)=>{if(!e.target.closest('.translate-popup')&&!e.target.closest('.msg-actions'))this.showTranslate=false;if(!e.target.closest('.reaction-picker')&&!e.target.closest('.msg-actions'))this.reactionPickerId=null;});},
+  beforeUnmount(){this.socket?.disconnect();clearTimeout(this.typingTimer);clearTimeout(this.typingEmitTimer);},
+  methods:{
+    proxifyUrl,fileIcon:getFileIcon,
+    openReactionPicker(m){this.reactionPickerId=this.reactionPickerId===(m.id||m.ts)?null:(m.id||m.ts);},
+    addReaction(m,emoji){if(!m.reactions)m.reactions={};m.reactions[emoji]=(m.reactions[emoji]||0)+1;this.reactionPickerId=null;this.socket?.emit('reaction',{messageId:m.id||m.ts,emoji,to:this.activeChat});},
+    toggleReaction(m,emoji){this.addReaction(m,emoji);},
+    emitTyping(){if(!this.socket?.connected||!this.activeChat)return;clearTimeout(this.typingEmitTimer);this.socket.emit('typing',{to:this.activeChat});},
+    startVideoCall(){const roomName=`english-club-${this.currentUserId}-${this.activeChat}`;this.jitsiUrl=`https://meet.jit.si/${roomName}`;this.jitsiActive=true;this.addToast('Видеозвонок начат! 📹','info');},
+    closeVideoCall(){this.jitsiActive=false;this.jitsiUrl='';},
+    handleIncomingMessage(msg){if(typeof msg.files==='string'){try{msg.files=JSON.parse(msg.files);}catch(e){msg.files=null;}}if(msg.from===this.currentUserId){this.loadDialogs();return;}if(this.activeChat===msg.from){if(!this.messages.find(m=>m.id===msg.id)){this.messages.push(msg);this.filterMessages();this.$nextTick(()=>this.scrollToBottom());}}if(document.hidden&&msg.from!==this.currentUserId){sendNotification(`💬 ${msg.fn||'Новое сообщение'}`,msg.msg||msg.message||'📎 Файл');playNotificationSound();}this.loadDialogs();},
+    async sendMsg(){const text=this.msgText.trim();if((!text&&!this.pendingFiles.length)||!this.activeChat||!this.socket?.connected)return;const replyTo=text.startsWith('↩')?text.split('\n')[0]:null;const cleanText=replyTo?text.split('\n').slice(1).join('\n').trim():text;if(cleanText){this.messages.push({id:Date.now(),from:this.currentUserId,sender_id:this.currentUserId,message:cleanText,ts:new Date().toISOString(),reactions:{}});this.filterMessages();this.socket.emit('dm',{to:this.activeChat,msg:cleanText,replyTo});}for(const file of this.pendingFiles){const url=await uploadFile(file);if(url){const type=getFileType(file);const msgText=type==='audio'?`🎵 ${file.name}`:`${getFileIcon(type)} ${file.name}`;this.messages.push({id:Date.now(),from:this.currentUserId,sender_id:this.currentUserId,message:msgText,files:[{url,type,name:file.name}],ts:new Date().toISOString(),reactions:{}});this.filterMessages();this.socket.emit('dm',{to:this.activeChat,msg:msgText,files:[{url,type,name:file.name}]});}}this.playSendSound();this.msgText='';this.pendingFiles=[];this.$nextTick(()=>this.scrollToBottom());this.partnerTyping=false;this.xpMessageCount++;const xpResult=await addXP('message_sent');if(xpResult){this.showXP?.(xpResult.xp_added,window.innerWidth/2,window.innerHeight/2);if(xpResult.leveled_up){this.addToast(`🎉 Уровень повышен до ${xpResult.level}!`,'success');}}},
+    handleFiles(e){if(e.target.files?.length){for(const file of e.target.files){if(file.type.startsWith('image/'))file.preview=URL.createObjectURL(file);this.pendingFiles.push(file);}}e.target.value='';},
     toggleAudio(e,url){const btn=e.target;const existing=document.querySelector('audio.voice-audio');if(existing){existing.pause();existing.remove();}if(btn.dataset.playing==='true'){btn.dataset.playing='false';btn.textContent='▶️';return;}const audio=new Audio(url);audio.classList.add('voice-audio');audio.preload='auto';btn.dataset.playing='true';btn.textContent='⏳';audio.oncanplaythrough=()=>{audio.play().then(()=>{btn.textContent='⏸️';}).catch(()=>{btn.dataset.playing='false';btn.textContent='▶️';});};audio.onended=()=>{btn.dataset.playing='false';btn.textContent='▶️';audio.remove();};audio.onerror=()=>{btn.dataset.playing='false';btn.textContent='▶️';audio.remove();};document.body.appendChild(audio);audio.load();},
     async startRecord(){try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});this.recording=true;this.recordingTime=0;this.recordingTimer=setInterval(()=>this.recordingTime++,1000);this.mediaRecorder=new MediaRecorder(stream);this.chunks=[];this.mediaRecorder.ondataavailable=e=>this.chunks.push(e.data);this.mediaRecorder.onstop=async()=>{clearInterval(this.recordingTimer);const blob=new Blob(this.chunks,{type:'audio/webm'});const form=new FormData();form.append('img',blob,'voice.webm');try{const r=await axios.post('/api/nimg',form);if(r.data?.url){this.messages.push({id:Date.now(),from:this.currentUserId,sender_id:this.currentUserId,message:'🎤 Голосовое',files:[{url:r.data.url,type:'audio',name:'Голосовое'}],ts:new Date().toISOString(),reactions:{}});this.filterMessages();this.socket.emit('dm',{to:this.activeChat,msg:'🎤 Голосовое',files:[{url:r.data.url,type:'audio',name:'Голосовое'}]});}}catch(e){}stream.getTracks().forEach(t=>t.stop());this.recording=false;this.recordingTime=0;this.$nextTick(()=>this.scrollToBottom());};this.mediaRecorder.start();}catch(e){this.recording=false;this.addToast('Нет доступа к микрофону 🎤','error');}},
     stopRecord(){if(this.mediaRecorder?.state==='recording')this.mediaRecorder.stop();},
@@ -253,7 +234,7 @@ export default {
 .jitsi-frame { width: 100%; height: 100%; border: none; border-radius: 16px; }
 .jitsi-close { position: absolute; top: 8px; right: 8px; z-index: 10; padding: 8px 16px; background: #ef4444; color: #fff; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; }
 .msg-search { display: flex; gap: 8px; padding: 10px 22px; background: var(--surface); border-bottom: 1px solid var(--b); }
-.chat-messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 14px; }
+.chat-messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 14px; -webkit-overflow-scrolling: touch; }
 .msg { max-width: 72%; padding: 12px 18px; border-radius: 20px; background: var(--surface); align-self: flex-start; box-shadow: 0 2px 8px rgba(0,0,0,0.04); position: relative; }
 .msg.mine { background: linear-gradient(135deg, var(--p), var(--p2)); color: #fff; align-self: flex-end; }
 .msg:hover .msg-actions { display: flex; }
@@ -277,7 +258,7 @@ export default {
 .file-link { color: var(--p); text-decoration: none; font-size: 0.85rem; font-weight: 500; }
 .msg.mine .file-link { color: #fff; }
 .msg-time { font-size: 0.7rem; opacity: 0.65; display: block; margin-top: 8px; }
-.chat-input { display: flex; gap: 10px; padding: 16px 22px; background: var(--surface); border-top: 1px solid var(--b); align-items: flex-end; flex-wrap: wrap; position: relative; }
+.chat-input { display: flex; gap: 10px; padding: 16px 22px; background: var(--surface); border-top: 1px solid var(--b); align-items: flex-end; flex-wrap: wrap; position: relative; flex-shrink: 0; }
 .file-preview-bar { display: flex; gap: 6px; padding: 6px 0; width: 100%; flex-wrap: wrap; }
 .file-preview-item { display: flex; align-items: center; gap: 4px; background: var(--bg); padding: 4px 8px; border-radius: 8px; font-size: 0.75rem; }
 .file-preview-img { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; }
@@ -315,54 +296,32 @@ export default {
 
 /* МОБИЛЬНАЯ АДАПТАЦИЯ */
 @media (max-width: 768px) {
-  .chat-container { height: 100dvh; flex-direction: column; position: fixed; inset: 0; z-index: 100; }
+  .chat-container { height: 100dvh; width: 100vw; flex-direction: row; position: fixed; inset: 0; z-index: 100; }
   .chat-sidebar { width: 100%; height: 100%; position: absolute; inset: 0; z-index: 10; border-right: none; background: var(--bg); }
   .chat-sidebar.mobile-hidden { display: none; }
-  .sidebar-header { padding: 16px; border-bottom: 1px solid var(--b); }
-  .sidebar-header h3 { font-size: 1.2rem; }
-  .search-box { padding: 12px 16px; }
-  .search-input { padding: 12px 16px; font-size: 0.9rem; border-radius: 16px; }
-  .dialog-list { padding: 8px; }
-  .dialog-item { padding: 14px; border-radius: 16px; margin-bottom: 2px; }
-  .dialog-avatar { width: 52px; height: 52px; }
-  .dialog-info strong { font-size: 0.9rem; }
-  .dialog-info small { font-size: 0.78rem; }
-  .mobile-back { display: flex; align-items: center; gap: 8px; padding: 14px 16px; background: var(--surface); border-bottom: 1px solid var(--b); font-weight: 600; cursor: pointer; border: none; width: 100%; text-align: left; color: var(--t); font-family: inherit; font-size: 0.95rem; }
-  .mobile-back:active { background: rgba(99,102,241,0.05); }
+  .mobile-back { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--b); font-weight: 600; cursor: pointer; border: none; width: 100%; text-align: left; color: var(--t); font-family: inherit; font-size: 0.95rem; }
   .chat-main { display: none; width: 100%; height: 100%; position: absolute; inset: 0; z-index: 20; background: var(--bg); }
   .chat-main.mobile-show { display: flex; }
   .empty-chat { display: flex; }
-  .chat-header { padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--b); }
-  .chat-header strong { font-size: 0.95rem; }
-  .chat-avatar { width: 40px; height: 40px; }
-  .chat-header small { font-size: 0.7rem; }
-  .chat-messages { padding: 12px; gap: 8px; background: var(--bg); }
-  .msg { max-width: 88%; padding: 10px 14px; border-radius: 18px; }
-  .msg.mine { border-bottom-right-radius: 4px; }
-  .msg:not(.mine) { border-bottom-left-radius: 4px; }
-  .msg-text { font-size: 0.88rem; line-height: 1.5; }
-  .msg-img { max-width: 240px; border-radius: 12px; }
-  .msg-time { font-size: 0.65rem; margin-top: 4px; }
-  .msg-actions button { width: 20px; height: 20px; font-size: 0.55rem; }
-  .chat-input { padding: 10px 12px; gap: 8px; background: var(--surface); border-top: 1px solid var(--b); align-items: center; }
-  .chat-input textarea { padding: 10px 14px; font-size: 0.9rem; border-radius: 20px; min-height: 40px; max-height: 100px; }
-  .send-btn { width: 42px; height: 42px; }
-  .voice-btn { width: 38px; height: 38px; font-size: 1rem; }
-  .emoji-btn { width: 38px; height: 38px; }
-  .emoji-picker { width: 100%; left: 0; right: 0; bottom: 60px; border-radius: 20px 20px 0 0; position: fixed; z-index: 200; }
-  .file-preview-bar { padding: 4px 0; }
-  .file-preview-item { font-size: 0.7rem; padding: 3px 6px; }
-  .file-preview-img { width: 28px; height: 28px; }
-  .jitsi-container { height: 220px; }
-  .msg-search { padding: 8px 12px; }
-  .typing-indicator { padding: 6px 14px; }
-  .typing-text { font-size: 0.75rem; }
-  .date-divider { padding: 4px 0; }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 12px; gap: 8px; -webkit-overflow-scrolling: touch; }
+  .msg { max-width: 85%; padding: 10px 14px; }
+  .msg-text { font-size: 0.9rem; }
+  .chat-input { padding: 10px 12px; gap: 6px; background: var(--surface); border-top: 1px solid var(--b); flex-shrink: 0; }
+  .chat-input textarea { padding: 10px 14px; font-size: 0.9rem; border-radius: 20px; min-height: 40px; max-height: 80px; }
+  .send-btn { width: 40px; height: 40px; }
+  .chat-header { padding: 10px 14px; }
+  .chat-avatar { width: 36px; height: 36px; }
+  .chat-header strong { font-size: 0.9rem; }
+  .sidebar-header { padding: 14px 16px; }
+  .sidebar-header h3 { font-size: 1.1rem; }
+  .dialog-item { padding: 12px; }
+  .dialog-avatar { width: 48px; height: 48px; }
+  .emoji-picker { width: 100%; left: 0; bottom: 60px; border-radius: 20px 20px 0 0; position: fixed; }
+  .btn-sm { padding: 6px 12px; font-size: 0.75rem; }
+  .msg-time { font-size: 0.65rem; }
   .date-divider span { font-size: 0.65rem; }
-  .translate-popup { width: 90%; max-width: 320px; }
-  .reaction-picker { bottom: -35px; }
-  .btn-sm { padding: 6px 14px; font-size: 0.78rem; }
-  .w-100 { width: 100%; }
-  .empty-text { padding: 20px; font-size: 0.8rem; }
+  .typing-indicator { padding: 6px 14px; }
+  .jitsi-container { height: 200px; }
+  .empty-text { padding: 20px; }
 }
 </style>
