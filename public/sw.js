@@ -1,6 +1,6 @@
-const CACHE = 'engclub-v4';
+const CACHE = 'engclub-v5';
 
-// Список доменов, которые НЕ кешируем (пропускаем напрямую)
+// Список доменов, которые НЕ кешируем
 const EXTERNAL_HOSTS = [
   'supabase.co',
   'googleapis.com',
@@ -14,21 +14,19 @@ const EXTERNAL_HOSTS = [
   'fonts.gstatic.com'
 ];
 
-// Проверка: является ли запрос внешним ресурсом
 function isExternal(url) {
   return EXTERNAL_HOSTS.some(host => url.hostname.includes(host));
 }
 
-// Проверка: является ли запрос API-вызовом
 function isApi(url) {
   return url.pathname.startsWith('/api/');
 }
 
-// Проверка: расширения Chrome
 function isChromeExtension(url) {
   return url.protocol === 'chrome-extension:';
 }
 
+// Установка — только сбрасываем старый кеш
 self.addEventListener('install', e => {
   self.skipWaiting();
   e.waitUntil(
@@ -38,6 +36,7 @@ self.addEventListener('install', e => {
   );
 });
 
+// Активация — чистим старые кеши
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys => {
@@ -49,45 +48,34 @@ self.addEventListener('activate', e => {
   e.waitUntil(clients.claim());
 });
 
+// Перехват запросов
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   
-  // Пропускаем внешние ресурсы (Supabase, CDN, Google Fonts)
-  if (isExternal(url)) {
-    return; // Не перехватываем — браузер сделает обычный запрос
-  }
+  // Пропускаем внешние ресурсы
+  if (isExternal(url)) return;
   
   // Пропускаем расширения Chrome
-  if (isChromeExtension(url)) {
-    return;
-  }
+  if (isChromeExtension(url)) return;
   
-  // API-запросы всегда идут в сеть
+  // API — только сеть
   if (isApi(url)) {
-    e.respondWith(
-      fetch(e.request).catch(() => {
-        return new Response(JSON.stringify({ error: 'Offline' }), {
-          status: 503,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      })
-    );
+    e.respondWith(fetch(e.request));
     return;
   }
   
-  // Для локальных ресурсов — кеш, потом сеть
+  // Локальные файлы — сеть, потом кеш (НЕ БЛОКИРУЕМ)
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      return cached || fetch(e.request).then(response => {
-        // Кешируем только успешные ответы
-        if (response && response.status === 200) {
-          const clone = response.clone();
-          caches.open(CACHE).then(cache => {
-            cache.put(e.request, clone);
-          });
-        }
-        return response;
-      });
+    fetch(e.request).then(response => {
+      // Кешируем успешные ответы
+      if (response && response.status === 200) {
+        const clone = response.clone();
+        caches.open(CACHE).then(cache => cache.put(e.request, clone));
+      }
+      return response;
+    }).catch(() => {
+      // Если сети нет — пробуем кеш
+      return caches.match(e.request);
     })
   );
 });
