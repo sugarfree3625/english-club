@@ -1,6 +1,8 @@
-const CACHE = 'engclub-v6';
+const CACHE_STATIC = 'engclub-static-v7';
+const CACHE_API = 'engclub-api-v7';
+const FETCH_TIMEOUT = 8000; // 8 секунд максимум ждем ответа
 
-// Список доменов, которые НЕ кешируем
+// Хосты, которые не кешируем (ходят напрямую)
 const EXTERNAL_HOSTS = [
   'supabase.co',
   'googleapis.com',
@@ -19,38 +21,90 @@ function isExternal(url) {
 }
 
 function isChromeExtension(url) {
-  return url.protocol === 'chrome-extension:';
+  return url.protocol === 'chrome-extension:' || url.protocol === 'chrome:';
 }
 
-// Установка
-self.addEventListener('install', e => {
+function isApiRequest(url) {
+  return url.pathname.startsWith('/api/') || url.pathname.startsWith('/socket.io/');
+}
+
+// Фетч с таймаутом — спасает от зависаний
+function fetchWithTimeout(request, timeout) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), timeout);
+    fetch(request)
+      .then(res => { clearTimeout(timer); resolve(res); })
+      .catch(err => { clearTimeout(timer); reject(err); });
+  });
+}
+
+// === УСТАНОВКА ===
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
-// Активация — чистим старые кеши
+// === АКТИВАЦИЯ ===
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key))))
+    caches.keys().then(keys =>
+      Promise.all(
+        keys
+          .filter(key => key !== CACHE_STATIC && key !== CACHE_API)
+          .map(key => caches.delete(key))
+      )
+    )
   );
   e.waitUntil(clients.claim());
 });
 
-// Перехват запросов — ВСЁ через сеть
+// === ПЕРЕХВАТ ЗАПРОСОВ ===
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  
-  // Пропускаем внешние ресурсы
+
+  // Пропускаем внешние запросы
   if (isExternal(url)) return;
-  
+
   // Пропускаем расширения Chrome
   if (isChromeExtension(url)) return;
-  
-  // ВСЁ через сеть, без блокировок
+
+  // Только GET-запросы кешируем
+  if (e.request.method !== 'GET') return;
+
+  // --- API запросы: NetworkFirst (с таймаутом) ---
+  if (isApiRequest(url)) {
+    e.respondWith(
+      fetchWithTimeout(e.request, FETCH_TIMEOUT)
+        .then(response => {
+          // Кешируем свежий ответ
+          const clone = response.clone();
+          caches.open(CACHE_API).then(cache => cache.put(e.request, clone));
+          return response;
+        })
+        .catch(() => {
+          // Если сеть не ответила — пробуем кеш
+          return caches.match(e.request).then(cached => {
+            return cached || new Response(
+              JSON.stringify({ error: 'API offline' }),
+              { status: 503, headers: { 'Content-Type': 'application/json' } }
+            );
+          });
+        })
+    );
+    return;
+  }
+
+  // --- Статика: StaleWhileRevalidate ---
   e.respondWith(
-    fetch(e.request).catch(() => {
-      return caches.match(e.request).then(cached => {
-        return cached || new Response('Offline', { status: 503 });
-      });
+    caches.match(e.request).then(cached => {
+      const fetchPromise = fetchWithTimeout(e.request, FETCH_TIMEOUT)
+        .then(response => {
+          const clone = response.clone();
+          caches.open(CACHE_STATIC).then(cache => cache.put(e.request, clone));
+          return response;
+        })
+        .catch(() => null);
+
+      return cached || fetchPromise;
     })
   );
 });
