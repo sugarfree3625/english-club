@@ -19,13 +19,13 @@ export default defineConfig({
     },
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['vue', 'vue-router', 'axios'],
-          ui: ['lucide-vue-next', 'animejs'],
-          editor: ['quill'],
-          calendar: ['@fullcalendar/core', '@fullcalendar/daygrid', '@fullcalendar/interaction', '@fullcalendar/vue3'],
-          supabase: ['@supabase/supabase-js'],
-          three: ['three']
+        manualChunks(id) {
+          if (id.includes('node_modules/vue') || id.includes('node_modules/vue-router') || id.includes('node_modules/axios')) return 'vendor';
+          if (id.includes('node_modules/lucide') || id.includes('node_modules/animejs')) return 'ui';
+          if (id.includes('node_modules/quill')) return 'editor';
+          if (id.includes('node_modules/@fullcalendar')) return 'calendar';
+          if (id.includes('node_modules/@supabase')) return 'supabase';
+          if (id.includes('node_modules/three')) return 'three';
         }
       }
     },
