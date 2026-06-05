@@ -1,4 +1,4 @@
-const CACHE = 'engclub-v5';
+const CACHE = 'engclub-v6';
 
 // Список доменов, которые НЕ кешируем
 const EXTERNAL_HOSTS = [
@@ -18,37 +18,24 @@ function isExternal(url) {
   return EXTERNAL_HOSTS.some(host => url.hostname.includes(host));
 }
 
-function isApi(url) {
-  return url.pathname.startsWith('/api/');
-}
-
 function isChromeExtension(url) {
   return url.protocol === 'chrome-extension:';
 }
 
-// Установка — только сбрасываем старый кеш
+// Установка
 self.addEventListener('install', e => {
   self.skipWaiting();
-  e.waitUntil(
-    caches.open(CACHE).then(cache => {
-      return cache.addAll(['/', '/index.html', '/manifest.json']);
-    })
-  );
 });
 
 // Активация — чистим старые кеши
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(keys => {
-      return Promise.all(
-        keys.filter(key => key !== CACHE).map(key => caches.delete(key))
-      );
-    })
+    caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key))))
   );
   e.waitUntil(clients.claim());
 });
 
-// Перехват запросов
+// Перехват запросов — ВСЁ через сеть
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   
@@ -58,24 +45,12 @@ self.addEventListener('fetch', e => {
   // Пропускаем расширения Chrome
   if (isChromeExtension(url)) return;
   
-  // API — только сеть
-  if (isApi(url)) {
-    e.respondWith(fetch(e.request));
-    return;
-  }
-  
-  // Локальные файлы — сеть, потом кеш (НЕ БЛОКИРУЕМ)
+  // ВСЁ через сеть, без блокировок
   e.respondWith(
-    fetch(e.request).then(response => {
-      // Кешируем успешные ответы
-      if (response && response.status === 200) {
-        const clone = response.clone();
-        caches.open(CACHE).then(cache => cache.put(e.request, clone));
-      }
-      return response;
-    }).catch(() => {
-      // Если сети нет — пробуем кеш
-      return caches.match(e.request);
+    fetch(e.request).catch(() => {
+      return caches.match(e.request).then(cached => {
+        return cached || new Response('Offline', { status: 503 });
+      });
     })
   );
 });
