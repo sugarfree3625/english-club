@@ -40,6 +40,7 @@
               <div v-if="menuOpen" class="dropdown">
                 <a @click="$router.push('/calendar');menuOpen=false"><i class="fas fa-calendar"></i> {{ t('calendar') }}</a>
                 <a @click="$router.push('/messages');menuOpen=false"><i class="fas fa-comments"></i> {{ t('messages') }}</a>
+                <a @click="$router.push('/groups');menuOpen=false"><i class="fas fa-users"></i> Группы</a>
                 <a @click="$router.push('/dashboard');menuOpen=false"><i class="fas fa-chart-line"></i> {{ t('dashboard') }}</a>
                 <a @click="$router.push('/profile');menuOpen=false"><i class="fas fa-user"></i> {{ t('profile') }}</a>
                 <a @click="$router.push('/about');menuOpen=false"><i class="fas fa-info-circle"></i> О нас</a>
@@ -146,7 +147,6 @@ export default {
     }; 
   },
   mounted() {
-    // Ленивая загрузка для всех lazy-img
     this.$nextTick(() => {
       document.querySelectorAll('.lazy-img').forEach(img => this.observe(img));
     });
