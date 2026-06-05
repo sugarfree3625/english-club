@@ -42,7 +42,7 @@
                 <a @click="$router.push('/messages');menuOpen=false"><i class="fas fa-comments"></i> {{ t('messages') }}</a>
                 <a @click="$router.push('/dashboard');menuOpen=false"><i class="fas fa-chart-line"></i> {{ t('dashboard') }}</a>
                 <a @click="$router.push('/profile');menuOpen=false"><i class="fas fa-user"></i> {{ t('profile') }}</a>
-                <a @click="$router.push('/about');menuOpen=false"><i class="fas fa-info-circle"></i> {{ t('about') || 'О нас' }}</a>
+                <a @click="$router.push('/about');menuOpen=false"><i class="fas fa-info-circle"></i> О нас</a>
                 <a @click="showPricing = true; menuOpen=false" v-if="user?.role === 'admin'"><i class="fas fa-crown"></i> Тарифы</a>
                 <a @click="$router.push('/admin');menuOpen=false" v-if="user?.role === 'admin'"><i class="fas fa-sliders-h"></i> {{ t('admin') }}</a>
                 <a @click="logout();menuOpen=false"><i class="fas fa-sign-out-alt"></i> {{ t('logout') }}</a>
@@ -82,16 +82,12 @@
         <div class="onboarding-progress">
           <div v-for="(step, i) in onboardingSteps" :key="i" class="onboarding-dot" :class="{ active: i === currentOnboardingStep, done: i < currentOnboardingStep }"></div>
         </div>
-        <div class="onboarding-icon-wrap">
-          <span class="onboarding-icon">{{ onboardingSteps[currentOnboardingStep].icon }}</span>
-        </div>
+        <div class="onboarding-icon-wrap"><span class="onboarding-icon">{{ onboardingSteps[currentOnboardingStep].icon }}</span></div>
         <h2 class="onboarding-title">{{ onboardingSteps[currentOnboardingStep].title }}</h2>
         <p class="onboarding-text">{{ onboardingSteps[currentOnboardingStep].text }}</p>
         <div class="onboarding-actions">
           <button v-if="currentOnboardingStep > 0" class="onboarding-btn secondary" @click="currentOnboardingStep--">← Назад</button>
-          <button class="onboarding-btn primary" @click="nextOnboardingStep">
-            {{ currentOnboardingStep < onboardingSteps.length - 1 ? 'Далее' : '🎉 Начать!' }}
-          </button>
+          <button class="onboarding-btn primary" @click="nextOnboardingStep">{{ currentOnboardingStep < onboardingSteps.length - 1 ? 'Далее' : '🎉 Начать!' }}</button>
         </div>
         <button class="onboarding-skip" @click="skipOnboarding">Пропустить</button>
       </div>
@@ -119,6 +115,7 @@ import XPFloating from './components/XPFloating.vue';
 import Preloader from './components/Preloader.vue';
 import NotificationBell from './components/NotificationBell.vue';
 import { useI18n } from './composables/useI18n';
+import { useLazyLoad } from './composables/useLazyLoad';
 import { playClick, playSuccess, playError } from './composables/useSound';
 
 export default {
@@ -126,7 +123,8 @@ export default {
   components: { ScrollToTop, WelcomeModal, PricingModal, ParticlesBackground, XPFloating, Preloader, NotificationBell },
   setup() {
     const { locale, t, toggleLocale } = useI18n();
-    return { locale, t, toggleLocale };
+    const { observe } = useLazyLoad();
+    return { locale, t, toggleLocale, observe };
   },
   data() { 
     return { 
@@ -146,6 +144,12 @@ export default {
         { icon: '🚀', title: 'Ты готов!', text: 'Запишись на занятие, добавь слова или напиши в чат. Удачи!' }
       ]
     }; 
+  },
+  mounted() {
+    // Ленивая загрузка для всех lazy-img
+    this.$nextTick(() => {
+      document.querySelectorAll('.lazy-img').forEach(img => this.observe(img));
+    });
   },
   methods: {
     addToast(m, type='info', d=3000) { const id = ++this.toastId; this.toasts.push({ id, message: m, type }); if (type === 'success') playSuccess(); else if (type === 'error') playError(); else playClick(); setTimeout(() => this.removeToast(id), d); },
@@ -192,6 +196,17 @@ body { background: var(--bg); color: var(--t); font-family: 'Inter', 'Plus Jakar
 .theme-btn { position: relative; overflow: hidden; } .theme-icon-wrapper { display: inline-block; transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
 .theme-icon-wrapper.rotating { animation: themeSpin 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
 @keyframes themeSpin { 0% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(180deg) scale(1.3); } 100% { transform: rotate(360deg) scale(1); } }
+
+/* ✨ АНИМАЦИИ КНОПОК */
+.btn { transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.2); }
+.btn:active { transform: scale(0.96) !important; }
+.btn:disabled { transform: none !important; box-shadow: none !important; opacity: 0.5; }
+.btn.ripple { position: relative; overflow: hidden; }
+.btn.ripple::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle, rgba(255,255,255,0.3) 10%, transparent 60%); opacity: 0; transition: opacity 0.3s; }
+.btn.ripple:active::after { opacity: 1; transition: 0s; }
+.btn-pulse { animation: btnPulse 2s infinite; }
+@keyframes btnPulse { 0%,100%{box-shadow:0 0 0 0 rgba(99,102,241,0.5)} 50%{box-shadow:0 0 0 15px rgba(99,102,241,0)} }
 
 /* 🎓 ОНБОРДИНГ */
 .onboarding-overlay { position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,0.85); backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: center; padding: 20px; }
