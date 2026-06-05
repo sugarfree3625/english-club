@@ -182,6 +182,7 @@ export default {
     ];},
     quickActions() { return [
       { emoji: '💬', label: 'Чат', handler: () => this.$router.push('/messages') },
+      { emoji: '👥', label: 'Группы', handler: () => this.$router.push('/groups') },
       { emoji: '📅', label: 'Встречи', handler: () => this.$router.push('/calendar') },
       { emoji: '🏆', label: 'Достижения', handler: this.goToAchievements },
       { emoji: '📚', label: 'Словарь', handler: () => this.goToProfile('words') },
