@@ -7,7 +7,7 @@
     @paste="onPaste"
     @keydown="onKeydown"
     tabindex="0"
-  >
+>
     <canvas ref="canvasRef" :width="canvasWidth" :height="canvasHeight"></canvas>
     
     <!-- Стикеры -->
