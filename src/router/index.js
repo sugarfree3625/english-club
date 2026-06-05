@@ -12,6 +12,7 @@ import FullCalendar from '../views/FullCalendar.vue';
 import AboutPage from '../views/AboutPage.vue';
 import TeacherLanding from '../views/TeacherLanding.vue';
 import AnalyticsPage from '../views/AnalyticsPage.vue';
+import WhiteboardPage from '../views/WhiteboardPage.vue';
 
 const routes = [
   { path: '/', component: Home },
@@ -19,6 +20,7 @@ const routes = [
   { path: '/dashboard', component: DashboardPage, meta: { requiresAuth: true } },
   { path: '/profile', component: ProfilePage, meta: { requiresAuth: true } },
   { path: '/messages', component: MessagesPage, meta: { requiresAuth: true } },
+  { path: '/whiteboard', component: WhiteboardPage, meta: { requiresAuth: true } },
   { path: '/groups', component: GroupChatPage, meta: { requiresAuth: true } },
   { path: '/admin', component: SiteEditor, meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/reset-password', component: ResetPassword },
