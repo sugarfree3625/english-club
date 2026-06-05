@@ -75,13 +75,11 @@ self.addEventListener('fetch', e => {
     e.respondWith(
       fetchWithTimeout(e.request, FETCH_TIMEOUT)
         .then(response => {
-          // Кешируем свежий ответ
           const clone = response.clone();
           caches.open(CACHE_API).then(cache => cache.put(e.request, clone));
           return response;
         })
         .catch(() => {
-          // Если сеть не ответила — пробуем кеш
           return caches.match(e.request).then(cached => {
             return cached || new Response(
               JSON.stringify({ error: 'API offline' }),
