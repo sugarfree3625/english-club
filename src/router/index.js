@@ -11,6 +11,7 @@ import SiteEditor from '../views/SiteEditor.vue';
 import FullCalendar from '../views/FullCalendar.vue';
 import AboutPage from '../views/AboutPage.vue';
 import TeacherLanding from '../views/TeacherLanding.vue';
+import AnalyticsPage from '../views/AnalyticsPage.vue';
 
 const routes = [
   { path: '/', component: Home },
@@ -24,6 +25,7 @@ const routes = [
   { path: '/calendar', component: FullCalendar, meta: { requiresAuth: true } },
   { path: '/about', component: AboutPage },
   { path: '/teacher', component: TeacherLanding },
+  { path: '/analytics', component: AnalyticsPage, meta: { requiresAuth: true } },
   { path: '/:pathMatch(.*)*', component: NotFound }
 ];
 
