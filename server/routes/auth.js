@@ -1,5 +1,6 @@
 const bcrypt = require('bcrypt');
-const { auth } = require('../middleware/auth');  // <-- ИСПРАВЛЕНО: деструктуризация
+const { auth } = require('../middleware/auth');
+const { sendEmail, templates } = require('../utils/mailer');
 
 module.exports = (app, supabase) => {
   const { notifyUser, updateRating } = require('../utils/telegram');
@@ -15,26 +16,38 @@ module.exports = (app, supabase) => {
     }
   }
 
+  // 📧 РЕГИСТРАЦИЯ С EMAIL
   app.post('/api/reg', async (req, res) => {
-    const { username, email, password, level } = req.body;
-    const { data: exists } = await supabase.from('users').select('id').eq('email', email).single();
-    if (exists) return res.status(400).json({ error: 'Email занят' });
-    const hash = await bcrypt.hash(password, 10);
-    const { data: newUser } = await supabase.from('users').insert({ username, email, password: hash, level: level || 'B1' }).select('id').single();
-    if (newUser) ensureTutorChat(newUser.id);
-    res.json({ success: true });
+    try {
+      const { username, email, password, level } = req.body;
+      const { data: exists } = await supabase.from('users').select('id').eq('email', email).single();
+      if (exists) return res.status(400).json({ error: 'Email занят' });
+      
+      const hash = await bcrypt.hash(password, 10);
+      const { data: newUser } = await supabase.from('users').insert({ username, email, password: hash, level: level || 'B1' }).select('id').single();
+      
+      if (newUser) {
+        ensureTutorChat(newUser.id);
+        // 📧 Отправляем приветственное письмо
+        sendEmail({ to: email, ...templates.welcome(username) }).catch(() => {});
+      }
+      
+      res.json({ success: true });
+    } catch(e) {
+      console.error('Reg error:', e);
+      res.status(500).json({ error: 'Ошибка регистрации' });
+    }
   });
 
-  // Вход с JWT токеном
+  // 🔐 ВХОД С JWT
   app.post('/api/login', async (req, res) => {
     try {
-      const { email, password } = req.body;  // Фронтенд шлёт email
+      const { email, password } = req.body;
       
       if (!email || !password) {
         return res.status(400).json({ error: 'Заполните все поля' });
       }
       
-      // Ищем пользователя по email
       const { data: user, error } = await supabase
         .from('users')
         .select('*')
@@ -45,9 +58,7 @@ module.exports = (app, supabase) => {
         return res.status(401).json({ error: 'Неверный логин или пароль' });
       }
       
-      // Проверяем пароль (поддерживаем и хэшированные, и обычные)
       let validPassword = false;
-      
       if (user.password && user.password.startsWith('$2')) {
         validPassword = await bcrypt.compare(password, user.password);
       } else {
@@ -58,15 +69,12 @@ module.exports = (app, supabase) => {
         return res.status(401).json({ error: 'Неверный логин или пароль' });
       }
       
-      // Генерируем JWT токен
       const { generateToken } = require('../middleware/auth');
       const token = generateToken(user.id, user.role);
       
-      // Сохраняем в сессии
       req.session.userId = user.id;
       req.session.role = user.role;
       
-      // Не отправляем пароль клиенту
       const { password: _, ...userWithoutPassword } = user;
       
       res.json({ user: userWithoutPassword, token });
