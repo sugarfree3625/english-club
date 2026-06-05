@@ -42,6 +42,7 @@
                 <a @click="$router.push('/messages');menuOpen=false"><i class="fas fa-comments"></i> {{ t('messages') }}</a>
                 <a @click="$router.push('/groups');menuOpen=false"><i class="fas fa-users"></i> Группы</a>
                 <a @click="$router.push('/dashboard');menuOpen=false"><i class="fas fa-chart-line"></i> {{ t('dashboard') }}</a>
+                <a @click="$router.push('/whiteboard');menuOpen=false"><i class="fas fa-chalkboard"></i> Доска</a>
                 <a @click="$router.push('/profile');menuOpen=false"><i class="fas fa-user"></i> {{ t('profile') }}</a>
                 <a @click="$router.push('/about');menuOpen=false"><i class="fas fa-info-circle"></i> О нас</a>
                 <a @click="showPricing = true; menuOpen=false" v-if="user?.role === 'admin'"><i class="fas fa-crown"></i> Тарифы</a>
