@@ -9,6 +9,8 @@ import Welcome from '../views/Welcome.vue';
 import ResetPassword from '../views/ResetPassword.vue';
 import SiteEditor from '../views/SiteEditor.vue';
 import FullCalendar from '../views/FullCalendar.vue';
+import AboutPage from '../views/AboutPage.vue';
+import TeacherLanding from '../views/TeacherLanding.vue';
 
 const routes = [
   { path: '/', component: Home },
@@ -20,6 +22,8 @@ const routes = [
   { path: '/admin', component: SiteEditor, meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/reset-password', component: ResetPassword },
   { path: '/calendar', component: FullCalendar, meta: { requiresAuth: true } },
+  { path: '/about', component: AboutPage },
+  { path: '/teacher', component: TeacherLanding },
   { path: '/:pathMatch(.*)*', component: NotFound }
 ];
 
