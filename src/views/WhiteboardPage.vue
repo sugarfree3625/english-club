@@ -6,7 +6,7 @@
       <h3>🎨 Интерактивная доска</h3>
       <div class="wb-header-right">
         <span class="wb-users" v-if="usersOnline > 1">👥 {{ usersOnline }}</span>
-        <button class="btn btn-o btn-sm" @click="jitsiActive = !jitsiActive">📹 {{ jitsiActive ? 'Скрыть звонок' : 'Видеозвонок' }}</button>
+        <button class="btn btn-o btn-sm" @click="jitsiActive = !jitsiActive">📹 {{ jitsiActive ? 'Скрыть' : 'Звонок' }}</button>
         <button class="btn btn-o btn-sm" @click="shareLink">🔗 Поделиться</button>
       </div>
     </div>
@@ -37,8 +37,10 @@
         ref="canvasRef"
         :activeTool="activeTool" :color="color" :lineWidth="lineWidth"
         :darkMode="darkMode" :showGrid="showGrid" :zoom="zoom"
+        :socket="socket"
         @update:zoom="zoom = $event"
-        @save-board="saveBoard"
+        @draw-data="sendDrawData"
+        @cursor-move="sendCursorMove"
         style="flex:1"
       />
       
@@ -51,7 +53,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { io } from 'socket.io-client';
 import WhiteboardToolbar from '../components/whiteboard/WhiteboardToolbar.vue';
 import WhiteboardCanvas from '../components/whiteboard/WhiteboardCanvas.vue';
 
@@ -67,7 +70,64 @@ const historyLength = ref(1);
 const historyIndex = ref(0);
 const canvasRef = ref(null);
 
-const jitsiUrl = ref(`https://meet.jit.si/english-club-whiteboard-${Date.now()}`);
+const socket = ref(null);
+const roomId = ref('room-' + Date.now());
+const userName = ref('User' + Math.floor(Math.random() * 1000));
+const userColor = ref('#' + Math.floor(Math.random() * 16777215).toString(16));
+
+const jitsiUrl = ref(`https://meet.jit.si/english-club-whiteboard-${roomId.value}`);
+
+// WebSocket
+onMounted(() => {
+  socket.value = io('https://english-club-v1.onrender.com', { 
+    transports: ['websocket', 'polling'] 
+  });
+  
+  socket.value.emit('join-whiteboard', {
+    roomId: roomId.value,
+    userName: userName.value,
+    userColor: userColor.value
+  });
+  
+  socket.value.on('user-joined', (data) => {
+    usersOnline.value = data.count;
+  });
+  
+  socket.value.on('user-left', (data) => {
+    usersOnline.value = data.count;
+  });
+  
+  socket.value.on('draw-data', (data) => {
+    canvasRef.value?.remoteDraw(data);
+  });
+  
+  socket.value.on('cursor-move', (data) => {
+    canvasRef.value?.updateRemoteCursor(data);
+  });
+  
+  socket.value.on('board-updated', (data) => {
+    canvasRef.value?.loadBoardData(data);
+  });
+});
+
+const sendDrawData = (type, data) => {
+  socket.value?.emit('draw', {
+    roomId: roomId.value,
+    type,
+    data,
+    color: userColor.value,
+    userName: userName.value
+  });
+};
+
+const sendCursorMove = (x, y) => {
+  socket.value?.emit('cursor', {
+    roomId: roomId.value,
+    x, y,
+    color: userColor.value,
+    name: userName.value
+  });
+};
 
 const shareLink = () => {
   navigator.clipboard?.writeText(window.location.href);
@@ -75,9 +135,16 @@ const shareLink = () => {
 
 const saveBoard = async () => {
   const data = canvasRef.value?.getBoardData();
-  console.log('💾 Сохраняем:', data);
-  // Тут сохранение в Supabase
+  socket.value?.emit('save-board', {
+    roomId: roomId.value,
+    data
+  });
+  console.log('💾 Доска сохранена!');
 };
+
+onBeforeUnmount(() => {
+  socket.value?.disconnect();
+});
 </script>
 
 <style scoped>
