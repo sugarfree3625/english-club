@@ -6,7 +6,7 @@
     @dragover.prevent @drop.prevent="onDrop"
     @paste="onPaste"
     @keydown="onKeydown"
-    tabindex="0" ref="wrapRef"
+    tabindex="0"
   >
     <canvas ref="canvasRef" :width="canvasWidth" :height="canvasHeight"></canvas>
     
@@ -55,24 +55,12 @@ function saveState() {
   emit('update:historyIndex', historyIndex);
 }
 
-function undo() {
-  if (historyIndex <= 0) return;
-  historyIndex--;
-  restoreState();
-}
-
-function redo() {
-  if (historyIndex >= history.length - 1) return;
-  historyIndex++;
-  restoreState();
-}
+function undo() { if (historyIndex <= 0) return; historyIndex--; restoreState(); }
+function redo() { if (historyIndex >= history.length - 1) return; historyIndex++; restoreState(); }
 
 function restoreState() {
   const img = new Image();
-  img.onload = () => {
-    ctx.clearRect(0, 0, canvasWidth.value, canvasHeight.value);
-    ctx.drawImage(img, 0, 0);
-  };
+  img.onload = () => { ctx.clearRect(0, 0, canvasWidth.value, canvasHeight.value); ctx.drawImage(img, 0, 0); };
   img.src = history[historyIndex];
 }
 
@@ -80,9 +68,6 @@ function restoreState() {
 let isDrawing = false;
 let startX = 0, startY = 0;
 let currentX = 0, currentY = 0;
-let startObject = null;
-
-// Фигуры и объекты
 let objects = [];
 let selectedObject = null;
 let isDragging = false;
@@ -94,23 +79,12 @@ const otherUsers = ref([]);
 
 function getPos(e) {
   const rect = canvasRef.value.getBoundingClientRect();
-  const scaleX = canvasWidth.value / rect.width;
-  const scaleY = canvasHeight.value / rect.height;
-  return {
-    x: (e.clientX - rect.left) * scaleX,
-    y: (e.clientY - rect.top) * scaleY
-  };
+  return { x: (e.clientX - rect.left) * (canvasWidth.value / rect.width), y: (e.clientY - rect.top) * (canvasHeight.value / rect.height) };
 }
-
 function getTouchPos(e) {
-  const touch = e.touches[0] || e.changedTouches[0];
+  const t = e.touches[0] || e.changedTouches[0];
   const rect = canvasRef.value.getBoundingClientRect();
-  const scaleX = canvasWidth.value / rect.width;
-  const scaleY = canvasHeight.value / rect.height;
-  return {
-    x: (touch.clientX - rect.left) * scaleX,
-    y: (touch.clientY - rect.top) * scaleY
-  };
+  return { x: (t.clientX - rect.left) * (canvasWidth.value / rect.width), y: (t.clientY - rect.top) * (canvasHeight.value / rect.height) };
 }
 
 function onMouseDown(e) { startDraw(getPos(e)); }
@@ -121,130 +95,48 @@ function onTouchMove(e) { draw(getTouchPos(e)); }
 function onTouchEnd() { stopDraw(); }
 
 function startDraw(pos) {
-  if (props.activeTool === 'laser') {
-    laserPos.value = pos;
-    return;
-  }
-  
-  isDrawing = true;
-  startX = pos.x;
-  startY = pos.y;
-  
+  if (props.activeTool === 'laser') { laserPos.value = pos; return; }
+  isDrawing = true; startX = pos.x; startY = pos.y;
   if (props.activeTool === 'select') {
-    // Проверяем клик по объекту
     const clicked = findObjectAt(pos.x, pos.y);
-    if (clicked) {
-      selectedObject = clicked;
-      isDragging = true;
-      dragOffsetX = pos.x - clicked.x;
-      dragOffsetY = pos.y - clicked.y;
-      return;
-    }
+    if (clicked) { selectedObject = clicked; isDragging = true; dragOffsetX = pos.x - clicked.x; dragOffsetY = pos.y - clicked.y; return; }
     selectedObject = null;
   }
-  
   if (props.activeTool === 'text') {
     const text = prompt('Введите текст:');
-    if (text) {
-      objects.push({ type: 'text', x: pos.x, y: pos.y, text, color: props.color, size: 20 });
-      redrawAll();
-      saveState();
-    }
-    isDrawing = false;
-    return;
+    if (text) { objects.push({ type: 'text', x: pos.x, y: pos.y, text, color: props.color, size: 20 }); redrawAll(); saveState(); }
+    isDrawing = false; return;
   }
-  
-  if (props.activeTool === 'sticker') {
-    stickers.value.push({ id: Date.now(), emoji: '😊', x: pos.x - 20, y: pos.y - 20, size: 40 });
-    return;
-  }
-  
-  if (['pen','brush','highlighter','eraser'].includes(props.activeTool)) {
-    ctx.beginPath();
-    ctx.moveTo(pos.x, pos.y);
-  }
-  
-  startObject = { type: props.activeTool, x: pos.x, y: pos.y };
+  if (props.activeTool === 'sticker') { stickers.value.push({ id: Date.now(), emoji: '😊', x: pos.x - 20, y: pos.y - 20, size: 40 }); return; }
+  if (['pen','brush','highlighter','eraser'].includes(props.activeTool)) { ctx.beginPath(); ctx.moveTo(pos.x, pos.y); }
 }
 
 function draw(pos) {
-  currentX = pos.x;
-  currentY = pos.y;
-  
-  if (props.activeTool === 'laser') {
-    laserPos.value = pos;
-    setTimeout(() => { laserPos.value = null; }, 200);
-    return;
-  }
-  
+  currentX = pos.x; currentY = pos.y;
+  if (props.activeTool === 'laser') { laserPos.value = pos; setTimeout(() => { laserPos.value = null; }, 200); return; }
   if (!isDrawing) return;
-  
-  if (isDragging && selectedObject) {
-    selectedObject.x = pos.x - dragOffsetX;
-    selectedObject.y = pos.y - dragOffsetY;
-    redrawAll();
-    return;
-  }
-  
+  if (isDragging && selectedObject) { selectedObject.x = pos.x - dragOffsetX; selectedObject.y = pos.y - dragOffsetY; redrawAll(); return; }
   if (['pen','brush','highlighter'].includes(props.activeTool)) {
     ctx.strokeStyle = props.activeTool === 'highlighter' ? props.color + '40' : props.color;
     ctx.lineWidth = props.activeTool === 'brush' ? props.lineWidth * 2 : props.lineWidth;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.lineTo(pos.x, pos.y);
-    ctx.stroke();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.globalCompositeOperation = 'source-over';
+    ctx.lineTo(pos.x, pos.y); ctx.stroke();
   }
-  
-  if (props.activeTool === 'eraser') {
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.lineWidth = props.lineWidth * 3;
-    ctx.lineCap = 'round';
-    ctx.lineTo(pos.x, pos.y);
-    ctx.stroke();
-  }
-  
-  // Предпросмотр фигур
-  if (['rect','circle','line','arrow','triangle','star'].includes(props.activeTool)) {
-    redrawAll();
-    drawShapePreview(ctx, startObject.type, startX, startY, pos.x, pos.y, props.color, props.lineWidth);
-  }
+  if (props.activeTool === 'eraser') { ctx.globalCompositeOperation = 'destination-out'; ctx.lineWidth = props.lineWidth * 3; ctx.lineCap = 'round'; ctx.lineTo(pos.x, pos.y); ctx.stroke(); }
+  if (['rect','circle','line','arrow','triangle','star'].includes(props.activeTool)) { redrawAll(); drawShapePreview(ctx, props.activeTool, startX, startY, pos.x, pos.y, props.color, props.lineWidth); }
 }
 
 function stopDraw() {
   if (['rect','circle','line','arrow','triangle','star'].includes(props.activeTool) && isDrawing) {
-    objects.push({
-      type: props.activeTool,
-      x: Math.min(startX, currentX),
-      y: Math.min(startY, currentY),
-      w: Math.abs(currentX - startX),
-      h: Math.abs(currentY - startY),
-      x1: startX, y1: startY, x2: currentX, y2: currentY,
-      color: props.color,
-      lineWidth: props.lineWidth
-    });
-    redrawAll();
-    saveState();
+    objects.push({ type: props.activeTool, x: Math.min(startX, currentX), y: Math.min(startY, currentY), w: Math.abs(currentX - startX), h: Math.abs(currentY - startY), color: props.color, lineWidth: props.lineWidth });
+    redrawAll(); saveState();
   }
-  
-  if (['pen','brush','highlighter','eraser'].includes(props.activeTool) && isDrawing) {
-    saveState();
-  }
-  
-  isDrawing = false;
-  isDragging = false;
-  laserPos.value = null;
-  
-  if (selectedObject && !isDragging) {
-    saveState();
-  }
+  if (['pen','brush','highlighter','eraser'].includes(props.activeTool) && isDrawing) saveState();
+  isDrawing = false; isDragging = false; laserPos.value = null;
 }
 
 function drawShapePreview(ctx, type, x, y, x2, y2, color, lw) {
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color + '20';
-  ctx.lineWidth = lw;
-  
+  ctx.strokeStyle = color; ctx.fillStyle = color + '20'; ctx.lineWidth = lw;
   switch(type) {
     case 'rect': ctx.strokeRect(x, y, x2 - x, y2 - y); break;
     case 'circle': ctx.beginPath(); ctx.ellipse(x + (x2-x)/2, y + (y2-y)/2, Math.abs(x2-x)/2, Math.abs(y2-y)/2, 0, 0, Math.PI*2); ctx.stroke(); break;
@@ -256,31 +148,19 @@ function drawShapePreview(ctx, type, x, y, x2, y2, color, lw) {
 }
 
 function drawArrow(ctx, x1, y1, x2, y2) {
-  const head = 10;
-  const angle = Math.atan2(y2 - y1, x2 - x1);
-  ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(x2, y2);
+  const head = 10, angle = Math.atan2(y2 - y1, x2 - x1);
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x2, y2);
   ctx.lineTo(x2 - head * Math.cos(angle - Math.PI/6), y2 - head * Math.sin(angle - Math.PI/6));
   ctx.lineTo(x2 - head * Math.cos(angle + Math.PI/6), y2 - head * Math.sin(angle + Math.PI/6));
-  ctx.closePath();
-  ctx.fill();
+  ctx.closePath(); ctx.fill();
 }
 
 function drawStar(ctx, cx, cy, spikes, outerR, innerR) {
   let rot = Math.PI / 2 * 3, step = Math.PI / spikes;
   ctx.beginPath();
-  for (let i = 0; i < spikes; i++) {
-    ctx.lineTo(cx + Math.cos(rot) * outerR, cy + Math.sin(rot) * outerR);
-    rot += step;
-    ctx.lineTo(cx + Math.cos(rot) * innerR, cy + Math.sin(rot) * innerR);
-    rot += step;
-  }
-  ctx.closePath();
-  ctx.stroke();
+  for (let i = 0; i < spikes; i++) { ctx.lineTo(cx + Math.cos(rot) * outerR, cy + Math.sin(rot) * outerR); rot += step; ctx.lineTo(cx + Math.cos(rot) * innerR, cy + Math.sin(rot) * innerR); rot += step; }
+  ctx.closePath(); ctx.stroke();
 }
 
 function findObjectAt(x, y) {
@@ -295,153 +175,72 @@ function redrawAll() {
   ctx.clearRect(0, 0, canvasWidth.value, canvasHeight.value);
   drawGrid();
   objects.forEach(o => {
-    if (o.type === 'text') {
-      ctx.fillStyle = o.color;
-      ctx.font = `${o.size}px Inter`;
-      ctx.fillText(o.text, o.x, o.y);
-    } else {
-      drawShapePreview(ctx, o.type, o.x, o.y, o.x + (o.w||0), o.y + (o.h||0), o.color, o.lineWidth);
-    }
+    if (o.type === 'text') { ctx.fillStyle = o.color; ctx.font = `${o.size}px Inter`; ctx.fillText(o.text, o.x, o.y); }
+    else if (o.type === 'image') { const img = new Image(); img.src = o.src; ctx.drawImage(img, o.x, o.y, o.w, o.h); }
+    else { drawShapePreview(ctx, o.type, o.x, o.y, o.x + (o.w||0), o.y + (o.h||0), o.color, o.lineWidth); }
   });
-  if (selectedObject) {
-    ctx.strokeStyle = '#6366f1';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 5]);
-    ctx.strokeRect(selectedObject.x - 5, selectedObject.y - 5, (selectedObject.w || 100) + 10, (selectedObject.h || 30) + 10);
-    ctx.setLineDash([]);
-  }
+  if (selectedObject) { ctx.strokeStyle = '#6366f1'; ctx.lineWidth = 2; ctx.setLineDash([5,5]); ctx.strokeRect(selectedObject.x-5, selectedObject.y-5, (selectedObject.w||100)+10, (selectedObject.h||30)+10); ctx.setLineDash([]); }
 }
 
 function drawGrid() {
   if (!props.showGrid) return;
-  ctx.strokeStyle = props.darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = props.darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)'; ctx.lineWidth = 1;
   for (let i = 0; i < canvasWidth.value; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvasHeight.value); ctx.stroke(); }
   for (let i = 0; i < canvasHeight.value; i += 40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvasWidth.value, i); ctx.stroke(); }
 }
 
-// ========== МАСШТАБ ==========
-function onWheel(e) {
-  const newZoom = Math.min(300, Math.max(10, props.zoom + (e.deltaY > 0 ? -10 : 10)));
-  emit('update:zoom', newZoom);
-}
+function onWheel(e) { emit('update:zoom', Math.min(300, Math.max(10, props.zoom + (e.deltaY > 0 ? -10 : 10)))); }
 
-// ========== DRAG & DROP КАРТИНОК ==========
 function onDrop(e) {
   const file = e.dataTransfer.files[0];
   if (file?.type.startsWith('image/')) {
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      const img = new Image();
-      img.onload = () => {
-        objects.push({ type: 'image', x: currentX, y: currentY, w: img.width, h: img.height, src: ev.target.result });
-        redrawAll();
-        saveState();
-      };
-      img.src = ev.target.result;
-    };
+    reader.onload = (ev) => { const img = new Image(); img.onload = () => { objects.push({ type:'image', x:currentX, y:currentY, w:img.width, h:img.height, src:ev.target.result }); redrawAll(); saveState(); }; img.src = ev.target.result; };
     reader.readAsDataURL(file);
   }
 }
 
-// ========== ВСТАВКА ИЗ БУФЕРА ==========
 function onPaste(e) {
-  const items = e.clipboardData?.items;
-  for (const item of items || []) {
+  for (const item of e.clipboardData?.items||[]) {
     if (item.type.startsWith('image/')) {
-      const blob = item.getAsFile();
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const img = new Image();
-        img.onload = () => {
-          objects.push({ type: 'image', x: currentX, y: currentY, w: img.width, h: img.height, src: ev.target.result });
-          redrawAll();
-          saveState();
-        };
-        img.src = ev.target.result;
-      };
+      const blob = item.getAsFile(), reader = new FileReader();
+      reader.onload = (ev) => { const img = new Image(); img.onload = () => { objects.push({ type:'image', x:currentX, y:currentY, w:img.width, h:img.height, src:ev.target.result }); redrawAll(); saveState(); }; img.src = ev.target.result; };
       reader.readAsDataURL(blob);
     }
   }
 }
 
-// ========== КЛАВИШИ ==========
 function onKeydown(e) {
   if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); }
   if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo(); }
   if (e.ctrlKey && e.key === 'd') { e.preventDefault(); duplicateSelected(); }
   if (e.key === 'Delete') { e.preventDefault(); deleteSelected(); }
-  if (e.ctrlKey && e.key === 's') { e.preventDefault(); emit('save-board'); }
 }
 
-function deleteSelected() {
-  if (selectedObject) {
-    objects = objects.filter(o => o !== selectedObject);
-    selectedObject = null;
-    redrawAll();
-    saveState();
-  }
-}
+function deleteSelected() { if (selectedObject) { objects = objects.filter(o => o !== selectedObject); selectedObject = null; redrawAll(); saveState(); } }
+function duplicateSelected() { if (selectedObject) { objects.push({...selectedObject, x:selectedObject.x+20, y:selectedObject.y+20}); redrawAll(); saveState(); } }
+function clearAll() { objects = []; stickers.value = []; ctx.clearRect(0, 0, canvasWidth.value, canvasHeight.value); saveState(); }
+function getBoardData() { return { objects, stickers: stickers.value, width: canvasWidth.value, height: canvasHeight.value }; }
+function exportPNG() { const link = document.createElement('a'); link.download = 'whiteboard.png'; link.href = canvasRef.value.toDataURL(); link.click(); }
 
-function duplicateSelected() {
-  if (selectedObject) {
-    objects.push({ ...selectedObject, x: selectedObject.x + 20, y: selectedObject.y + 20 });
-    redrawAll();
-    saveState();
-  }
-}
-
-function clearAll() {
-  objects = [];
-  stickers.value = [];
-  ctx.clearRect(0, 0, canvasWidth.value, canvasHeight.value);
-  saveState();
-}
-
-function getBoardData() {
-  return { objects, stickers: stickers.value, width: canvasWidth.value, height: canvasHeight.value };
-}
-
-function exportPNG() {
-  const link = document.createElement('a');
-  link.download = 'whiteboard.png';
-  link.href = canvasRef.value.toDataURL();
-  link.click();
-}
-
-// ========== ИНИЦИАЛИЗАЦИЯ ==========
 onMounted(() => {
   ctx = canvasRef.value.getContext('2d');
   ctx.fillStyle = props.darkMode ? '#0b1120' : '#f8fafc';
   ctx.fillRect(0, 0, canvasWidth.value, canvasHeight.value);
-  drawGrid();
-  saveState();
+  drawGrid(); saveState();
 });
 
-watch(() => props.darkMode, () => {
-  ctx.fillStyle = props.darkMode ? '#0b1120' : '#f8fafc';
-  ctx.fillRect(0, 0, canvasWidth.value, canvasHeight.value);
-  redrawAll();
-});
+watch(() => props.darkMode, () => { ctx.fillStyle = props.darkMode ? '#0b1120' : '#f8fafc'; ctx.fillRect(0, 0, canvasWidth.value, canvasHeight.value); redrawAll(); });
 
 defineExpose({ undo, redo, clearAll, getBoardData, exportPNG, deleteSelected, duplicateSelected, objects, stickers });
 </script>
 
 <style scoped>
-.wb-canvas-wrap {
-  flex: 1; overflow: hidden; position: relative;
-  cursor: crosshair; outline: none; background: v-bind("darkMode ? '#0b1120' : '#f8fafc'");
-}
+.wb-canvas-wrap { flex: 1; overflow: hidden; position: relative; cursor: crosshair; outline: none; background: v-bind("darkMode ? '#0b1120' : '#f8fafc'"); }
 canvas { display: block; }
 .sticker-item { position: absolute; cursor: move; user-select: none; pointer-events: auto; transition: transform 0.1s; }
 .sticker-item:hover { transform: scale(1.2); }
-.laser-dot {
-  position: absolute; width: 8px; height: 8px;
-  background: red; border-radius: 50%;
-  box-shadow: 0 0 20px red; pointer-events: none;
-  animation: laserFade 0.5s forwards;
-  transform: translate(-50%, -50%);
-}
+.laser-dot { position: absolute; width: 8px; height: 8px; background: red; border-radius: 50%; box-shadow: 0 0 20px red; pointer-events: none; animation: laserFade 0.5s forwards; transform: translate(-50%, -50%); }
 @keyframes laserFade { to { opacity: 0; transform: translate(-50%, -50%) scale(2); } }
 .remote-cursor { position: absolute; pointer-events: none; z-index: 10; transition: all 0.1s; }
 .cursor-name { padding: 2px 8px; border-radius: 8px; color: #fff; font-size: 0.7rem; white-space: nowrap; }
